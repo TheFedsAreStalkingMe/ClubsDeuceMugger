@@ -34,6 +34,29 @@ const state = {
 
 // ---------------------------------------------------------------- DOM helpers
 
+// Tell the server which player you opened to attack, so the leaderboard can match it to a mug later.
+function trackAttack(targetId) {
+  try {
+    fetch("/api/clicks", {
+      method: "POST", keepalive: true, credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ target: Number(targetId) }),
+    }).catch(() => {});
+    localStorage.setItem("cdm.lastClick", String(Date.now()));
+  } catch { /* tracking is best effort */ }
+}
+
+// When you come back from Torn, quietly check for new mugs (at most every 2 minutes).
+async function syncLeaderboard() {
+  try {
+    if (!state.keys.torn || !localStorage.getItem("cdm.lastClick")) return;
+    const last = Number(localStorage.getItem("cdm.lastSync") || 0);
+    if (Date.now() - last < 120000) return;
+    localStorage.setItem("cdm.lastSync", String(Date.now()));
+    await api("/api/leaderboard/sync", { method: "POST", headers: { "X-Torn-Key": state.keys.torn }, body: {} });
+  } catch { /* the leaderboard page shows sync problems */ }
+}
+
 function el(tag, props = {}, ...kids) {
   const n = document.createElement(tag);
   for (const [k, v] of Object.entries(props)) {
@@ -506,6 +529,12 @@ function render() {
   tick();
 }
 
+function attackLink(id) {
+  const a = el("a", { class: "btn small", href: `https://www.torn.com/loader.php?sid=attack&user2ID=${id}`, target: "_blank", rel: "noopener noreferrer", text: "Attack" });
+  a.addEventListener("click", () => trackAttack(id));
+  return a;
+}
+
 function card(r, i, opts = {}) {
   const rem = remaining(r);
   const suitName = rem == null ? "diamond" : rem === 0 ? "club" : r.state === "Hospital" ? "heart" : "spade";
@@ -532,7 +561,7 @@ function card(r, i, opts = {}) {
     dl,
     el("div", { class: "btns" },
       el("a", { class: "btn small ghost", href: `https://www.torn.com/bazaar.php?userId=${r.id}`, target: "_blank", rel: "noopener noreferrer", text: "Bazaar" }),
-      el("a", { class: "btn small", href: `https://www.torn.com/loader.php?sid=attack&user2ID=${r.id}`, target: "_blank", rel: "noopener noreferrer", text: "Attack" }))
+      attackLink(r.id))
   );
   if (opts.dismiss) {
     const x = el("button", { class: "x", type: "button", "aria-label": "Dismiss", text: "X" });
@@ -554,7 +583,7 @@ function updateAlerts(now) {
   alertKey = key;
   box.replaceChildren();
   for (const r of hits) {
-    const links = el("a", { href: `https://www.torn.com/loader.php?sid=attack&user2ID=${r.id}`, target: "_blank", rel: "noopener noreferrer", text: "Attack" });
+    const links = attackLink(r.id);
     box.append(el("div", { class: "alert" },
       el("div", { class: "face", text: "JACKPOT >:D" }),
       el("div", { text: `${r.name} [${r.id}] has ${r.itemName} at ${fmtMoney(r.price)}. Est. stats ${fmtStats(r.bs)}, offline ${Math.round((now - r.last) / 60)}m.` }),
@@ -645,5 +674,7 @@ async function boot() {
     location.href = "/";
   });
   setInterval(tick, 1000);
+  syncLeaderboard();
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") syncLeaderboard(); });
 }
 boot();

@@ -81,6 +81,9 @@ async function api(request, env, url, path, method) {
   if (path === "/api/admin/users" && method === "GET") return adminList(env, user);
   if (path === "/api/admin/users" && method === "POST") return adminAction(request, env, user);
   if (path === "/api/torn/me" && method === "GET") return proxyTornMe(request, env, user);
+  if (path === "/api/clicks" && method === "POST") return recordClick(request, env, user);
+  if (path === "/api/leaderboard" && method === "GET") return leaderboard(env, user, url);
+  if (path === "/api/leaderboard/sync" && method === "POST") return syncMugs(request, env, user);
   if (path === "/api/logout" && method === "POST") {
     await env.DB.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(user.tokenHash).run();
     return json({ ok: true }, 200, { "Set-Cookie": sessionCookie("", 0) });
@@ -434,6 +437,118 @@ async function adminAction(request, env, user) {
   return json({ ok: true });
 }
 
+// ---------------------------------------------------------------- mugging leaderboard
+
+async function recordClick(request, env, user) {
+  const { target } = await readJson(request);
+  if (!Number.isInteger(target) || target < 1 || target > 9999999999) return json({ error: "Bad target." }, 400);
+  const rl = await rateLimit(env, "click", String(user.id), 120, 3600);
+  if (!rl.ok) return tooMany(rl);
+  await env.DB.prepare("INSERT INTO clicks (user_id, target_id, clicked_at) VALUES (?, ?, ?)").bind(user.id, target, nowSec()).run();
+  return json({ ok: true });
+}
+
+// Calls Torn's v2 API with the member's own key (passed through, never stored).
+async function tornV2(env, path, params, key) {
+  const qs = new URLSearchParams({ ...params, key, comment: "ClubsDeuceMugger" });
+  const res = await fetch(`${env.TORN_API_BASE || "https://api.torn.com/v2"}${path}?${qs}`, { headers: { Accept: "application/json" } });
+  const data = await res.json().catch(() => null);
+  if (!data) throw new Error("Torn sent bad data.");
+  if (data.error) {
+    const e = new Error(data.error.error || "Torn error");
+    e.code = data.error.code;
+    throw e;
+  }
+  return data;
+}
+
+// Money in a mug entry, e.g. "... mugged X and stole $1,234,567". Takes the largest $ amount in the mug lines.
+function mugAmount(attacklog) {
+  let best = 0;
+  for (const entry of (attacklog && attacklog.log) || []) {
+    if (entry.action !== "mug") continue;
+    for (const m of String(entry.text || "").matchAll(/\$\s?([\d,]+)/g)) {
+      best = Math.max(best, parseInt(m[1].replace(/,/g, ""), 10) || 0);
+    }
+  }
+  return best;
+}
+
+// Finds the member's recent outgoing mugs on players they opened through the site, and records them.
+// Amounts come from Torn's own attack log, never from the browser.
+async function syncMugs(request, env, user) {
+  const key = request.headers.get("X-Torn-Key") || "";
+  if (!KEY_RE.test(key)) return json({ error: "Add your Torn key in Settings first." }, 400);
+  const rl = await rateLimit(env, "sync", String(user.id), 12, 3600);
+  if (!rl.ok) return tooMany(rl);
+  const rlTorn = await rateLimit(env, "torn", String(user.id), 70, 60);
+  if (!rlTorn.ok) return tooMany(rlTorn);
+
+  try {
+    // Prove who this key belongs to, and link it to the member (one Torn player per member).
+    const basic = await tornV2(env, "/user/basic", {}, key);
+    const tornId = basic.profile && basic.profile.id;
+    if (!tornId) return json({ error: "Could not read your Torn profile." }, 502);
+    try {
+      await env.DB.prepare("UPDATE users SET torn_id = ?, torn_name = ? WHERE id = ?").bind(tornId, basic.profile.name, user.id).run();
+    } catch (err) {
+      if (String(err && err.message).includes("UNIQUE")) return json({ error: "That Torn player is already linked to another member." }, 409);
+      throw err;
+    }
+
+    const now = nowSec();
+    const { results: clicks } = await env.DB.prepare(
+      "SELECT id, target_id, clicked_at FROM clicks WHERE user_id = ? AND matched = 0 AND clicked_at > ? ORDER BY clicked_at ASC LIMIT 300"
+    ).bind(user.id, now - 86400).all();
+    if (!clicks.length) return json({ ok: true, linked: basic.profile.name, counted: 0, checked: 0 });
+
+    const from = Math.max(0, clicks[0].clicked_at - 120);
+    const att = await tornV2(env, "/user/attacks", { filters: "outgoing", limit: "100", sort: "DESC", from: String(from) }, key);
+    const attacks = (att.attacks || [])
+      .filter((a) => a.result === "Mugged" && a.defender && a.attacker && a.attacker.id === tornId)
+      .sort((a, b) => a.started - b.started);
+
+    let counted = 0, checked = 0;
+    const used = new Set();
+    for (const a of attacks) {
+      if (checked >= 8) break; // keep each sync small
+      // Must follow a tap on Attack for that same player, within an hour.
+      const click = clicks.find((c) => !used.has(c.id) && c.target_id === a.defender.id && a.started >= c.clicked_at - 120 && a.started <= c.clicked_at + 3600);
+      if (!click) continue;
+      const known = await env.DB.prepare("SELECT 1 AS x FROM mugs WHERE attack_code = ?").bind(a.code).first();
+      used.add(click.id);
+      await env.DB.prepare("UPDATE clicks SET matched = 1 WHERE id = ?").bind(click.id).run();
+      if (known) continue;
+      checked++;
+      const log = await tornV2(env, "/torn/attacklog", { log: a.code, striptags: "true" }, key);
+      const amount = mugAmount(log.attacklog);
+      await env.DB.prepare("INSERT OR IGNORE INTO mugs (attack_code, user_id, target_id, amount, mugged_at) VALUES (?, ?, ?, ?, ?)")
+        .bind(a.code, user.id, a.defender.id, amount, a.started).run();
+      counted++;
+    }
+    return json({ ok: true, linked: basic.profile.name, counted, checked });
+  } catch (err) {
+    if (err.code === 2 || err.code === 16 || err.code === 10 || err.code === 13) {
+      return json({ error: `Torn key problem: ${err.message}. The key needs the "attacks" permission.` }, 400);
+    }
+    if (err.code === 5) return json({ error: "Torn says slow down. Try again in a minute." }, 429);
+    return json({ error: err.message || "Sync failed." }, 502);
+  }
+}
+
+async function leaderboard(env, user, url) {
+  const range = url.searchParams.get("range") || "all";
+  const since = range === "day" ? nowSec() - 86400 : range === "week" ? nowSec() - 7 * 86400 : 0;
+  const { results } = await env.DB.prepare(
+    `SELECT u.username, u.torn_name, SUM(m.amount) AS total, COUNT(*) AS mugs, MAX(m.amount) AS biggest
+     FROM mugs m JOIN users u ON u.id = m.user_id
+     WHERE m.mugged_at >= ?
+     GROUP BY u.id ORDER BY total DESC, mugs DESC LIMIT 50`
+  ).bind(since).all();
+  const me = await env.DB.prepare("SELECT torn_name FROM users WHERE id = ?").bind(user.id).first();
+  return json({ range, me: user.username, linked: me && me.torn_name ? me.torn_name : null, rows: results });
+}
+
 // ---------------------------------------------------------------- proxies
 
 async function proxyWeav3r(env, user, url) {
@@ -571,6 +686,7 @@ async function cleanup(env) {
     env.DB.prepare("DELETE FROM rate_limits WHERE expires_at < ?").bind(now),
     env.DB.prepare("DELETE FROM sessions WHERE expires_at < ?").bind(now),
     env.DB.prepare("DELETE FROM password_resets WHERE expires_at < ?").bind(now),
+    env.DB.prepare("DELETE FROM clicks WHERE clicked_at < ?").bind(now - 2 * 86400),
     env.DB.prepare("DELETE FROM apply_sessions WHERE expires_at < ?").bind(now),
     // Stale applications nobody acted on free their username again.
     env.DB.prepare("DELETE FROM users WHERE status = 'pending' AND created_at < ?").bind(now - APPROVAL_SECONDS),

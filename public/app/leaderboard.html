@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <meta name="robots" content="noindex">
+  <title>Clubs Deuce Mugger | Leaderboard</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Cd">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <main class="wrap">
+    <header class="topbar">
+      <h1>Leaderboard</h1>
+      <div class="actions">
+        <a class="btn ghost small" href="/app/">Back to Mug Finder</a>
+        <a class="btn ghost small" href="/app/settings.html">Settings</a>
+      </div>
+    </header>
+
+    <section class="card panel">
+      <h2>Top muggers</h2>
+      <p class="hint">Money mugged from players you opened through this site (tap Attack on a card). Amounts are read from Torn's own attack log with each member's key.</p>
+      <div class="sortbar">
+        <label>Show
+          <select id="range">
+            <option value="all">All time</option>
+            <option value="week">Last 7 days</option>
+            <option value="day">Last 24 hours</option>
+          </select>
+        </label>
+      </div>
+      <div class="board" id="board"></div>
+      <div class="row">
+        <button class="btn green small" id="sync" type="button">Check my mugs now</button>
+      </div>
+      <p class="msg" id="sync-msg" role="status" aria-live="polite"></p>
+    </section>
+    <p class="foot">Font: Fontstuck by KevinHilt, <a href="/fonts/LICENSE-fontstuck.txt">CC BY-SA 3.0</a></p>
+  </main>
+  <script src="/app/leaderboard.js"></script>
+</body>
+</html>
