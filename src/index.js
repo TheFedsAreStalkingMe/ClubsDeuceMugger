@@ -93,6 +93,8 @@ async function api(request, env, url, path, method) {
   if (path === "/api/weav3r" && method === "GET") return proxyWeav3r(env, user, url);
   if (path === "/api/torn/user" && method === "GET") return proxyTorn(request, env, user, url);
   if (path === "/api/ffscouter" && method === "POST") return proxyFF(request, env, user);
+  if (path === "/api/ffscouter/check" && method === "GET") return ffCheck(request, env, user);
+  if (path === "/api/ffscouter/register" && method === "POST") return ffRegister(request, env, user);
 
   return json({ error: "Not found." }, 404);
 }
@@ -694,6 +696,40 @@ async function proxyTornMe(request, env, user) {
   if (data.error) return json({ error: data.error.error || "Torn error", code: data.error.code }, 200);
   const total = Number(data.total) || ["strength", "defense", "speed", "dexterity"].reduce((n, k) => n + (Number(data[k]) || 0), 0);
   return json({ total });
+}
+
+// Asks FF Scouter whether a key is registered with them.
+async function ffCheck(request, env, user) {
+  const key = request.headers.get("X-FF-Key") || "";
+  if (!KEY_RE.test(key)) return json({ error: "Enter a key first." }, 400);
+  const rl = await rateLimit(env, "ffcheck", String(user.id), 10, 60);
+  if (!rl.ok) return tooMany(rl);
+  const res = await fetch(`https://ffscouter.com/api/v1/check-key?key=${key}`, {
+    headers: { Accept: "application/json", "User-Agent": "ClubsDeuceMugger/1.0" },
+  });
+  const data = await res.json().catch(() => null);
+  if (!data) return json({ error: `FF Scouter returned ${res.status}` }, 502);
+  if (data.error) return json({ error: data.error }, 502);
+  return json({ registered: !!data.is_registered, premium: !!data.is_premium, last_used: data.last_used || null });
+}
+
+// Registers a Torn key with FF Scouter. Only runs after the member ticks the data-policy box.
+async function ffRegister(request, env, user) {
+  const key = request.headers.get("X-FF-Key") || "";
+  if (!KEY_RE.test(key)) return json({ error: "Enter a key first." }, 400);
+  const body = await readJson(request);
+  if (body.agree !== true) return json({ error: "Tick the box to confirm you read FF Scouter's data policy." }, 400);
+  const rl = await rateLimit(env, "ffreg", String(user.id), 5, 3600);
+  if (!rl.ok) return tooMany(rl);
+  const res = await fetch("https://ffscouter.com/api/v1/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json", "User-Agent": "ClubsDeuceMugger/1.0" },
+    body: JSON.stringify({ key, agree_to_data_policy: true, signup_source: "ClubsDeuceMugger" }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!data) return json({ error: `FF Scouter returned ${res.status}` }, 502);
+  if (data.success) return json({ ok: true, message: data.message || "Registered." });
+  return json({ error: data.error || data.message || "FF Scouter did not register the key." }, 400);
 }
 
 async function proxyFF(request, env, user) {

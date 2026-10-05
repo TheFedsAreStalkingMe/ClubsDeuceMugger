@@ -32,6 +32,11 @@
           <p class="hint">Opens Torn with the right permissions filled in (including attacks, which the leaderboard uses to read your mugs). Tap Create there, copy the key, and paste it below.</p>
           <label>Torn API key <input type="password" id="key-torn" autocomplete="off" spellcheck="false" maxlength="64"></label>
           <p class="hint">Stat estimates come from FF Scouter, which uses this same key once you have registered at <a href="https://ffscouter.com" target="_blank" rel="noopener noreferrer">ffscouter.com</a> (one time, free).</p>
+          <div class="row"><button class="btn small" id="test-ff" type="button">Test key with FF Scouter</button></div>
+          <div class="stack" id="register-box" hidden>
+            <label class="check"><input type="checkbox" id="ff-agree"> I read FF Scouter's <a href="https://ffscouter.com" target="_blank" rel="noopener noreferrer">data policy and terms</a> and agree</label>
+            <button class="btn green small" id="ff-register" type="button">Register this key with FF Scouter</button>
+          </div>
           <details>
             <summary class="hint">Advanced: separate FF Scouter key</summary>
             <label>FF Scouter key (only if different) <input type="password" id="key-ff" autocomplete="off" spellcheck="false" maxlength="64"></label>

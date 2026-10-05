@@ -180,3 +180,31 @@ $("make-invite").addEventListener("click", async () => {
     await loadInvites();
   } catch (e) { say("invite-msg", e.message, "err"); }
 });
+
+// FF Scouter: is this key registered with them? If not, offer to register it (needs the consent tick).
+function ffKeyToTest() { return $("key-ff").value.trim() || $("key-torn").value.trim(); }
+$("test-ff").addEventListener("click", async () => {
+  const k = ffKeyToTest();
+  if (!/^[A-Za-z0-9]{8,64}$/.test(k)) return say("keys-msg", "Paste your key first.", "err");
+  say("keys-msg", "Asking FF Scouter...", "info");
+  $("register-box").hidden = true;
+  try {
+    const r = await api("/api/ffscouter/check", { headers: { "X-FF-Key": k } });
+    if (r.registered) say("keys-msg", "FF Scouter knows this key. Stat estimates will work.", "ok");
+    else {
+      say("keys-msg", "FF Scouter does not know this key yet. Register it below, then wait about 5 minutes and test again.", "err");
+      $("register-box").hidden = false;
+    }
+  } catch (e) { say("keys-msg", e.message, "err"); }
+});
+$("ff-register").addEventListener("click", async () => {
+  const k = $("key-torn").value.trim();
+  if (!/^[A-Za-z0-9]{8,64}$/.test(k)) return say("keys-msg", "Paste your Torn key in the Torn API key box first.", "err");
+  if (!$("ff-agree").checked) return say("keys-msg", "Tick the box to confirm you read the FF Scouter policy.", "err");
+  say("keys-msg", "Registering...", "info");
+  try {
+    const r = await api("/api/ffscouter/register", { method: "POST", headers: { "X-FF-Key": k }, body: { agree: true } });
+    $("register-box").hidden = true;
+    say("keys-msg", `${r.message} Wait about 5 minutes, then tap Test key again.`, "ok");
+  } catch (e) { say("keys-msg", e.message, "err"); }
+});

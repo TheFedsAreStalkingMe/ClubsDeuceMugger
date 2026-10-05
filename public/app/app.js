@@ -350,7 +350,7 @@ async function scan() {
       } catch (e) {
         if (e.retryAfter || e.message === "cancelled") throw e;
         state.outcome = "fatal";
-        throw new Error(`FF Scouter did not accept the key (${e.message}). Register once at ffscouter.com with your Torn key, wait about 5 minutes, or add a separate FF Scouter key in Settings.`);
+        throw new Error(`FF Scouter did not accept the key (${e.message}). Open Settings and tap "Test key with FF Scouter" to register it, or add a separate FF Scouter key there.`);
       }
       const list = Array.isArray(data) ? data : data.data || data.results || [];
       const seen = new Set();
