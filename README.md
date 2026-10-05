@@ -54,7 +54,6 @@ tests/                  Automated checks (see Tests)
 | File | Job |
 | --- | --- |
 | `scan.js` | One scan in stages: choose items, read bazaars (single items and stacks, grouped per seller, or added up to the minimum price), estimates, filter, status |
-| `buymug.js` | Buymugging: weapons and armor with a bonus, sold in bazaars by weaker players (see below) |
 | `status-stage.js` | The Torn status and account age stage shared by the Inactive Earners and Bonus Weapon Sellers scans |
 | `weav3r.js`, `torncall.js` | Shared readers: Weav3r with a "busy" gate (all reads wait together), and Torn calls under the 80 a minute limit |
 | `rules.js` | Pure rules: what is a good mug, expected profit and the good/mediocre/bad rating (`mugOutlook`), why a listing was filtered out, sorting |
@@ -67,16 +66,6 @@ tests/                  Automated checks (see Tests)
 | `tracking.js` | Logs Attack taps and checks for new mugs (leaderboard) |
 | `admin.js` | The owner panel, built only for the owner |
 | `ui.js` | Message line, progress bar stages, run buttons |
-
-### Buymugging (`features/buymug.js`)
-
-Bonus weapons and armor cost far more than the plain market price, so they hide at the expensive end of an item's
-bazaar list. Weav3r lists cheapest first, 100 per page, so the scan reads the LAST page (and the one before it if
-the last is short). It then asks FF Scouter about those sellers, applies your stat limits, and only for the weak
-sellers' items asks Torn for the bonuses (`/torn/{uids}/itemdetails`, 25 per call; the unique item id is on each
-Weav3r listing). Weapons and armor come from `/torn/items?cat=` (cached a day). Temporary weapons are skipped (they cannot carry bonuses). You choose the kinds to read (Primary, Secondary, Melee,
-Armor); items are picked by highest bazaar average first, since bonus items pull the average up, and a scan reads 60
-of them by default.
 
 ### Bonus Weapon Sellers tab (`public/app/js/bonus/`)
 

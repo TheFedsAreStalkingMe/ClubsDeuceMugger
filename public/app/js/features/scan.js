@@ -176,7 +176,6 @@ export async function scan() {
   const runId = ++state.runId;
   const f = state.filters;
   state.outcome = "retry";
-  state.mode = "hunt";
   if (!state.keys.torn) { state.outcome = "fatal"; return setScanMsg("Add your Torn key in Settings first.", "err"); }
   if (!state.watch.length && !f.autoScan) { state.outcome = "fatal"; return setScanMsg("Turn on auto scan or add an item ID to the watchlist.", "err"); }
 

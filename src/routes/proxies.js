@@ -34,14 +34,11 @@ export async function weav3r({ env, url, user }) {
     return json({
       items: data.items
         .filter((i) => i.item_id > 0 && i.total_bazaars > 0 && i.market_price > 0)
-        .map((i) => ({ id: i.item_id, name: i.item_name, price: i.market_price, lowest: i.lowest_price, average: i.bazaar_average ?? null, bazaars: i.total_bazaars })),
+        .map((i) => ({ id: i.item_id, name: i.item_name, price: i.market_price, lowest: i.lowest_price, bazaars: i.total_bazaars })),
     });
   }
 
-  // Weav3r lists 100 bazaar listings per page, cheapest first. Page 1 is the default.
-  const page = url.searchParams.get("page") || "1";
-  if (!/^\d{1,4}$/.test(page) || Number(page) < 1) return fail("Bad page.");
-  const { res, data } = await fetchJson(`${base}/marketplace/${item}${page === "1" ? "" : `?page=${page}`}`, { cf: { cacheTtl: 30, cacheEverything: true } });
+  const { res, data } = await fetchJson(`${base}/marketplace/${item}`, { cf: { cacheTtl: 30, cacheEverything: true } });
   if (!res.ok) return weav3rFail(res);
   if (!data) return fail("Weav3r sent bad data.", 502);
   return json({
@@ -49,10 +46,7 @@ export async function weav3r({ env, url, user }) {
     item_name: data.item_name,
     market_price: data.market_price,
     generated_at: data.generated_at,
-    page: data.page ?? Number(page),
-    total: data.total_count ?? null,
-    hasMore: !!data.has_more,
-    listings: (data.listings || []).map((l) => ({ player_id: l.player_id, player_name: l.player_name, quantity: l.quantity, price: l.price, uid: l.uid ? String(l.uid) : null, updated: l.content_updated })),
+    listings: (data.listings || []).map((l) => ({ player_id: l.player_id, player_name: l.player_name, quantity: l.quantity, price: l.price, updated: l.content_updated })),
   });
 }
 
@@ -133,39 +127,6 @@ export async function tornMe({ request, env, user }) {
   if (response) return response;
   const total = Number(data.total) || ["strength", "defense", "speed", "dexterity"].reduce((n, k) => n + (Number(data[k]) || 0), 0);
   return json({ total });
-}
-
-// ---------------------------------------------------------------- Torn items (buymugging)
-
-// Weapons or armor: id, name and type. Used to pick which bazaar items can carry bonuses.
-export async function itemList({ request, env, url, user }) {
-  const cat = url.searchParams.get("cat") || "";
-  if (!["Weapon", "Armor"].includes(cat)) return fail("Bad category.");
-  const { data, response } = await tornPublic(env, request, user, "/torn/items", { cat });
-  if (response) return response;
-  // Temporary weapons (grenades, flash bombs) cannot carry bonuses, so they are left out.
-  return json({
-    items: (data.items || [])
-      .filter((i) => i.is_tradable !== false && i.details?.category !== "Temporary" && i.sub_type !== "Temporary")
-      .map((i) => ({ id: i.id, name: i.name, type: i.type, cat: cat === "Armor" ? "Armor" : i.details?.category || "Primary", market: i.value?.market_price ?? 0 })),
-  });
-}
-
-// Bonuses and stats of specific items (by the unique id Weav3r shows on each listing). 25 at a time.
-export async function itemDetails({ request, env, url, user }) {
-  const uids = (url.searchParams.get("uids") || "").split(",").filter(Boolean);
-  if (!uids.length || uids.length > 25 || !uids.every((u) => /^\d{1,15}$/.test(u))) return fail("Bad item list (1 to 25 ids).");
-  const { data, response } = await tornPublic(env, request, user, `/torn/${uids.join(",")}/itemdetails`);
-  if (response) return response;
-  const raw = data.itemdetails;
-  const list = Array.isArray(raw) ? raw : raw && raw.uid ? [raw] : [];
-  return json({
-    items: list.map((d) => ({
-      uid: String(d.uid), id: d.id, name: d.name, rarity: d.rarity || null,
-      stats: d.stats ? { damage: d.stats.damage, accuracy: d.stats.accuracy, armor: d.stats.armor, quality: d.stats.quality } : null,
-      bonuses: (d.bonuses || []).map((b) => ({ title: b.title, value: b.value, description: b.description })),
-    })),
-  });
 }
 
 // ---------------------------------------------------------------- Torn companies (inactive earners)

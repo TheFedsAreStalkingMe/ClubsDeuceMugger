@@ -68,7 +68,7 @@ export function explainDrops(why, sellers) {
 // Rating: bad if you lose money, good if the profit is at least 5% of what you spend (and $500k), else mediocre.
 export function mugOutlook(r, f = state.filters) {
   const spend = r.total;
-  const resale = r.items.reduce((sum, i) => sum + (i.market && !i.bonus ? (i.market - i.price) * i.qty : 0), 0); // a bonus is worth more than the plain market price, so no resale gain is counted
+  const resale = r.items.reduce((sum, i) => sum + (i.market ? (i.market - i.price) * i.qty : 0), 0);
   const rate = BASE_MUG * (1 + (f.merits ? MERIT_BONUS : 0) + (Number(f.plunder) || 0) / 100);
   const mug = spend * rate;
   const profit = resale + mug;

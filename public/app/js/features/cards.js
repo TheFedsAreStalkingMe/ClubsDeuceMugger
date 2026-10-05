@@ -21,8 +21,7 @@ const bazaarLink = (id) =>
 function itemList(r) {
   return el("ul", { class: "items" },
     ...r.items.map((it) => {
-      const bonus = it.bonuses ? it.bonuses.map((b) => `${b.title} ${b.value}`).join(", ") : "";
-      const detail = [bonus, `${fmtShortMoney(it.price)} each`, it.market && !it.bonus ? `${Math.round((it.price / it.market) * 100)}% of market` : "", it.activity != null ? `${it.activity}/hr` : ""].filter(Boolean).join(" · ");
+      const detail = [`${fmtShortMoney(it.price)} each`, it.market ? `${Math.round((it.price / it.market) * 100)}% of market` : "", it.activity != null ? `${it.activity}/hr` : ""].filter(Boolean).join(" · ");
       return el("li", {},
         el("span", { class: "line" }, el("span", { text: `${it.itemName} ×${it.qty}` }), el("span", { text: fmtShortMoney(it.total) })),
         el("span", { class: "meta", text: detail }));
