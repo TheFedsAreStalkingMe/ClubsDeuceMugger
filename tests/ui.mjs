@@ -132,6 +132,25 @@ async function runChecks() {
   await setStore("cdm.filters", filters);
   await page.reload();
 
+  section("New bazaars each scan");
+  // Three items qualify but only one is read per scan: each scan takes the next item, then it wraps round.
+  await page.goto(BASE + "/app/");
+  await page.waitForFunction(() => document.getElementById("maxBs").value !== "");
+  await page.evaluate(() => localStorage.removeItem("cdm.cursor"));
+  await setStore("cdm.filters", { ...filters, minPrice: 8000000, maxItems: 1 });
+  await page.reload();
+  const rotated = [];
+  for (let i = 0; i < 4; i++) {
+    await page.click("#scan");
+    await scanDone();
+    rotated.push((await names()));
+  }
+  check("each scan reads the next item's bazaars", rotated[0] === "Alpha,Charlie" && rotated[1] === "Alpha,Bravo" && rotated[2] === "Delta,Echo,Foxtrot", rotated.join(" | "));
+  check("after the last item it wraps round to the first", rotated[3] === rotated[0], rotated.join(" | "));
+  check("the message says which items were read", /Read items 1 to 1 of 3/.test(await text("#scan-msg")) || /Read items/.test(await text("#scan-msg")), await text("#scan-msg"));
+  await setStore("cdm.filters", filters);
+  await page.evaluate(() => localStorage.removeItem("cdm.cursor"));
+
   section("Trade activity");
   // Gold Bar changed a minute ago (busy), Silver Bar has been quiet for two days. Busiest first:
   await setStore("cdm.filters", { ...filters, sort: "activity", dir: "desc" });

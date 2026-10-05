@@ -7,7 +7,7 @@
 import { api } from "/js/core/api.js";
 import { pool } from "/js/core/async.js";
 import { fmtMoney } from "/js/core/format.js";
-import { STORE, save } from "/js/core/storage.js";
+import { STORE, load, save } from "/js/core/storage.js";
 import { MIN_PRICE, state } from "../state.js";
 import { acquireTorn } from "./limits.js";
 import { explainDrops, statVerdict, visibleRows } from "./rules.js";
@@ -40,26 +40,34 @@ function unitFloor(f) {
 
 // ---------------------------------------------------------------- 1. choose items
 
+// When more items qualify than one scan reads, each scan takes the next stretch of the list (wrapping round), so
+// repeat scans and auto hunt move on to new bazaars instead of reading the same top items every time.
+// `window` says where the stretch was; the cursor is moved on only once the bazaars were read.
 async function chooseItems(call, f) {
   const targets = new Map(state.watch.map((w) => [w.id, w])); // the watchlist is always scanned
   let indexError = "";
+  let window = null;
   if (f.autoScan) {
     try {
       const { items } = await weav3rRead(call, "/api/weav3r?item=all", state.runId);
-      items
+      const ranked = items
         .map((i) => ({ ...i, floor: i.lowest ?? i.price })) // floor = cheapest bazaar listing
         // With a stack worth or an add-up value set, cheaper items can still qualify, so look lower.
         .filter((i) => (unitFloor(f) < f.minPrice ? i.price >= unitFloor(f) : i.floor >= f.minPrice && i.price >= f.minPrice) && !targets.has(i.id))
         // Busiest first when sorting by trade activity (more bazaars = more traded), otherwise priciest first.
-        .sort((a, b) => (f.sort === "activity" ? b.bazaars - a.bazaars || b.floor - a.floor : b.floor - a.floor))
-        .slice(0, Math.max(0, f.maxItems - targets.size))
-        .forEach((i) => targets.set(i.id, { id: i.id, name: i.name, auto: true, bazaars: i.bazaars }));
+        .sort((a, b) => (f.sort === "activity" ? b.bazaars - a.bazaars || b.floor - a.floor : b.floor - a.floor));
+      const room = Math.max(0, f.maxItems - targets.size);
+      const start = ranked.length > room ? (load(STORE.cursor, 0) % ranked.length) : 0;
+      const picked = [...ranked.slice(start), ...ranked.slice(0, start)].slice(0, room);
+      if (ranked.length > room) window = { start, count: picked.length, of: ranked.length };
+      for (const i of picked) targets.set(i.id, { id: i.id, name: i.name, auto: true, bazaars: i.bazaars });
     } catch (e) {
       if (isCancel(e)) throw e;
       indexError = e.message;
     }
   }
   const list = [...targets.values()];
+  list.window = window;
   if (list.length) return list;
   if (indexError) throw new Stop(`Could not load the item list from Weav3r: ${indexError}`, "err", "retry");
   if (f.autoScan) throw new Stop(`No items are worth ${fmtMoney(unitFloor(f))} or more. Lower the minimum price.`);
@@ -194,6 +202,7 @@ export async function scan() {
     const list = await chooseItems(call, f);
     let rows = await readBazaars(call, list, f, runId);
     if (runId !== state.runId) return;
+    if (list.window) save(STORE.cursor, list.window.start + list.window.count); // the next scan starts further along the list
 
     // stats for every seller, then drop listings that fail the stat and fair fight limits
     const sellers = rows.length;
@@ -224,7 +233,9 @@ export async function scan() {
     const { sellers: checked, keyProblem } = await fetchStatuses(call, rows, runId);
     if (runId === state.runId && !keyProblem) {
       state.outcome = "ok";
-      setScanMsg(`Done. ${visibleRows().length} seller(s) shown.${weav3rGaveUp() ? " Weav3r was busy, so some items were skipped." : ""}`, weav3rGaveUp() ? "info" : "ok");
+      const w = list.window;
+      const where = w ? ` Read items ${w.start + 1} to ${Math.min(w.of, w.start + w.count)} of ${w.of}; the next scan moves on.` : "";
+      setScanMsg(`Done. ${visibleRows().length} seller(s) shown.${where}${weav3rGaveUp() ? " Weav3r was busy, so some items were skipped." : ""}`, weav3rGaveUp() ? "info" : "ok");
       setProgress(1);
     }
     render();

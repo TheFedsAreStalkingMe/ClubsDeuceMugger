@@ -12,6 +12,7 @@ export const STORE = {
   tornCalls: "cdm.calls", // timestamps of recent Torn calls (rate limiter)
   taps: "cdm.taps", // Attack taps not yet confirmed by a leaderboard check: [{ target, at }]
   lastSync: "cdm.lastSync",
+  cursor: "cdm.cursor", // where the next scan starts in the list of items, so scans move on to new bazaars
   bonusFilters: "cdm.bonus.filters", // Bonus Weapon Sellers: filters
   bonusCache: "cdm.bonus.cache", // Bonus Weapon Sellers: listings kept for a few minutes
   earnFilters: "cdm.earn.filters", // Inactive Earners: filters
