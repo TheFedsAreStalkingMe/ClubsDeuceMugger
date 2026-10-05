@@ -429,7 +429,7 @@ function updateAlerts(now) {
   for (const r of hits) {
     const links = el("a", { href: `https://www.torn.com/loader.php?sid=attack&user2ID=${r.id}`, target: "_blank", rel: "noopener noreferrer", text: "Attack" });
     box.append(el("div", { class: "alert" },
-      el("div", { class: "face", text: ">:D JACKPOT" }),
+      el("div", { class: "face", text: "JACKPOT >:D" }),
       el("div", { text: `${r.name} [${r.id}] has ${r.itemName} at ${fmtMoney(r.price)}. Est. stats ${fmtStats(r.bs)}, offline ${Math.round((now - r.last) / 60)}m.` }),
       links));
   }

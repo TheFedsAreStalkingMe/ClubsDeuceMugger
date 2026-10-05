@@ -89,8 +89,8 @@ input:focus, select:focus { border-color: var(--club); }
 
 .msg { min-height: 1.4em; font-size: .95rem; }
 .msg.ok { color: var(--club); } .msg.err { color: var(--danger); } .msg.info { color: var(--derse-l); }
-.msg.ok::before { content: "<3 "; }
-.msg.err::before { content: ":( "; }
+.msg.ok::after { content: " <3"; }
+.msg.err::after { content: " :("; }
 
 .arrow-note { color: var(--muted); font-weight: 400; margin: 6px 0 12px; }
 
@@ -142,7 +142,7 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 24px; background: #
 .status.out { color: var(--derse-l); }
 .status.pending { color: var(--muted); }
 .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.btns .btn::before { content: "->"; }
+.btns .btn::after { content: "->"; }
 .empty { color: var(--muted); padding: 30px 12px; grid-column: 1 / -1; border: 1px dashed var(--muted); }
 
 .foot { margin-top: 24px; font-size: .75rem; color: var(--muted); font-weight: 400; }
