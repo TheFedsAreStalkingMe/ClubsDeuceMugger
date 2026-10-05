@@ -253,6 +253,15 @@ function initFilters() {
 
 // ---------------------------------------------------------------- scanning
 
+// Waits while counting down on screen, one tick per second. Stops early if the scan is cancelled.
+async function countdown(sec, label, runId) {
+  for (let t = Math.ceil(sec); t > 0; t--) {
+    if (runId !== state.runId) return;
+    setScanMsg(`${label} ${t}s`);
+    await sleep(1000);
+  }
+}
+
 function setScanMsg(text, cls = "info") { const m = $("scan-msg"); m.className = "msg " + cls; m.textContent = text; }
 function setProgress(f) { $("bar").style.width = Math.round(f * 100) + "%"; }
 
@@ -323,7 +332,7 @@ async function scan() {
           }
           break;
         } catch (e) {
-          if (e.retryAfter && attempt < 2) { setScanMsg(`Pacing item reads... ${e.retryAfter}s`); await sleep(e.retryAfter * 1000); continue; }
+          if (e.retryAfter && attempt < 2) { await countdown(e.retryAfter, "Pacing item reads...", runId); continue; }
           if (runId === state.runId) setScanMsg(`Item ${w.id}: ${e.message}`, "err");
           break;
         }
@@ -384,7 +393,7 @@ async function scan() {
           spyCache[id] = { t: Date.now(), found: !!r.found, total: r.total || 0, ts: r.timestamp || 0 };
         } catch (e) {
           if (e.message === "cancelled") return;
-          if (e.retryAfter) { await sleep(e.retryAfter * 1000); return; }
+          if (e.retryAfter) { await countdown(e.retryAfter, "Pacing TornStats calls...", runId); return; }
           return; // skip this one, estimate will be used
         }
         setScanMsg(`Checking TornStats spies ${++got}/${todoSpies.length}...`);
@@ -425,7 +434,7 @@ async function scan() {
           await acquireTornSlot(runId);
           const p = await api(`/api/torn/user?id=${id}`, { headers: { "X-Torn-Key": state.keys.torn } });
           if (p.error) {
-            if (p.code === 5) { setScanMsg("Torn says slow down. Waiting 30s...", "info"); await sleep(30000); continue; }
+            if (p.code === 5) { await countdown(30, "Torn says slow down. Waiting", runId); continue; }
             if ([2, 10, 13, 16].includes(p.code)) { errored = true; state.outcome = "fatal"; setScanMsg(`Torn key problem: ${p.error}`, "err"); return; }
             apply(id, { state: "Unknown", desc: p.error });
           } else {
@@ -435,7 +444,7 @@ async function scan() {
           }
         } catch (e) {
           if (e.message === "cancelled") return;
-          if (e.retryAfter) { await sleep(e.retryAfter * 1000); continue; }
+          if (e.retryAfter) { await countdown(e.retryAfter, "Pacing Torn API calls...", runId); continue; }
           apply(id, { state: "Unknown", desc: e.message });
         }
         break;
