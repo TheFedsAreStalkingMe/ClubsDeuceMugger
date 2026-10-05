@@ -3,7 +3,7 @@
 //
 //   PLAYWRIGHT=/path/to/playwright/index.mjs CHROMIUM=/path/to/chromium WRANGLER=... node tests/ui.mjs
 
-import { BASE, OWNER, check, fail, finish, section, startEnvironment } from "./lib/harness.mjs";
+import { BASE, OWNER, check, fail, finish, section, setFakeStatus, startEnvironment } from "./lib/harness.mjs";
 
 const playwright = await import(process.env.PLAYWRIGHT || "playwright");
 const chromium = playwright.chromium || playwright.default.chromium;
@@ -87,6 +87,29 @@ async function runChecks() {
   const busyOnly = (await cards("#results")).map((c) => c.name).sort();
   check("minimum activity hides quiet items", busyOnly.join() === "Alpha,Bravo", busyOnly.join());
 
+  section("Live status updates");
+  // Statuses must catch up on their own, without a new scan.
+  const statusOf = (name) => page.evaluate((n) => {
+    const card = [...document.querySelectorAll("#results .target")].find((c) => c.querySelector(".name").textContent === n);
+    return card ? card.querySelector(".status").textContent : null;
+  }, name);
+  await setStore("cdm.filters", filters);
+  await page.reload();
+  await page.click("#scan");
+  await scanDone();
+  check("Alpha starts out okay", (await statusOf("Alpha")) === "Okay", await statusOf("Alpha"));
+  await setFakeStatus(7, "Hospital", 30);
+  check("Alpha is caught going to hospital without a new scan",
+    await page.waitForFunction(() => [...document.querySelectorAll("#results .target")].some((c) => c.querySelector(".name").textContent === "Alpha" && /^Out in/.test(c.querySelector(".status").textContent)), null, { timeout: 45000 }).then(() => true, () => false),
+    await statusOf("Alpha"));
+  await setFakeStatus(8, "Abroad");
+  check("Bravo flying abroad shows Abroad, not Okay",
+    await page.waitForFunction(() => [...document.querySelectorAll("#results .target")].some((c) => c.querySelector(".name").textContent === "Bravo" && c.querySelector(".status").textContent === "Abroad"), null, { timeout: 45000 }).then(() => true, () => false),
+    await statusOf("Bravo"));
+  check("cards show when they were last checked", (await page.$$eval("#results .ago[data-kind=checked]", (els) => els.every((e) => /s ago|m ago|just now/.test(e.textContent)))));
+  await setFakeStatus(7, "Okay");
+  await setFakeStatus(8, "Okay");
+
   section("Auto hunt, feed and cancel");
   await setStore("cdm.filters", { ...filters, autoEvery: 30 });
   await page.reload();
@@ -94,8 +117,13 @@ async function runChecks() {
   await page.waitForSelector("#feed:not([hidden])", { timeout: 60000 });
   check("good mugs land in the feed", (await cards("#feed-list")).length === 3);
   check("tab title shows the count", (await page.title()).startsWith("(3)"));
+  // a mug that stops qualifying leaves the feed by itself
+  await setFakeStatus(7, "Hospital", 30);
+  check("a mug that goes to hospital leaves the feed",
+    await page.waitForFunction(() => document.querySelectorAll("#feed-list .target").length === 2, null, { timeout: 60000 }).then(() => true, () => false));
+  await setFakeStatus(7, "Okay");
   await page.click("#feed-list .x");
-  check("X dismisses one", (await cards("#feed-list")).length === 2);
+  check("X dismisses one", (await cards("#feed-list")).length === 1);
   await page.click("#feed-dismiss-all");
   check("Dismiss all clears the feed", await page.isHidden("#feed"));
   check("cancel button visible while hunting", await page.isVisible("#cancel"));

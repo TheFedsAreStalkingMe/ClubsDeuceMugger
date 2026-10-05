@@ -26,5 +26,15 @@ async function acquire(storeKey, limit, label, runId) {
   }
 }
 
+// For background work: takes a slot only if one is free (keeping room for scans), never waits.
+export function tryAcquireTorn(max) {
+  const now = Date.now();
+  const calls = load(STORE.tornCalls, []).filter((t) => now - t < WINDOW_MS);
+  if (calls.length >= max) return false;
+  calls.push(now);
+  save(STORE.tornCalls, calls);
+  return true;
+}
+
 export const acquireTorn = (runId) => acquire(STORE.tornCalls, TORN_PER_MIN, "Torn", runId);
 export const acquireTornStats = (runId) => acquire(STORE.tsCalls, TORNSTATS_PER_MIN, "TornStats", runId);

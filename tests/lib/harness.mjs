@@ -30,6 +30,11 @@ export const section = (title) => console.log(`\n${title}`);
 // ------------------------------------------------------------------ fake outside services
 
 const now = () => Math.floor(Date.now() / 1000);
+// Test control: statuses the fake Torn reports, by player id. Change them with setFakeStatus().
+const statusOverride = {};
+export async function setFakeStatus(id, state, mins = 30) {
+  await fetch(`http://localhost:${FAKE_PORT}/__status?id=${id}&state=${state}&mins=${mins}`);
+}
 const TORN_IDS = { abcdefgh12345678: 555, DANAKEY12345678: 555, OTHERKEY1234567: 556 }; // DANA shares 555 on purpose
 
 function fakeServer() {
@@ -54,11 +59,22 @@ function fakeServer() {
     if (p === "/weav3r/marketplace/2") return send({ item_id: 2, item_name: "Silver Bar", market_price: 20000000, generated_at: now(),
       listings: [{ player_id: 9, player_name: "Charlie", quantity: 1, price: 20000000, content_updated: now() - 2 * 86400 }] });
 
+    // Test control: /__status?id=7&state=Hospital&mins=30 (state=Okay clears it)
+    if (p === "/__status") {
+      const id = u.searchParams.get("id"), st = u.searchParams.get("state");
+      if (st === "Okay") delete statusOverride[id];
+      else statusOverride[id] = { state: st, until: now() + Number(u.searchParams.get("mins")) * 60 };
+      return send({ ok: true });
+    }
+
     // Torn v1 (status, own stats)
     if (p.startsWith("/tornv1/user")) {
       if (key === "BADKEY1234567890") return send({ error: { code: 2, error: "Incorrect key" } });
       if (u.searchParams.get("selections") === "battlestats") return send({ strength: 1, defense: 2, speed: 3, dexterity: 4, total: 10 });
-      return send({ player_id: 7, name: "A", age: 100, secret: "dropped", last_action: { timestamp: 5, status: "Offline", relative: "x" }, status: { state: "Okay", until: 0, description: "Okay" } });
+      const id = p.split("/").pop();
+      const o = statusOverride[id];
+      const status = o ? { state: o.state, until: o.state === "Abroad" ? 0 : o.until, description: o.state } : { state: "Okay", until: 0, description: "Okay" };
+      return send({ player_id: Number(id) || 7, name: "A", age: 100, secret: "dropped", last_action: { timestamp: 5, status: "Offline", relative: "x" }, status });
     }
 
     // Torn v2 (leaderboard)

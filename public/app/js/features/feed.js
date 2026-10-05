@@ -6,7 +6,7 @@ import { state } from "../state.js";
 import { card, refreshStatuses } from "./cards.js";
 import { isMug, rowKey } from "./rules.js";
 
-const FIELDS = ["id", "name", "itemId", "itemName", "market", "activity", "bazaars", "price", "qty", "total", "ff", "bs", "src", "spyTs", "state", "until", "desc", "age", "last"];
+const FIELDS = ["id", "name", "itemId", "itemName", "market", "activity", "bazaars", "price", "qty", "total", "ff", "bs", "src", "spyTs", "state", "until", "desc", "age", "last", "checkedAt"];
 const snapshot = (r) => Object.fromEntries(FIELDS.map((k) => [k, r[k]]));
 const GONE_AFTER = 20 * 60; // seconds a mug may be missing from the bazaars before it is dropped
 
@@ -23,22 +23,22 @@ export function renderFeed() {
   refreshStatuses(now);
 }
 
-// Adds new mugs from the current rows, refreshes ones already in the feed, drops ones long gone.
+// Keeps the feed true. New mugs are added only while auto hunt runs; entries are always refreshed from the
+// latest data, and dropped once they stop qualifying (flew away, hospitalized, came online) or vanish.
 export function collectMugs(now) {
-  if (!state.auto) return;
   let changed = false;
   for (const r of state.rows) {
     const key = rowKey(r);
     const old = state.feed.find((e) => e.key === key);
     if (old) {
       if (r.state != null) Object.assign(old, snapshot(r), { seen: now });
-    } else if (!state.dismissed[key] && isMug(r, now, false)) {
+    } else if (state.auto && !state.dismissed[key] && isMug(r, now, false)) {
       state.feed.unshift({ key, found: now, seen: now, ...snapshot(r) });
       changed = true;
     }
   }
   const before = state.feed.length;
-  state.feed = state.feed.filter((e) => now - e.seen < GONE_AFTER);
+  state.feed = state.feed.filter((e) => now - e.seen < GONE_AFTER && isMug(e, now, false));
   if (state.feed.length !== before) changed = true;
   if (changed) { save(STORE.feed, state.feed); renderFeed(); }
 }

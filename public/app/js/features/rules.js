@@ -4,10 +4,12 @@ import { NUM_MAX, state } from "../state.js";
 
 export const rowKey = (r) => `${r.id}:${r.itemId}`;
 
-// Seconds until the player can be attacked: 0 = now, null = status not known yet.
+// Seconds until the player can be attacked: 0 = now, null = not known, Infinity = away with no timer
+// (abroad, for example).
 export function remaining(r) {
-  if (r.state == null) return null;
-  if (r.state === "Okay" || !r.until) return 0;
+  if (r.state == null || r.state === "Unknown") return null;
+  if (r.state === "Okay") return 0;
+  if (!r.until) return Infinity;
   return Math.max(0, r.until - Date.now() / 1000);
 }
 

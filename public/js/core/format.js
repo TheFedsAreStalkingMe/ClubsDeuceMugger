@@ -19,6 +19,9 @@ export function fmtAgo(sec) {
   return d ? `${d}d ${h % 24}h ago` : h ? `${h}h ${m % 60}m ago` : `${m}m ago`;
 }
 
+// Seconds ago with second precision under a minute: "8s ago", then like fmtAgo.
+export const fmtShortAgo = (sec) => (sec < 60 ? `${Math.max(0, Math.floor(sec))}s ago` : fmtAgo(sec));
+
 // Seconds left -> "12m 40s", "1h 5m 2s", "2d 4h 10m"
 export function fmtCountdown(sec) {
   sec = Math.max(0, Math.ceil(sec));

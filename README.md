@@ -56,6 +56,7 @@ tests/                  Automated checks (see Tests)
 | `filters.js`, `watchlist.js` | The Filters panel and the watchlist |
 | `cards.js`, `results.js` | A result card, the results grid, the once-a-second tick |
 | `feed.js`, `alerts.js` | The auto hunt mug feed and the jackpot banners |
+| `status.js`, `refresh.js` | Torn status records, and the background re-check that keeps statuses on screen true between scans |
 | `runner.js` | Scan, auto hunt and cancel buttons |
 | `limits.js` | Keeps Torn and TornStats calls under their per-minute limits |
 | `tracking.js` | Logs Attack taps and checks for new mugs (leaderboard) |

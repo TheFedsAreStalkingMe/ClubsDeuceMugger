@@ -8,6 +8,7 @@ import { dismissAll, forgetOldDismissals, renderFeed } from "../features/feed.js
 import { initFilters } from "../features/filters.js";
 import { render, tick } from "../features/results.js";
 import { cancelScan, toggleAutoHunt } from "../features/runner.js";
+import { startLiveRefresh } from "../features/refresh.js";
 import { scan } from "../features/scan.js";
 import { syncLeaderboard } from "../features/tracking.js";
 import { updateRunButtons } from "../features/ui.js";
@@ -54,6 +55,7 @@ async function boot() {
   });
 
   setInterval(tick, 1000);
+  startLiveRefresh();
   syncLeaderboard();
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") syncLeaderboard(); });
 }

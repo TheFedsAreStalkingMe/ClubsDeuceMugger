@@ -13,6 +13,7 @@ import { acquireTorn, acquireTornStats } from "./limits.js";
 import { explainDrops, statVerdict } from "./rules.js";
 import { render, scheduleRender, tick } from "./results.js";
 import { STAGES, countdown, setProgress, setScanMsg, updateRunButtons } from "./ui.js";
+import { applyProfile, profileFresh, profiles, recordFrom } from "./status.js";
 import { renderWatch } from "./watchlist.js";
 
 const HOUR = 3600e3;
@@ -160,27 +161,12 @@ async function fetchSpies(call, ids, runId) {
 
 // ---------------------------------------------------------------- 6. Torn status, age, last action
 
-// Okay players are trusted for 45 s. Players who are out are trusted until their timer ends (max 15 min).
-function profileFresh(p) {
-  if (!p) return false;
-  const now = Date.now();
-  if (p.until && p.state !== "Okay") return now < Math.min(p.until * 1000, p.t + 15 * 60000);
-  return now - p.t < 45000;
-}
-
 async function fetchStatuses(call, rows, runId) {
-  const profiles = new Cache(STORE.profiles, 3000);
-  const byPlayer = new Map(); // player id -> their rows
-  for (const r of rows) (byPlayer.get(r.id) || byPlayer.set(r.id, []).get(r.id)).push(r);
-  const apply = (id, p) => {
-    for (const r of byPlayer.get(id)) Object.assign(r, { state: p.state, until: p.until, desc: p.desc, age: p.age, last: p.last });
-  };
-
-  const ids = [...byPlayer.keys()];
+  const ids = [...new Set(rows.map((r) => r.id))];
   const todo = [];
   for (const id of ids) {
     const p = profiles.get(id);
-    if (profileFresh(p)) apply(id, p); else todo.push(id);
+    if (profileFresh(p)) applyProfile(id, p); else todo.push(id);
   }
   render();
 
@@ -196,16 +182,16 @@ async function fetchStatuses(call, rows, runId) {
         if (p.error) {
           if (p.code === 5) { await countdown(30, "Torn says slow down. Waiting", runId); continue; }
           if (TORN_KEY_ERRORS.includes(p.code)) { keyProblem = true; state.outcome = "fatal"; setScanMsg(`Torn key problem: ${p.error}`, "err"); return; }
-          apply(id, { state: "Unknown", desc: p.error });
+          applyProfile(id, { state: "Unknown", desc: p.error });
         } else {
-          const rec = { t: Date.now(), state: p.status?.state || "Okay", until: p.status?.until || 0, desc: p.status?.description || "", age: p.age, last: p.last_action?.timestamp || 0 };
+          const rec = recordFrom(p);
           profiles.put(id, rec);
-          apply(id, rec);
+          applyProfile(id, rec);
         }
       } catch (e) {
         if (isCancel(e)) return;
         if (e.retryAfter) { await countdown(e.retryAfter, "Pacing Torn API calls...", runId); continue; }
-        apply(id, { state: "Unknown", desc: e.message });
+        applyProfile(id, { state: "Unknown", desc: e.message });
       }
       break;
     }
