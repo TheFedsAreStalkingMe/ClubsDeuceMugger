@@ -19,7 +19,7 @@ const state = {
   keys: Object.assign({ torn: "", ff: "", ts: "" }, load(LS.keys, {})),
   watch: load(LS.watch, []),
   filters: Object.assign(
-    { minPrice: MIN_PRICE, minBs: 0, maxBs: NUM_MAX, maxFf: 10, maxSellers: 80, autoScan: true, maxItems: 40, priceTol: 10, autoEvery: 120, sort: "stats", dir: "desc" },
+    { minPrice: MIN_PRICE, minBs: 0, maxBs: NUM_MAX, maxFf: 10, maxSellers: 80, autoScan: true, includeUnknown: false, maxItems: 40, priceTol: 10, autoEvery: 120, sort: "stats", dir: "desc" },
     load(LS.filters, {})
   ),
   prefs: Object.assign({ notify: true, minJackpot: 10000000, myBs: 0, outMinutes: 5, offlineMinutes: 35 }, load(LS.prefs, {})),
@@ -146,6 +146,13 @@ const acquireTsSlot = (runId) => acquireSlot(LS.tscalls, 80, "TornStats", runId)
 
 // ---------------------------------------------------------------- caches
 
+// Keeps a cache from growing forever: drop the oldest entries past the limit.
+function pruneCache(map, max) {
+  const ids = Object.keys(map);
+  if (ids.length <= max) return;
+  ids.sort((a, b) => (map[a].t || 0) - (map[b].t || 0)).slice(0, ids.length - Math.floor(max * 0.75)).forEach((k) => delete map[k]);
+}
+
 function cacheGet(key, id) {
   const m = load(key, {});
   return m[id] || null;
@@ -224,6 +231,9 @@ function initFilters() {
   bindFilter("maxBs", { log: true });
   bindFilter("maxFf", { log: false });
   bindFilter("priceTol", { log: false });
+  const inc = $("includeUnknown");
+  inc.checked = !!state.filters.includeUnknown;
+  inc.addEventListener("change", () => { state.filters.includeUnknown = inc.checked; save(LS.filters, state.filters); });
   const auto = $("autoScan");
   auto.checked = !!state.filters.autoScan;
   auto.addEventListener("change", () => { state.filters.autoScan = auto.checked; save(LS.filters, state.filters); });
@@ -344,16 +354,12 @@ async function scan() {
     if (runId !== state.runId) return;
 
     let rows = [...groups.values()].sort((a, b) => b.total - a.total);
-    const sellerIds = [];
-    for (const r of rows) if (!sellerIds.includes(r.id)) sellerIds.push(r.id);
-    const keep = new Set(sellerIds.slice(0, f.maxSellers));
-    rows = rows.filter((r) => keep.has(r.id));
-    const ids = [...keep];
+    const allIds = [...new Set(rows.map((r) => r.id))];
 
-    // 2. FF Scouter estimates
-    setScanMsg(`Estimating stats for ${ids.length} sellers...`);
+    // 2. FF Scouter estimates for EVERY seller (cheap, 200 per request), so weak players are never skipped
+    setScanMsg(`Estimating stats for ${allIds.length} sellers...`);
     const ffCache = load(LS.ff, {});
-    const need = ids.filter((id) => !ffCache[id] || Date.now() - ffCache[id].t > 6 * 3600e3);
+    const need = allIds.filter((id) => !ffCache[id] || Date.now() - ffCache[id].t > 6 * 3600e3);
     for (let i = 0; i < need.length; i += 200) {
       const batch = need.slice(i, i + 200);
       let data;
@@ -372,14 +378,43 @@ async function scan() {
         ffCache[s.player_id] = { t: Date.now(), ff: s.fair_fight ?? null, bs: s.bs_estimate ?? null };
       }
       for (const id of batch) if (!seen.has(id)) ffCache[id] = { t: Date.now(), ff: null, bs: null };
+      pruneCache(ffCache, 8000);
       save(LS.ff, ffCache);
       if (runId !== state.runId) return;
+      setScanMsg(`Estimating stats ${Math.min(i + 200, need.length)}/${need.length}...`);
     }
+    setProgress(0.3);
+
+    // 3. filter on stats and fair fight, counting why sellers drop out
+    const statLimits = f.minBs > 0 || f.maxBs < NUM_MAX;
+    const why = { noEst: 0, tooStrong: 0, tooWeak: 0, ffHigh: 0 };
+    const verdict = (bs, ff) => {
+      if (ff != null && ff > f.maxFf) return "ffHigh";
+      if (bs == null) return statLimits && !f.includeUnknown ? "noEst" : null;
+      if (bs < f.minBs) return "tooWeak";
+      if (bs > f.maxBs) return "tooStrong";
+      return null;
+    };
+    const drop = (r) => {
+      const v = verdict(r.bs, r.ff);
+      if (v) why[v]++;
+      return !v;
+    };
+    rows = rows.filter((r) => {
+      const e = ffCache[r.id] || {};
+      r.ff = e.ff; r.bs = e.bs; r.src = "Est."; r.spyTs = 0;
+      return drop(r);
+    });
+
+    // only now limit to the highest-value sellers (the expensive Torn status checks come next)
+    const keep = new Set();
+    for (const r of rows) { if (keep.size >= f.maxSellers && !keep.has(r.id)) continue; keep.add(r.id); }
+    rows = rows.filter((r) => keep.has(r.id));
+    const ids = [...keep];
     setProgress(0.35);
 
-    // 2b. optional: real spies from TornStats beat the FF Scouter estimate
-    const spyOf = {};
-    if (state.keys.ts) {
+    // 3b. optional: real spies from TornStats beat the FF Scouter estimate
+    if (state.keys.ts && ids.length) {
       const spyCache = load(LS.spies, {});
       const fresh = (e) => e && Date.now() - e.t < (e.found ? 6 * 3600e3 : 3600e3);
       const todoSpies = ids.filter((id) => !fresh(spyCache[id]));
@@ -399,25 +434,27 @@ async function scan() {
         setScanMsg(`Checking TornStats spies ${++got}/${todoSpies.length}...`);
       });
       if (runId !== state.runId) return;
+      pruneCache(spyCache, 4000);
       save(LS.spies, spyCache);
-      for (const id of ids) if (spyCache[id] && spyCache[id].found) spyOf[id] = spyCache[id];
+      // a real spy replaces the estimate, so check the stat limits again with it
+      rows = rows.filter((r) => {
+        const spy = spyCache[r.id];
+        if (spy && spy.found) { r.bs = spy.total; r.src = "Spy"; r.spyTs = spy.ts; }
+        return drop(r);
+      });
     }
-
-    // 3. filter on stats / fair fight (unknown estimates only pass when no stat limits are set)
-    const statLimits = f.minBs > 0 || f.maxBs < NUM_MAX;
-    rows = rows.filter((r) => {
-      const s = ffCache[r.id] || {};
-      const spy = spyOf[r.id];
-      r.ff = s.ff;
-      r.bs = spy ? spy.total : s.bs;
-      r.src = spy ? "Spy" : "Est.";
-      r.spyTs = spy ? spy.ts : 0;
-      if (r.bs == null) return !statLimits && (r.ff == null || r.ff <= f.maxFf);
-      if (r.bs < f.minBs || r.bs > f.maxBs) return false;
-      return r.ff == null || r.ff <= f.maxFf;
-    });
     state.rows = rows; render();
-    if (!rows.length) { state.outcome = "ok"; setScanMsg("No targets match your filters.", "info"); setProgress(1); return; }
+    if (!rows.length) {
+      state.outcome = "ok";
+      const parts = [];
+      if (why.noEst) parts.push(`${why.noEst} listings have no stat estimate`);
+      if (why.tooStrong) parts.push(`${why.tooStrong} listings are over your max stats`);
+      if (why.tooWeak) parts.push(`${why.tooWeak} listings are under your min stats`);
+      if (why.ffHigh) parts.push(`${why.ffHigh} listings are over your max fair fight`);
+      setScanMsg(`No targets match your filters. ${allIds.length} sellers checked${parts.length ? `: ${parts.join(", ")}` : ""}.`, "info");
+      setProgress(1);
+      return;
+    }
 
     // 4. Torn status + age, paced under the API limit
     const uniq = [...new Set(rows.map((r) => r.id))];

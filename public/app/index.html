@@ -75,7 +75,8 @@
           <div class="label">Listing price within % of market value
             <span class="hint">Skips listings priced far from what the item sells for. 0 turns this check off.</span>
             <div class="slider-row"><input type="range" id="priceTol-r" min="0" max="100" step="1"><input type="number" id="priceTol" inputmode="numeric" min="0" max="100" step="1" aria-label="Percent of market value"></div></div>
-          <label>Max sellers to check <span class="hint">Highest value listings first</span>
+          <label class="check"><input type="checkbox" id="includeUnknown"> Include players with no stat estimate</label>
+          <label>Max sellers to check <span class="hint">Highest value first. Stats are checked on every seller before this limit is applied.</span>
             <input type="number" id="maxSellers" inputmode="numeric" min="1" max="500" step="1"></label>
         </div>
       </section>
