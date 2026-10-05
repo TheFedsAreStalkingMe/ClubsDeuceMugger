@@ -12,28 +12,23 @@
   <div class="smoke"><i></i><i></i><i></i></div><div class="suits-bg"></div>
   <main class="wrap narrow">
     <header class="brand">
-      <svg class="icon gent" aria-hidden="true"><use href="/img/sprite.svg#gent"/></svg>
-      <h1><span class="club">&clubs;</span> Clubs Deuce Mugger</h1>
-      <p>Members only. After hours.</p>
+      <h1>Clubs Deuce Mugger</h1>
+      <svg class="icon big-symbol" aria-hidden="true"><use href="/img/sprite.svg#club"/></svg>
     </header>
 
-    <section class="card" aria-labelledby="signin-h">
-      <span class="corner tl club-c"><svg class="icon"><use href="/img/sprite.svg#club"/></svg></span>
-      <h2 id="signin-h">Sign in</h2>
+    <section class="secret" aria-labelledby="signin-h">
+      <h2 id="signin-h" class="prompt">Enter Password:</h2>
       <form id="login-form" class="stack" autocomplete="on">
         <label>Username <input type="text" name="username" autocomplete="username" autocapitalize="none" required maxlength="24"></label>
         <label>Password <input type="password" name="password" autocomplete="current-password" required maxlength="128"></label>
-        <button class="btn green block" type="submit">Deal me in</button>
+        <button class="btn green" type="submit">Submit</button>
         <p class="msg" id="login-msg" role="status" aria-live="polite"></p>
       </form>
     </section>
 
-    <div class="divider" aria-hidden="true">&spades; &hearts; &diams; &clubs;</div>
-
-    <section class="card" aria-labelledby="apply-h">
-      <span class="corner tl derse-c"><svg class="icon"><use href="/img/sprite.svg#spade"/></svg></span>
+    <section class="card dashed" aria-labelledby="apply-h">
       <h2 id="apply-h">Apply for an account</h2>
-      <p class="hint">New accounts wait for approval before they can sign in.</p>
+      <p class="arrow-note">&lt;- No password? Ask nicely. You wait for approval.</p>
       <form id="apply-form" class="stack" autocomplete="off">
         <label>Username <span class="hint">3-24 characters: letters, numbers, _ . -</span>
           <input type="text" name="username" autocomplete="off" autocapitalize="none" required minlength="3" maxlength="24" pattern="[A-Za-z0-9_.\-]{3,24}"></label>
@@ -41,10 +36,11 @@
           <input type="password" name="password" autocomplete="new-password" required minlength="8" maxlength="128"></label>
         <label>Confirm password
           <input type="password" name="confirm" autocomplete="new-password" required minlength="8" maxlength="128"></label>
-        <button class="btn block" type="submit">Send application</button>
+        <button class="btn" type="submit">Send application</button>
         <p class="msg" id="apply-msg" role="status" aria-live="polite"></p>
       </form>
     </section>
+  <p class="foot">Font: Fontstuck by KevinHilt, <a href="/fonts/LICENSE-fontstuck.txt">CC BY-SA 3.0</a></p>
   </main>
   <script src="/js/login.js"></script>
 </body>

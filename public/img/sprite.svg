@@ -1,24 +1,99 @@
 <svg xmlns="http://www.w3.org/2000/svg">
-  <symbol id="club" viewBox="0 0 100 100">
-    <path fill="currentColor" d="M50 6a21 21 0 0 0-17 33 21 21 0 1 0 12 38c-1 9-4 15-9 17h28c-5-2-8-8-9-17a21 21 0 1 0 12-38A21 21 0 0 0 50 6z"/>
+  <symbol id="club" viewBox="0 0 9 10" shape-rendering="crispEdges">
+    <rect x="3" y="0" width="3" height="1" fill="currentColor"/>
+    <rect x="2" y="1" width="5" height="1" fill="currentColor"/>
+    <rect x="2" y="2" width="5" height="1" fill="currentColor"/>
+    <rect x="3" y="3" width="3" height="1" fill="currentColor"/>
+    <rect x="1" y="4" width="7" height="1" fill="currentColor"/>
+    <rect x="0" y="5" width="9" height="1" fill="currentColor"/>
+    <rect x="0" y="6" width="9" height="1" fill="currentColor"/>
+    <rect x="1" y="7" width="2" height="1" fill="currentColor"/>
+    <rect x="4" y="7" width="1" height="1" fill="currentColor"/>
+    <rect x="6" y="7" width="2" height="1" fill="currentColor"/>
+    <rect x="4" y="8" width="1" height="1" fill="currentColor"/>
+    <rect x="3" y="9" width="3" height="1" fill="currentColor"/>
   </symbol>
-  <symbol id="spade" viewBox="0 0 100 100">
-    <path fill="currentColor" d="M50 4C34 28 8 40 8 62a21 21 0 0 0 37 13c-1 9-4 16-9 20h28c-5-4-8-11-9-20a21 21 0 0 0 37-13C92 40 66 28 50 4z"/>
+  <symbol id="spade" viewBox="0 0 9 10" shape-rendering="crispEdges">
+    <rect x="4" y="0" width="1" height="1" fill="currentColor"/>
+    <rect x="3" y="1" width="3" height="1" fill="currentColor"/>
+    <rect x="2" y="2" width="5" height="1" fill="currentColor"/>
+    <rect x="1" y="3" width="7" height="1" fill="currentColor"/>
+    <rect x="0" y="4" width="9" height="1" fill="currentColor"/>
+    <rect x="0" y="5" width="9" height="1" fill="currentColor"/>
+    <rect x="0" y="6" width="9" height="1" fill="currentColor"/>
+    <rect x="1" y="7" width="2" height="1" fill="currentColor"/>
+    <rect x="4" y="7" width="1" height="1" fill="currentColor"/>
+    <rect x="6" y="7" width="2" height="1" fill="currentColor"/>
+    <rect x="4" y="8" width="1" height="1" fill="currentColor"/>
+    <rect x="3" y="9" width="3" height="1" fill="currentColor"/>
   </symbol>
-  <symbol id="heart" viewBox="0 0 100 100">
-    <path fill="currentColor" d="M50 92C20 68 6 52 6 34a22 22 0 0 1 44-6 22 22 0 0 1 44 6c0 18-14 34-44 58z"/>
+  <symbol id="heart" viewBox="0 0 9 8" shape-rendering="crispEdges">
+    <rect x="1" y="0" width="3" height="1" fill="currentColor"/>
+    <rect x="5" y="0" width="3" height="1" fill="currentColor"/>
+    <rect x="0" y="1" width="9" height="1" fill="currentColor"/>
+    <rect x="0" y="2" width="9" height="1" fill="currentColor"/>
+    <rect x="0" y="3" width="9" height="1" fill="currentColor"/>
+    <rect x="1" y="4" width="7" height="1" fill="currentColor"/>
+    <rect x="2" y="5" width="5" height="1" fill="currentColor"/>
+    <rect x="3" y="6" width="3" height="1" fill="currentColor"/>
+    <rect x="4" y="7" width="1" height="1" fill="currentColor"/>
   </symbol>
-  <symbol id="diamond" viewBox="0 0 100 100">
-    <path fill="currentColor" d="M50 3 86 50 50 97 14 50z"/>
+  <symbol id="diamond" viewBox="0 0 9 9" shape-rendering="crispEdges">
+    <rect x="4" y="0" width="1" height="1" fill="currentColor"/>
+    <rect x="3" y="1" width="3" height="1" fill="currentColor"/>
+    <rect x="2" y="2" width="5" height="1" fill="currentColor"/>
+    <rect x="1" y="3" width="7" height="1" fill="currentColor"/>
+    <rect x="0" y="4" width="9" height="1" fill="currentColor"/>
+    <rect x="1" y="5" width="7" height="1" fill="currentColor"/>
+    <rect x="2" y="6" width="5" height="1" fill="currentColor"/>
+    <rect x="3" y="7" width="3" height="1" fill="currentColor"/>
+    <rect x="4" y="8" width="1" height="1" fill="currentColor"/>
   </symbol>
-  <!-- faceless gentleman in a fedora -->
-  <symbol id="gent" viewBox="0 0 120 150">
-    <ellipse cx="60" cy="42" rx="52" ry="10" fill="currentColor"/>
-    <path fill="currentColor" d="M31 40C31 14 42 6 60 6s29 8 29 34z"/>
-    <path fill="#0b0b0e" opacity=".55" d="M31 33h58v7H31z"/>
-    <path fill="#0b0b0e" d="M42 46h36v20c0 16-8 26-18 26S42 82 42 66z"/>
-    <path fill="currentColor" d="M6 150c2-34 14-52 40-58l14 20 14-20c26 6 38 24 40 58z"/>
-    <path fill="#0b0b0e" d="M60 112l-8 8 6 30h4l6-30z"/>
-    <path fill="#0b0b0e" opacity=".6" d="M46 92l14 20-8 8-20-22zM74 92l-14 20 8 8 20-22z"/>
+  <symbol id="gent" viewBox="0 0 16 17" shape-rendering="crispEdges">
+    <rect x="4" y="0" width="8" height="1" fill="currentColor"/>
+    <rect x="4" y="1" width="8" height="1" fill="currentColor"/>
+    <rect x="4" y="2" width="8" height="1" fill="currentColor"/>
+    <rect x="1" y="3" width="14" height="1" fill="currentColor"/>
+    <rect x="0" y="4" width="16" height="1" fill="currentColor"/>
+    <rect x="5" y="6" width="6" height="1" fill="currentColor"/>
+    <rect x="5" y="7" width="6" height="1" fill="currentColor"/>
+    <rect x="5" y="8" width="6" height="1" fill="currentColor"/>
+    <rect x="5" y="9" width="6" height="1" fill="currentColor"/>
+    <rect x="6" y="10" width="4" height="1" fill="currentColor"/>
+    <rect x="2" y="11" width="4" height="1" fill="currentColor"/>
+    <rect x="7" y="11" width="2" height="1" fill="currentColor"/>
+    <rect x="10" y="11" width="4" height="1" fill="currentColor"/>
+    <rect x="1" y="12" width="5" height="1" fill="currentColor"/>
+    <rect x="7" y="12" width="2" height="1" fill="currentColor"/>
+    <rect x="10" y="12" width="5" height="1" fill="currentColor"/>
+    <rect x="0" y="13" width="7" height="1" fill="currentColor"/>
+    <rect x="7" y="13" width="2" height="1" fill="#000" opacity=".6"/>
+    <rect x="9" y="13" width="7" height="1" fill="currentColor"/>
+    <rect x="0" y="14" width="7" height="1" fill="currentColor"/>
+    <rect x="7" y="14" width="2" height="1" fill="#000" opacity=".6"/>
+    <rect x="9" y="14" width="7" height="1" fill="currentColor"/>
+    <rect x="0" y="15" width="7" height="1" fill="currentColor"/>
+    <rect x="7" y="15" width="2" height="1" fill="#000" opacity=".6"/>
+    <rect x="9" y="15" width="7" height="1" fill="currentColor"/>
+    <rect x="0" y="16" width="7" height="1" fill="currentColor"/>
+    <rect x="7" y="16" width="2" height="1" fill="#000" opacity=".6"/>
+    <rect x="9" y="16" width="7" height="1" fill="currentColor"/>
+  </symbol>
+  <symbol id="lock" viewBox="0 0 9 10" shape-rendering="crispEdges">
+    <rect x="2" y="0" width="5" height="1" fill="currentColor"/>
+    <rect x="1" y="1" width="2" height="1" fill="currentColor"/>
+    <rect x="6" y="1" width="2" height="1" fill="currentColor"/>
+    <rect x="1" y="2" width="1" height="1" fill="currentColor"/>
+    <rect x="7" y="2" width="1" height="1" fill="currentColor"/>
+    <rect x="1" y="3" width="1" height="1" fill="currentColor"/>
+    <rect x="7" y="3" width="1" height="1" fill="currentColor"/>
+    <rect x="0" y="4" width="9" height="1" fill="currentColor"/>
+    <rect x="0" y="5" width="9" height="1" fill="currentColor"/>
+    <rect x="0" y="6" width="4" height="1" fill="currentColor"/>
+    <rect x="5" y="6" width="4" height="1" fill="currentColor"/>
+    <rect x="0" y="7" width="4" height="1" fill="currentColor"/>
+    <rect x="5" y="7" width="4" height="1" fill="currentColor"/>
+    <rect x="0" y="8" width="9" height="1" fill="currentColor"/>
+    <rect x="0" y="9" width="9" height="1" fill="currentColor"/>
   </symbol>
 </svg>

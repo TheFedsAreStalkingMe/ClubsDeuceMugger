@@ -388,8 +388,8 @@ function withSecurityHeaders(response) {
   res.headers.set("Referrer-Policy", "no-referrer");
   res.headers.set(
     "Content-Security-Policy",
-    "default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; " +
-      "font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; " +
+    "default-src 'self'; script-src 'self'; style-src 'self'; " +
+      "font-src 'self'; img-src 'self' data:; connect-src 'self'; " +
       "frame-ancestors 'none'; form-action 'self'; base-uri 'none'"
   );
   if (res.headers.get("Content-Type")?.includes("text/html") && !res.headers.has("Cache-Control")) {
