@@ -428,9 +428,25 @@ async function adminAction(request, env, user) {
 
 async function proxyWeav3r(env, user, url) {
   const item = url.searchParams.get("item") || "";
-  if (!/^\d{1,7}$/.test(item)) return json({ error: "Bad item ID." }, 400);
-  const rl = await rateLimit(env, "weav3r", String(user.id), 60, 60);
+  if (item !== "all" && !/^\d{1,7}$/.test(item)) return json({ error: "Bad item ID." }, 400);
+  const rl = await rateLimit(env, "weav3r", String(user.id), 75, 60);
   if (!rl.ok) return tooMany(rl);
+
+  // Index of every item that has bazaar listings, so the site can pick what to scan.
+  if (item === "all") {
+    const res = await fetch("https://weav3r.dev/api/marketplace", {
+      headers: { Accept: "application/json", "User-Agent": "ClubsDeuceMugger/1.0" },
+      cf: { cacheTtl: 60, cacheEverything: true },
+    });
+    if (!res.ok) return json({ error: `Weav3r returned ${res.status}` }, 502);
+    const data = await res.json().catch(() => null);
+    if (!data || !Array.isArray(data.items)) return json({ error: "Weav3r sent bad data." }, 502);
+    return json({
+      items: data.items
+        .filter((i) => i.item_id > 0 && i.total_bazaars > 0 && i.market_price > 0)
+        .map((i) => ({ id: i.item_id, name: i.item_name, price: i.market_price, bazaars: i.total_bazaars })),
+    });
+  }
   const res = await fetch(`https://weav3r.dev/api/marketplace/${item}`, {
     headers: { Accept: "application/json", "User-Agent": "ClubsDeuceMugger/1.0" },
     cf: { cacheTtl: 30, cacheEverything: true },

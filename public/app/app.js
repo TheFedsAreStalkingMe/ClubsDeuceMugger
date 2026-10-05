@@ -18,7 +18,7 @@ const state = {
   keys: load(LS.keys, { torn: "", ff: "" }),
   watch: load(LS.watch, []),
   filters: Object.assign(
-    { minPrice: 0, minBs: 0, maxBs: NUM_MAX, maxFf: 3, maxSellers: 80, sort: "stats", dir: "desc" },
+    { minPrice: 0, minBs: 0, maxBs: NUM_MAX, maxFf: 3, maxSellers: 80, autoScan: true, maxItems: 40, sort: "stats", dir: "desc" },
     load(LS.filters, {})
   ),
   prefs: Object.assign({ notify: true, minJackpot: 10000000, myBs: 0, outMinutes: 5, offlineMinutes: 35 }, load(LS.prefs, {})),
@@ -173,6 +173,15 @@ function initFilters() {
   bindFilter("minBs", { log: true });
   bindFilter("maxBs", { log: true });
   bindFilter("maxFf", { log: false });
+  const auto = $("autoScan");
+  auto.checked = !!state.filters.autoScan;
+  auto.addEventListener("change", () => { state.filters.autoScan = auto.checked; save(LS.filters, state.filters); });
+  const mi = $("maxItems");
+  mi.value = state.filters.maxItems;
+  mi.addEventListener("input", () => {
+    const v = Math.min(150, Math.max(1, parseInt(mi.value, 10) || 40));
+    state.filters.maxItems = v; save(LS.filters, state.filters);
+  });
   const ms = $("maxSellers");
   ms.value = state.filters.maxSellers;
   ms.addEventListener("input", () => {
@@ -200,31 +209,53 @@ async function pool(items, limit, fn) {
 async function scan() {
   const runId = ++state.runId;
   const f = state.filters;
-  if (!state.watch.length) return setScanMsg("Add at least one item ID to the watchlist.", "err");
+  if (!state.watch.length && !f.autoScan) return setScanMsg("Turn on auto scan or add an item ID to the watchlist.", "err");
   if (!state.keys.torn || !state.keys.ff) return setScanMsg("Enter both API keys in Settings first.", "err");
 
   $("scan").disabled = true; $("cancel").hidden = false;
   state.rows = []; render(); setProgress(0);
   try {
-    // 1. bazaar listings
+    // 1. work out which items to read: your watchlist plus (optionally) every item priced at or above your minimum
     setScanMsg("Reading bazaars...");
+    const targets = new Map(state.watch.map((w) => [w.id, w]));
+    if (f.autoScan) {
+      try {
+        const { items } = await api("/api/weav3r?item=all");
+        const pool_ = items
+          .filter((i) => i.price >= f.minPrice && !targets.has(i.id))
+          .sort((a, b) => b.price - a.price)
+          .slice(0, Math.max(0, f.maxItems - targets.size));
+        for (const i of pool_) targets.set(i.id, { id: i.id, name: i.name, auto: true });
+      } catch (e) {
+        setScanMsg(`Could not load the item list: ${e.message}`, "err");
+      }
+    }
+    const list = [...targets.values()];
+    if (!list.length) return setScanMsg("Nothing to scan. Turn on auto scan or add an item ID.", "err");
     const groups = new Map(); // seller:item -> row
     let done = 0;
-    await pool(state.watch, 3, async (w) => {
-      try {
-        const data = await api(`/api/weav3r?item=${w.id}`);
-        if (data.item_name && w.name !== data.item_name) { w.name = data.item_name; }
-        for (const l of data.listings) {
-          if (l.price < f.minPrice) continue;
-          const k = `${l.player_id}:${w.id}`;
-          const g = groups.get(k) || { id: l.player_id, name: l.player_name, itemId: w.id, itemName: data.item_name || `#${w.id}`, price: l.price, qty: 0, total: 0 };
-          g.price = Math.min(g.price, l.price); g.qty += l.quantity; g.total += l.price * l.quantity;
-          groups.set(k, g);
+    await pool(list, 3, async (w) => {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        if (runId !== state.runId) return;
+        try {
+          const data = await api(`/api/weav3r?item=${w.id}`);
+          if (!w.auto && data.item_name && w.name !== data.item_name) { w.name = data.item_name; }
+          for (const l of data.listings) {
+            if (l.price < f.minPrice) continue;
+            const k = `${l.player_id}:${w.id}`;
+            const g = groups.get(k) || { id: l.player_id, name: l.player_name, itemId: w.id, itemName: data.item_name || w.name || `#${w.id}`, price: l.price, qty: 0, total: 0 };
+            g.price = Math.min(g.price, l.price); g.qty += l.quantity; g.total += l.price * l.quantity;
+            groups.set(k, g);
+          }
+          break;
+        } catch (e) {
+          if (e.retryAfter && attempt < 2) { setScanMsg(`Pacing item reads... ${e.retryAfter}s`); await sleep(e.retryAfter * 1000); continue; }
+          if (runId === state.runId) setScanMsg(`Item ${w.id}: ${e.message}`, "err");
+          break;
         }
-      } catch (e) {
-        if (runId === state.runId) setScanMsg(`Item ${w.id}: ${e.message}`, "err");
       }
-      setProgress(++done / state.watch.length * 0.2);
+      setProgress(++done / list.length * 0.2);
+      if (runId === state.runId) setScanMsg(`Reading bazaars ${done}/${list.length}...`);
     });
     save(LS.watch, state.watch); renderWatch();
     if (runId !== state.runId) return;

@@ -27,7 +27,13 @@
     <div class="panels">
       <section class="card panel">
         <span class="corner tl club-c"><svg class="icon"><use href="/img/sprite.svg#club"/></svg></span>
-        <h2>Watchlist</h2>
+        <h2>Items to scan</h2>
+        <div class="stack">
+          <label class="check"><input type="checkbox" id="autoScan"> Auto scan every item at or above my minimum price</label>
+          <label>Max items per scan <span class="hint">Most valuable first. The watchlist below is always included.</span>
+            <input type="number" id="maxItems" inputmode="numeric" min="1" max="150" step="1"></label>
+        </div>
+        <h3 class="sub-h">Watchlist (always scanned)</h3>
         <form class="row" id="watch-form">
           <input type="number" id="watch-id" inputmode="numeric" min="1" step="1" placeholder="Item ID (e.g. 206)" aria-label="Item ID">
           <button class="btn small" type="submit">Add</button>
