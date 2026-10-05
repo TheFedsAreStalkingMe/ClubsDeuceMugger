@@ -286,11 +286,16 @@ async function runChecks() {
   await page.evaluate(() => localStorage.removeItem("cdm.earn.cache"));
   await page.reload();
   await page.waitForSelector("#types .msg.err");
-  check("a failed list says why and offers Try again", /Could not load company types: Torn: ?Incorrect key|Incorrect key/.test(await text("#types")) && (await page.isVisible("#types button")), await text("#types"));
+  check("a failed list says why, how to fix a key without company access, and offers Try again", /Access level of this key is not high enough/.test(await text("#types")) && /make a new key/.test(await text("#types")) && (await page.isVisible("#types button")), await text("#types"));
   await setFakeFlag("typesFail", false);
   await page.click("#types button");
   await page.waitForSelector("#types label");
   check("Try again loads the list", (await page.$$("#types label")).length === 2);
+  await page.goto(BASE + "/app/settings.html");
+  const keyLink = await page.getAttribute("#make-key", "href");
+  check("the key made from Settings includes company and Torn access", /company=[^&]*employees/.test(keyLink) && /torn=companies/.test(keyLink) && /user=basic,profile,battlestats,attacks/.test(keyLink), keyLink);
+  await page.goto(BASE + "/app/earners.html");
+  await page.waitForSelector("#types label");
   await page.click("#scan");
   await scanDone();
   let efound = await earnCards();

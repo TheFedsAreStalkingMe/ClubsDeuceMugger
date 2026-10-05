@@ -41,7 +41,8 @@ async function loadTypeList() {
     await loadTypes((path) => api(path, { headers: { "X-Torn-Key": state.keys.torn } }));
     renderTypes();
   } catch (e) {
-    showTypesError(e.message, () => { $("types").replaceChildren(el("span", { class: "hint", text: "Loading..." })); loadTypeList(); });
+    const hint = /access level/i.test(e.message) ? " Your key needs company and Torn access: make a new key with step 1 in Settings, or edit your key in Torn's API settings and tick Company and Torn." : "";
+    showTypesError(e.message + hint, () => { $("types").replaceChildren(el("span", { class: "hint", text: "Loading..." })); loadTypeList(); });
   }
 }
 
