@@ -55,6 +55,17 @@ function bindNumber(name, min, max, fallback) {
   });
 }
 
+// A decimal box with limits (empty = 0).
+function bindDecimal(name, min, max, onChange) {
+  const input = $(name);
+  input.value = state.filters[name];
+  input.addEventListener("input", () => {
+    state.filters[name] = Math.min(max, Math.max(min, parseFloat(input.value) || 0));
+    persist();
+    if (onChange) onChange();
+  });
+}
+
 // A dropdown whose options are numbers. A saved value between options snaps to the nearest one below.
 function bindChoice(name) {
   const select = $(name);
@@ -88,6 +99,9 @@ export function initFilters() {
   bindCheckbox("includeUnknown");
   bindChoice("minActivity");
   bindAmount("minStack");
+  bindAmount("minPart");
+  bindCheckbox("merits", render);
+  bindDecimal("plunder", 0, 100, render);
   bindNumber("maxItems", 1, 150, 40);
   bindNumber("autoEvery", 30, 3600, 120);
   bindNumber("maxSellers", 1, 500, 80);

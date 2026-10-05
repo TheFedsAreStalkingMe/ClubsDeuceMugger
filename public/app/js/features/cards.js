@@ -2,6 +2,7 @@
 
 import { el } from "/js/core/dom.js";
 import { fmtAgo, fmtCountdown, fmtMoney, fmtShortAgo, fmtShortMoney, fmtStats } from "/js/core/format.js";
+import { mugOutlook } from "./rules.js";
 import { trackAttack } from "./tracking.js";
 
 export function attackLink(id) {
@@ -27,6 +28,8 @@ function itemList(r) {
     }));
 }
 
+const signed = (n) => `${n < 0 ? "-" : "+"}${fmtShortMoney(Math.abs(n))}`;
+
 // opts.found: seconds since a feed mug was found. opts.dismiss: makes an X button.
 export function card(r, index, opts = {}) {
   const status = el("span", { class: "status pending", text: "Checking..." });
@@ -35,6 +38,7 @@ export function card(r, index, opts = {}) {
   status.dataset.state = r.state || "";
   status.dataset.known = r.state == null ? "" : "1";
 
+  const out = mugOutlook(r);
   const row = (label, value) => [el("dt", { text: label }), el("dd", {}, value)];
   // A time that keeps counting up on its own (see refreshStatuses).
   const ago = (kind, ts) => {
@@ -44,6 +48,7 @@ export function card(r, index, opts = {}) {
   };
   const dl = el("dl", {},
     ...row("Total", fmtMoney(r.total)),
+    ...row("Expected profit", el("span", { class: `rating ${out.rating}`, text: `${signed(out.profit)} · ${out.rating} mug`, title: `Resale ${signed(out.resale)}, mug ${signed(out.mug)} (${(out.rate * 100).toFixed(1)}% of their cash)` })),
     ...row("Est. stats", fmtStats(r.bs)),
     ...row("Fair fight", r.ff != null ? Number(r.ff).toFixed(2) : "?"),
     ...row("Account age", r.age != null ? `${Number(r.age).toLocaleString("en-US")} days` : "?"),

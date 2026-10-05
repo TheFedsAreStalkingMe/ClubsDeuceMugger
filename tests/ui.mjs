@@ -113,6 +113,25 @@ async function runChecks() {
   check("a seller's singles and stacks share one card", (await itemCount("Alpha")) === 2, `${await itemCount("Alpha")}`);
   check("small stacks and single cheap items are left out", !(await names()).includes("Echo") && !(await names()).includes("Foxtrot"));
 
+  section("Added-up items and profit");
+  // Emeralds are $8m each. With a $16m minimum and "add up items worth $8m+", Foxtrot's two ($16m) and Delta's five count; Echo's one does not.
+  await setStore("cdm.filters", { ...filters, minPrice: 16000000, minPart: 8000000 });
+  await page.reload();
+  await page.click("#scan");
+  await scanDone();
+  check("items added up reach the minimum price", (await names()).includes("Foxtrot") && (await names()).includes("Delta") && !(await names()).includes("Echo"), await names());
+  const profitText = async () => page.$$eval("#results .target", (cs) => cs.map((c) => c.textContent).join("|"));
+  check("cards show expected profit and a rating", /Expected profit/.test(await profitText()) && /(good|mediocre|bad) mug/.test(await profitText()));
+  // Foxtrot: $16m at market, so profit is the mug alone: 16m x 5% = +$800k (good). Merits + 20% plunder: 5% x 1.3 = 6.5% = +$1.04m.
+  const foxtrot = async () => page.$$eval("#results .target", (cs) => (cs.find((c) => c.textContent.includes("Foxtrot")) || {}).textContent || "");
+  check("expected profit at base rate", /\+\$800k/.test(await foxtrot()), await foxtrot());
+  await page.click("summary:has-text('More options')");
+  await page.check("#merits");
+  await page.fill("#plunder", "20");
+  check("merits and plunder raise the expected profit", /\+\$1\.04m/.test(await foxtrot()), await foxtrot());
+  await setStore("cdm.filters", filters);
+  await page.reload();
+
   section("Trade activity");
   // Gold Bar changed a minute ago (busy), Silver Bar has been quiet for two days. Busiest first:
   await setStore("cdm.filters", { ...filters, sort: "activity", dir: "desc" });

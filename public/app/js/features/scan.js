@@ -29,6 +29,13 @@ class Stop extends Error {
   }
 }
 
+// The cheapest single item worth looking at: stacks and added-up items can qualify below the minimum price.
+function unitFloor(f) {
+  if (f.minStack > 0) return MIN_PRICE;
+  if (f.minPart > 0) return Math.max(MIN_PRICE, Math.min(f.minPart, f.minPrice));
+  return f.minPrice;
+}
+
 // ---------------------------------------------------------------- 1. choose items
 
 async function chooseItems(call, f) {
@@ -39,8 +46,8 @@ async function chooseItems(call, f) {
       const { items } = await call("/api/weav3r?item=all");
       items
         .map((i) => ({ ...i, floor: i.lowest ?? i.price })) // floor = cheapest bazaar listing
-        // With a stack worth set, cheaper items can still qualify as stacks, so look at everything worth $1m+.
-        .filter((i) => (f.minStack > 0 ? i.price >= MIN_PRICE : i.floor >= f.minPrice && i.price >= f.minPrice) && !targets.has(i.id))
+        // With a stack worth or an add-up value set, cheaper items can still qualify, so look lower.
+        .filter((i) => (unitFloor(f) < f.minPrice ? i.price >= unitFloor(f) : i.floor >= f.minPrice && i.price >= f.minPrice) && !targets.has(i.id))
         // Busiest first when sorting by trade activity (more bazaars = more traded), otherwise priciest first.
         .sort((a, b) => (f.sort === "activity" ? b.bazaars - a.bazaars || b.floor - a.floor : b.floor - a.floor))
         .slice(0, Math.max(0, f.maxItems - targets.size))
@@ -53,7 +60,7 @@ async function chooseItems(call, f) {
   const list = [...targets.values()];
   if (list.length) return list;
   if (indexError) throw new Stop(`Could not load the item list from Weav3r: ${indexError}`, "err", "retry");
-  if (f.autoScan) throw new Stop(`No items are worth ${fmtMoney(f.minStack > 0 ? MIN_PRICE : f.minPrice)} or more. Lower the minimum price.`);
+  if (f.autoScan) throw new Stop(`No items are worth ${fmtMoney(unitFloor(f))} or more. Lower the minimum price.`);
   throw new Stop("Nothing to scan. Turn on auto scan or add an item ID.", "err", "fatal");
 }
 
@@ -64,7 +71,8 @@ async function chooseItems(call, f) {
 //   { id, name, items: [{ itemId, itemName, market, price, qty, total, activity, bazaars }], total, topPrice, activity }
 async function readBazaars(call, list, f, runId) {
   const sellers = new Map();
-  const unitFloor = f.minStack > 0 ? MIN_PRICE : f.minPrice; // cheapest item worth looking at
+  const floor = unitFloor(f); // cheapest item worth looking at
+  const part = f.minPart > 0 ? Math.max(MIN_PRICE, Math.min(f.minPart, f.minPrice)) : 0;
   let done = 0;
   await pool(list, ITEM_READS_AT_ONCE, async (w) => {
     for (let attempt = 0; attempt < 6 && runId === state.runId; attempt++) {
@@ -72,7 +80,7 @@ async function readBazaars(call, list, f, runId) {
         const data = await call(`/api/weav3r?item=${w.id}`);
         if (!w.auto && data.item_name) w.name = data.item_name;
         const market = data.market_price || 0;
-        if (market < unitFloor) break; // not worth enough on the market to resell
+        if (market < floor) break; // not worth enough on the market to resell
         // Trade activity: listings that changed in the last hour (a sale, a restock or a price change).
         const asOf = data.generated_at || Date.now() / 1000;
         const activity = data.listings.filter((l) => l.updated && asOf - l.updated <= 3600).length;
@@ -80,17 +88,20 @@ async function readBazaars(call, list, f, runId) {
         for (const l of data.listings) {
           const single = l.price >= f.minPrice;
           const stack = f.minStack > 0 && l.quantity >= 2 && l.price >= MIN_PRICE && l.price * l.quantity >= f.minStack;
-          if (!single && !stack) continue;
+          const adds = part > 0 && l.price >= part; // counts toward the added-up total
+          if (!single && !stack && !adds) continue;
           // only listings priced near what the item really sells for
           if (f.priceTol > 0 && market > 0 && Math.abs(l.price / market - 1) > f.priceTol / 100) continue;
 
-          const seller = sellers.get(l.player_id) || { id: l.player_id, name: l.player_name, items: new Map(), total: 0, topPrice: 0, activity: 0 };
+          const seller = sellers.get(l.player_id) || { id: l.player_id, name: l.player_name, items: new Map(), total: 0, topPrice: 0, activity: 0, sure: false, added: 0 };
           const item = seller.items.get(w.id) || { itemId: w.id, itemName: data.item_name || w.name || `#${w.id}`, market, activity, bazaars: w.bazaars ?? null, price: l.price, qty: 0, total: 0 };
           item.price = Math.min(item.price, l.price);
           item.qty += l.quantity;
           item.total += l.price * l.quantity;
           seller.items.set(w.id, item);
           seller.total += l.price * l.quantity;
+          if (single || stack) seller.sure = true;
+          if (adds) seller.added += l.price * l.quantity;
           seller.topPrice = Math.max(seller.topPrice, l.price);
           seller.activity = Math.max(seller.activity, activity);
           sellers.set(l.player_id, seller);
@@ -107,7 +118,9 @@ async function readBazaars(call, list, f, runId) {
   });
   save(STORE.watch, state.watch);
   renderWatch();
+  // A seller with only added-up items needs them to reach the minimum price together.
   return [...sellers.values()]
+    .filter((s) => s.sure || s.added >= f.minPrice)
     .map((s) => ({ ...s, items: [...s.items.values()].sort((a, b) => b.total - a.total) }))
     .sort((a, b) => b.total - a.total);
 }

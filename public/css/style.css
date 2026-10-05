@@ -234,3 +234,8 @@ details.more[open] > summary { margin-bottom: 10px; }
 
 @media (max-width: 480px) { .slider-row { grid-template-columns: 1fr 100px; } }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* ---- mug rating ---- */
+.rating.good { color: var(--club); }
+.rating.mediocre { color: var(--muted); }
+.rating.bad { color: var(--derse-l); }

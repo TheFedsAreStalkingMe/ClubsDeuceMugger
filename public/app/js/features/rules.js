@@ -1,6 +1,6 @@
 // Pure rules about a listing row. No page access here.
 
-import { NUM_MAX, state } from "../state.js";
+import { BASE_MUG, MERIT_BONUS, NUM_MAX, state } from "../state.js";
 
 // A row is one seller with everything of theirs that qualifies: { id, name, items: [...], total, topPrice, activity, ... }
 export const rowKey = (r) => String(r.id);
@@ -23,6 +23,7 @@ export function sortValue(r, key) {
     case "hospital": return remaining(r);
     case "age": return r.age;
     case "activity": return r.activity;
+    case "profit": return mugOutlook(r).profit;
     default: return r.total; // price: the value of everything they sell that qualifies
   }
 }
@@ -59,4 +60,18 @@ export function explainDrops(why, sellers) {
   if (why.tooWeak) parts.push(`${why.tooWeak} are under your min stats`);
   if (why.ffHigh) parts.push(`${why.ffHigh} are over your max fair fight`);
   return `No targets match your filters. ${sellers} sellers checked${parts.length ? `: ${parts.join(", ")}` : ""}.`;
+}
+
+// Expected profit if you buy everything this seller lists and then mug them.
+//   resale  = what the items are worth on the market minus what you pay (negative if overpriced)
+//   mug     = the cash they hold after your purchase (what you paid) x 5% x (1 + merits + plunder)
+// Rating: bad if you lose money, good if the profit is at least 5% of what you spend (and $500k), else mediocre.
+export function mugOutlook(r, f = state.filters) {
+  const spend = r.total;
+  const resale = r.items.reduce((sum, i) => sum + (i.market ? (i.market - i.price) * i.qty : 0), 0);
+  const rate = BASE_MUG * (1 + (f.merits ? MERIT_BONUS : 0) + (Number(f.plunder) || 0) / 100);
+  const mug = spend * rate;
+  const profit = resale + mug;
+  const rating = profit <= 0 ? "bad" : profit >= 500000 && profit >= spend * 0.05 ? "good" : "mediocre";
+  return { resale, mug, rate, profit, rating };
 }
