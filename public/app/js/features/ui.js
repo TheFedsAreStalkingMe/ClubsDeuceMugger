@@ -4,13 +4,16 @@ import { $ } from "/js/core/dom.js";
 import { sleep } from "/js/core/async.js";
 import { state } from "../state.js";
 
+// The message line and bar of whichever scan is running (Buymugging has its own).
+const ids = () => (state.mode === "buymug" ? { msg: "bm-msg", bar: "bm-bar" } : { msg: "scan-msg", bar: "bar" });
+
 export function setScanMsg(text, kind = "info") {
-  const m = $("scan-msg");
+  const m = $(ids().msg);
   m.className = `msg ${kind}`;
   m.textContent = text;
 }
 
-export const setProgress = (fraction) => { $("bar").style.width = `${Math.round(fraction * 100)}%`; };
+export const setProgress = (fraction) => { $(ids().bar).style.width = `${Math.round(fraction * 100)}%`; };
 
 // The bar is split into stages. phase(0.25, 0.5)(0.4) fills the bar to 25% + 40% of the next 25%.
 export const phase = (from, to) => (fraction) => setProgress(from + (to - from) * Math.min(1, Math.max(0, fraction)));
@@ -34,4 +37,6 @@ export function updateRunButtons() {
   auto.textContent = state.auto ? "Stop auto hunt" : "Start auto hunt";
   auto.disabled = state.scanning && !state.auto;
   $("cancel").hidden = !(state.scanning || state.auto);
+  $("bm-cancel").hidden = !(state.scanning && state.mode === "buymug");
+  $("bm-scan").disabled = state.scanning;
 }

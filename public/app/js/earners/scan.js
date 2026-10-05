@@ -9,42 +9,21 @@
 import { api } from "/js/core/api.js";
 import { pool } from "/js/core/async.js";
 import { estimateStats } from "../features/estimates.js";
-import { acquireTorn } from "../features/limits.js";
 import { profileFresh, profiles, recordFrom } from "../features/records.js";
 import { statVerdict, explainDrops } from "../features/rules.js";
-import { countdown, phase, setProgress, setScanMsg } from "../features/ui.js";
+import { phase, setProgress, setScanMsg } from "../features/ui.js";
+import { tornCall } from "../features/torncall.js";
 import { state } from "../state.js";
 import { cached, flushCache, keep, loadTypes } from "./data.js";
 import { applyRecord, render } from "./results.js";
 import { daysInactive, estimateCash } from "./rules.js";
 import { earn } from "./state.js";
 
-const TORN_KEY_ERRORS = [2, 10, 13, 16];
 const isCancel = (e) => e && e.message === "cancelled";
 const STAGES = { companies: phase(0, 0.15), employees: phase(0.15, 0.55), estimates: phase(0.55, 0.7), status: phase(0.7, 1) };
 
 class Stop extends Error {
   constructor(message, kind = "info", progress = null) { super(message); Object.assign(this, { kind, progress }); }
-}
-
-// A Torn call (through our server) that waits for a free slot, pacing and slow-downs included.
-async function tornCall(path, runId) {
-  for (;;) {
-    await acquireTorn(runId);
-    try {
-      const r = await api(path, { headers: { "X-Torn-Key": state.keys.torn }, signal: state.ctrl.signal });
-      if (r.error) {
-        if (r.code === 5) { await countdown(30, "Torn says slow down. Waiting", runId); continue; }
-        const e = new Error(`Torn: ${r.error}`);
-        e.fatal = TORN_KEY_ERRORS.includes(r.code);
-        throw e;
-      }
-      return r;
-    } catch (e) {
-      if (e.retryAfter) { await countdown(e.retryAfter, "Pacing Torn API calls...", runId); continue; }
-      throw e;
-    }
-  }
 }
 
 // ---------------------------------------------------------------- 1. companies

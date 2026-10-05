@@ -21,6 +21,13 @@ function bindAmount(name) {
   });
 }
 
+// A text box.
+function bindText(name) {
+  const input = $(name);
+  input.value = state.filters[name];
+  input.addEventListener("input", () => { state.filters[name] = input.value.slice(0, 120); persist(); });
+}
+
 // A whole-number box with limits.
 function bindNumber(name, min, max, fallback) {
   const input = $(name);
@@ -76,6 +83,10 @@ export function initFilters() {
   bindChoice("minActivity");
   bindAmount("minStack");
   bindAmount("minPart");
+  bindAmount("bmMinPrice");
+  bindText("bmBonus");
+  bindNumber("bmItems", 1, 100, 25);
+  bindNumber("bmChecks", 25, 500, 100);
   bindCheckbox("merits", render);
   bindDecimal("plunder", 0, 100, render);
   bindNumber("maxItems", 1, 150, 40);

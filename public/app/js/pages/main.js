@@ -9,6 +9,7 @@ import { initFilters } from "../features/filters.js";
 import { render, tick } from "../features/results.js";
 import { cancelScan, toggleAutoHunt } from "../features/runner.js";
 import { startLiveRefresh } from "../features/refresh.js";
+import { scanBuymug } from "../features/buymug.js";
 import { scan } from "../features/scan.js";
 import { syncLeaderboard } from "../features/tracking.js";
 import { updateRunButtons } from "../features/ui.js";
@@ -37,6 +38,8 @@ async function boot() {
   $("scan").addEventListener("click", scan);
   $("auto").addEventListener("click", toggleAutoHunt);
   $("cancel").addEventListener("click", cancelScan);
+  $("bm-scan").addEventListener("click", scanBuymug);
+  $("bm-cancel").addEventListener("click", cancelScan);
   $("feed-dismiss-all").addEventListener("click", dismissAll);
   $("logout").addEventListener("click", async () => {
     try { await api("/api/logout", { method: "POST", body: {} }); } catch { /* sign out anyway */ }

@@ -3,7 +3,7 @@
 //
 //   PLAYWRIGHT=/path/to/playwright/index.mjs CHROMIUM=/path/to/chromium WRANGLER=... node tests/ui.mjs
 
-import { BASE, OWNER, check, fail, finish, section, setFakeStatus, startEnvironment } from "./lib/harness.mjs";
+import { BASE, OWNER, check, fail, finish, section, setFakeFlag, setFakeStatus, startEnvironment } from "./lib/harness.mjs";
 
 const playwright = await import(process.env.PLAYWRIGHT || "playwright");
 const chromium = playwright.chromium || playwright.default.chromium;
@@ -247,6 +247,28 @@ async function runChecks() {
   await page.click("#test-ff");
   await page.waitForFunction(() => document.getElementById("keys-msg").textContent.length > 12);
   check("FF Scouter key test answers", /FF Scouter/.test(await text("#keys-msg")), await text("#keys-msg"));
+
+  section("Buymugging");
+  await page.goto(BASE + "/app/");
+  await setStore("cdm.keys", { torn: "abcdefgh12345678", ff: "" });
+  await setFakeFlag("buymug", true);
+  // Weakling ($30m, Plunder) is weak enough. Muscle ($28m, Quicken) is too strong. Plain ($12m) has no bonus.
+  await setStore("cdm.filters", { ...filters, maxBs: 5000000000 });
+  await page.reload();
+  check("the Buymugging section is there", (await page.isVisible("#bm-scan")) && (await page.isVisible("#bmMinPrice")));
+  await page.click("#bm-scan");
+  await page.waitForSelector("#bm-scan:not([disabled])", { timeout: 60000 });
+  let bm = (await cards("#results")).map((c) => c.name).join();
+  check("only the weaker seller with a bonus item is listed", bm === "Weakling", `${bm} | ${await text("#bm-msg")}`);
+  check("the card shows the bonus and the price", /Plunder 25/.test(await text("#results .target")) && /\$30m each/.test(await text("#results .target")), (await text("#results .target")).slice(0, 160));
+  await setStore("cdm.filters", { ...filters, bmBonus: "quicken" });
+  await page.reload();
+  await page.click("#bm-scan");
+  await page.waitForSelector("#bm-scan:not([disabled])", { timeout: 60000 });
+  bm = (await cards("#results")).map((c) => c.name).join();
+  check("a bonus name filter keeps only matching bonuses", bm === "Muscle", `${bm} | ${await text("#bm-msg")}`);
+  await setFakeFlag("buymug", false);
+  await setStore("cdm.filters", filters);
 
   section("Inactive earners");
   const earnCards = () => page.$$eval("#results .target", (els) => els.map((e) => ({

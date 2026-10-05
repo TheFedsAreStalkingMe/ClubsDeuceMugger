@@ -24,6 +24,10 @@ export const DEFAULT_FILTERS = {
   includeUnknown: false, // keep players that have no stat estimate
   onlyOkay: false, // hide players who are in hospital, traveling, abroad or in jail
   autoEvery: 120, // seconds between auto hunt scans
+  bmMinPrice: 5000000, // buymugging: only listings priced at least this much
+  bmBonus: "", // buymugging: only bonuses whose name contains one of these words (comma separated, empty = any)
+  bmItems: 25, // buymugging: weapons and armor read per scan
+  bmChecks: 100, // buymugging: items whose bonuses are looked up per scan
   sort: "stats",
   dir: "desc",
 };
@@ -48,6 +52,7 @@ export const state = {
   runId: 0, // changes on every scan start and cancel; old work checks it and stops
   ctrl: null, // AbortController for the running scan
   scanning: false,
+  mode: "hunt", // which scan is running: hunt (bazaar finder) or buymug
   auto: false, // auto hunt on
   outcome: "retry", // how the last scan ended: ok | retry | fatal
 };

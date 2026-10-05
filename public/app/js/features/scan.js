@@ -14,11 +14,13 @@ import { explainDrops, statVerdict, visibleRows } from "./rules.js";
 import { render, scheduleRender, tick } from "./results.js";
 import { STAGES, countdown, setProgress, setScanMsg, updateRunButtons } from "./ui.js";
 import { estimateStats } from "./estimates.js";
+import { resetWeav3r, weav3rGaveUp, weav3rRead } from "./weav3r.js";
 import { applyProfile, profileFresh, profiles, recordFrom } from "./status.js";
 import { renderWatch } from "./watchlist.js";
 
 const ITEM_READS_AT_ONCE = 6;
 const TORN_KEY_ERRORS = [2, 10, 13, 16];
+const DONE = Symbol("item skipped"); // thrown to leave one item early
 const isCancel = (e) => e && e.message === "cancelled";
 
 // An orderly early finish (nothing to do, nothing matched). Not a crash.
@@ -43,13 +45,7 @@ async function chooseItems(call, f) {
   let indexError = "";
   if (f.autoScan) {
     try {
-      let items;
-      for (let attempt = 0; ; attempt++) { // Weav3r sometimes says "busy": wait and ask again
-        try { ({ items } = await call("/api/weav3r?item=all")); break; } catch (e) {
-          if (!e.retryAfter || attempt >= 5) throw e;
-          await countdown(e.retryAfter, "Weav3r is busy. Waiting", state.runId);
-        }
-      }
+      const { items } = await weav3rRead(call, "/api/weav3r?item=all", state.runId);
       items
         .map((i) => ({ ...i, floor: i.lowest ?? i.price })) // floor = cheapest bazaar listing
         // With a stack worth or an add-up value set, cheaper items can still qualify, so look lower.
@@ -81,16 +77,16 @@ async function readBazaars(call, list, f, runId) {
   const part = f.minPart > 0 ? Math.max(MIN_PRICE, Math.min(f.minPart, f.minPrice)) : 0;
   let done = 0;
   await pool(list, ITEM_READS_AT_ONCE, async (w) => {
-    for (let attempt = 0; attempt < 6 && runId === state.runId; attempt++) {
+    if (runId === state.runId) {
       try {
-        const data = await call(`/api/weav3r?item=${w.id}`);
+        const data = await weav3rRead(call, `/api/weav3r?item=${w.id}`, runId, "Weav3r is busy. Waiting");
         if (!w.auto && data.item_name) w.name = data.item_name;
         const market = data.market_price || 0;
-        if (market < floor) break; // not worth enough on the market to resell
+        if (market < floor) throw DONE; // not worth enough on the market to resell
         // Trade activity: listings that changed in the last hour (a sale, a restock or a price change).
         const asOf = data.generated_at || Date.now() / 1000;
         const activity = data.listings.filter((l) => l.updated && asOf - l.updated <= 3600).length;
-        if (activity < f.minActivity) break; // too quiet to sell quickly
+        if (activity < f.minActivity) throw DONE; // too quiet to sell quickly
         for (const l of data.listings) {
           const single = l.price >= f.minPrice;
           const stack = f.minStack > 0 && l.quantity >= 2 && l.price >= MIN_PRICE && l.price * l.quantity >= f.minStack;
@@ -112,11 +108,8 @@ async function readBazaars(call, list, f, runId) {
           seller.activity = Math.max(seller.activity, activity);
           sellers.set(l.player_id, seller);
         }
-        break;
       } catch (e) {
-        if (e.retryAfter && attempt < 5) { await countdown(e.retryAfter, "Pacing item reads...", runId); continue; }
-        if (runId === state.runId) setScanMsg(`Item ${w.id}: ${e.message}`, "err");
-        break;
+        if (e !== DONE && runId === state.runId && !weav3rGaveUp()) setScanMsg(`Item ${w.id}: ${e.message}`, "err");
       }
     }
     STAGES.items(++done / list.length);
@@ -135,7 +128,7 @@ async function readBazaars(call, list, f, runId) {
 
 // ---------------------------------------------------------------- 5. Torn status, age, last action
 
-async function fetchStatuses(call, rows, runId) {
+export async function fetchStatuses(call, rows, runId) {
   const ids = [...new Set(rows.map((r) => r.id))];
   const todo = [];
   for (const id of ids) {
@@ -183,6 +176,7 @@ export async function scan() {
   const runId = ++state.runId;
   const f = state.filters;
   state.outcome = "retry";
+  state.mode = "hunt";
   if (!state.keys.torn) { state.outcome = "fatal"; return setScanMsg("Add your Torn key in Settings first.", "err"); }
   if (!state.watch.length && !f.autoScan) { state.outcome = "fatal"; return setScanMsg("Turn on auto scan or add an item ID to the watchlist.", "err"); }
 
@@ -194,6 +188,7 @@ export async function scan() {
   state.rows = [];
   render();
   setProgress(0);
+  resetWeav3r();
   setScanMsg("Reading bazaars...");
 
   try {
@@ -230,7 +225,7 @@ export async function scan() {
     const { sellers: checked, keyProblem } = await fetchStatuses(call, rows, runId);
     if (runId === state.runId && !keyProblem) {
       state.outcome = "ok";
-      setScanMsg(`Done. ${visibleRows().length} seller(s) shown.`, "ok");
+      setScanMsg(`Done. ${visibleRows().length} seller(s) shown.${weav3rGaveUp() ? " Weav3r was busy, so some items were skipped." : ""}`, weav3rGaveUp() ? "info" : "ok");
       setProgress(1);
     }
     render();

@@ -32,7 +32,7 @@ export const section = (title) => console.log(`\n${title}`);
 const now = () => Math.floor(Date.now() / 1000);
 // Test control: statuses the fake Torn reports, by player id. Change them with setFakeStatus().
 const statusOverride = {};
-const flags = { attacklogFail: false, weav3rBusy: false };
+const flags = { attacklogFail: false, weav3rBusy: false, buymug: false };
 export async function setFakeFlag(name, on) {
   await fetch(`http://localhost:${FAKE_PORT}/__flag?name=${name}&on=${on ? 1 : 0}`);
 }
@@ -53,11 +53,21 @@ function fakeServer() {
     //   Silver Bar $20m, quiet: Charlie one at $20m, Alpha one at $20m.
     //   Emerald $8m: Delta a stack of 5 ($40m), Echo a single, Foxtrot a stack of 2 ($16m).
     if (p === "/weav3r/marketplace" && flags.weav3rBusy) { res.setHeader("Retry-After", "2"); return send({ error: "slow down" }, 429); }
+    // Buymugging (only while the "buymug" flag is on): Gold Rifle $10m, 150 bazaar listings. The cheapest 100 are page 1.
+    //   Page 2 holds the expensive ones: Weakling $30m (Plunder), Muscle $28m (Quicken, but strong), Plain $12m (no bonus).
+    if (p === "/weav3r/marketplace/4") {
+      const page = Number(u.searchParams.get("page") || 1);
+      const fill = Array.from({ length: 100 }, (_, i) => ({ player_id: 40, player_name: "Filler", quantity: 1, price: 10000000, uid: String(8000 + i), content_updated: now() }));
+      const top = [[31, "Weakling", 30000000, "9001"], [32, "Muscle", 28000000, "9002"], [33, "Plain", 12000000, "9003"]]
+        .map(([id, name, price, uid]) => ({ player_id: id, player_name: name, quantity: 1, price, uid, content_updated: now() }));
+      return send({ item_id: 4, item_name: "Gold Rifle", market_price: 10000000, generated_at: now(), page, total_count: 103, has_more: page === 1, listings: page === 1 ? fill : top });
+    }
     if (p === "/weav3r/marketplace") return send({ items: [
       { item_id: 1, item_name: "Gold Bar", market_price: 20000000, lowest_price: 19500000, bazaar_average: 20000000, total_bazaars: 5 },
       { item_id: 2, item_name: "Silver Bar", market_price: 20000000, lowest_price: 20000000, bazaar_average: 20000000, total_bazaars: 50 },
       { item_id: 3, item_name: "Emerald", market_price: 8000000, lowest_price: 8000000, bazaar_average: 8000000, total_bazaars: 20 },
       { item_id: -1, item_name: "Bundle", market_price: 5, lowest_price: null, total_bazaars: 0 },
+      ...(flags.buymug ? [{ item_id: 4, item_name: "Gold Rifle", market_price: 10000000, lowest_price: 10000000, bazaar_average: 11000000, total_bazaars: 4 }] : []),
     ] });
     const old = () => now() - 2 * 86400;
     if (p === "/weav3r/marketplace/1") return send({ item_id: 1, item_name: "Gold Bar", market_price: 20000000, generated_at: now(), extra: "dropped",
@@ -131,8 +141,15 @@ function fakeServer() {
       return send({ employees: by[m[1]] || [] });
     }
 
+    // Torn items (buymugging): weapons list, and bonuses for specific unique items
+    if (p === "/v2/torn/items") return send({ items: u.searchParams.get("cat") === "Weapon" ? [{ id: 4, name: "Gold Rifle", type: "Weapon", sub_type: "Rifle", is_tradable: true, value: { market_price: 10000000 } }] : [] });
+    if ((m = p.match(/^\/v2\/torn\/([\d,]+)\/itemdetails$/))) {
+      const bonus = { 9001: [{ id: 1, title: "Plunder", description: "+25% mug money", value: 25 }], 9002: [{ id: 2, title: "Quicken", description: "faster", value: 20 }] };
+      return send({ itemdetails: m[1].split(",").map((uid) => ({ uid: Number(uid), id: 4, name: "Gold Rifle", type: "Weapon", sub_type: "Rifle", rarity: bonus[uid] ? "orange" : null, stats: { damage: 60, accuracy: 55, armor: null, quality: 20 }, bonuses: bonus[uid] || [] })) });
+    }
+
     // FF Scouter
-    if (p === "/ff/get-stats") return send(u.searchParams.get("targets").split(",").map((id) => ({ player_id: Number(id), fair_fight: 1.5, bs_estimate: 2e9 })));
+    if (p === "/ff/get-stats") return send(u.searchParams.get("targets").split(",").map((id) => ({ player_id: Number(id), fair_fight: 1.5, bs_estimate: Number(id) === 32 ? 9e9 : 2e9 })));
     if (p === "/ff/check-key") return send({ is_registered: key === "REGISTEREDKEY123", is_premium: false, last_used: null });
     if (p === "/ff/register") return send({ success: true, message: "API key successfully registered." });
     send({ error: "not found" }, 404);
