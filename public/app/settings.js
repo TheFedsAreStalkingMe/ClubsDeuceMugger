@@ -81,6 +81,30 @@ function xButton(id) {
   return x;
 }
 let shownInvite = null;
+
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch { /* fall back below */ }
+  try {
+    const range = document.createRange();
+    range.selectNodeContents($("invite-link"));
+    const sel = getSelection(); sel.removeAllRanges(); sel.addRange(range);
+    const ok = document.execCommand("copy");
+    sel.removeAllRanges();
+    return ok;
+  } catch { return false; }
+}
+$("invite-copy").addEventListener("click", async () => {
+  const link = $("invite-link").textContent;
+  say("invite-msg", (await copyText(link)) ? "Link copied." : "Could not copy. Touch and hold the link to copy it.", "ok");
+});
+if (navigator.share) {
+  $("invite-share").addEventListener("click", async () => {
+    try { await navigator.share({ title: "Clubs Deuce Mugger invite", text: "Here is your invite:", url: $("invite-link").textContent }); }
+    catch { /* share sheet closed */ }
+  });
+} else {
+  $("invite-share").hidden = true;
+}
 async function loadInvites() {
   const { invites } = await api("/api/invites");
   const box = $("invite-list");
@@ -117,9 +141,8 @@ $("make-invite").addEventListener("click", async () => {
     shownInvite = d.id;
     $("invite-link").textContent = d.link;
     $("invite-box").hidden = false;
-    $("invite-close").onclick = () => revoke(d.id);
     say("invite-msg", "Copy this link now. It is only shown once.", "ok");
-    try { await navigator.clipboard.writeText(d.link); say("invite-msg", "Link copied. It is only shown once.", "ok"); } catch { /* manual copy */ }
+    if (await copyText(d.link)) say("invite-msg", "Link copied. It is only shown once.", "ok");
     await loadInvites();
   } catch (e) { say("invite-msg", e.message, "err"); }
 });

@@ -186,8 +186,7 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 24px; background: #
 .target .x { position: absolute; top: 8px; right: 8px; width: 40px; height: 40px; border: 2px solid; border-color: #fff #5a5a62 #5a5a62 #fff; background: #c0c0c8; color: #000; font: 700 1rem var(--font-small); cursor: pointer; z-index: 1; }
 .target .x:active { border-color: #5a5a62 #fff #fff #5a5a62; }
 
-.invite-box { display: flex; gap: 8px; align-items: flex-start; width: 100%; }
-.invite-box .invite-link { flex: 1; min-width: 0; }
+.invite-box { display: grid; gap: 10px; width: 100%; }
 .x-btn { min-width: 44px; padding: 4px 10px; }
 
 .board { display: grid; gap: 8px; margin: 12px 0; text-align: left; }
