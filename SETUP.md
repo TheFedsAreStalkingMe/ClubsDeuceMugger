@@ -39,3 +39,9 @@ Worker > **Settings** > **Bindings** should show `DB` (D1: deucemugger), `EMAIL`
 - Limits: 10 login tries per 10 minutes and 5 applications per hour per IP.
 - Torn calls are capped at 80 per minute in the browser, with a server backstop at 84.
 
+## Invites and the owner account
+- Signup is invite only. Members make a link in **Settings > Invite someone** and send it to the person.
+- Before making invites, each member saves their email in **Settings > Your email**. The applicant types that email as their sponsor, and the Approve/Deny links go there. You get a copy at `lobsterlover7170@gmail.com`.
+- `TheFedsAreStalkingMe` is the owner. It has an **Owner panel** on the Mug Finder to approve, deny or remove accounts, and its invites only need your email on file (it falls back to `lobsterlover7170@gmail.com`).
+- The new database migration (`0002_invites.sql`) runs by itself through the deploy command.
+

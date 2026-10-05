@@ -2,7 +2,7 @@
 const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const LS = { keys: "cdm.keys", watch: "cdm.watch", filters: "cdm.filters", profiles: "cdm.profiles", ff: "cdm.ff", calls: "cdm.calls" };
+const LS = { prefs: "cdm.prefs", keys: "cdm.keys", watch: "cdm.watch", filters: "cdm.filters", profiles: "cdm.profiles", ff: "cdm.ff", calls: "cdm.calls" };
 const TORN_CALLS_PER_MIN = 80; // hard ceiling is 85; stay under it
 const WINDOW_MS = 60000;
 const NUM_MAX = 1e10;
@@ -21,6 +21,7 @@ const state = {
     { minPrice: 0, minBs: 0, maxBs: NUM_MAX, maxFf: 3, maxSellers: 80, sort: "stats", dir: "desc" },
     load(LS.filters, {})
   ),
+  prefs: Object.assign({ notify: true, minJackpot: 10000000, myBs: 0, outMinutes: 5, offlineMinutes: 35 }, load(LS.prefs, {})),
   rows: [],
   runId: 0,
 };
@@ -50,6 +51,12 @@ function fmtStats(n) {
   if (n == null) return "?";
   for (const [d, s] of [[1e12, "t"], [1e9, "b"], [1e6, "m"], [1e3, "k"]]) if (n >= d) return (n / d).toFixed(n / d >= 100 ? 0 : 2).replace(/\.?0+$/, "") + s;
   return String(Math.round(n));
+}
+function fmtAgo(sec) {
+  sec = Math.max(0, sec);
+  if (sec < 90) return "just now";
+  const m = Math.floor(sec / 60), h = Math.floor(m / 60), d = Math.floor(h / 24);
+  return d ? `${d}d ${h % 24}h ago` : h ? `${h}h ${m % 60}m ago` : `${m}m ago`;
 }
 function fmtCountdown(sec) {
   sec = Math.max(0, Math.ceil(sec));
@@ -117,29 +124,6 @@ function profileFresh(p) {
   const now = Date.now();
   if (p.until && p.state !== "Okay") return now < Math.min(p.until * 1000, p.t + 15 * 60000);
   return now - p.t < 45000;
-}
-
-// ---------------------------------------------------------------- settings
-
-function initSettings() {
-  $("key-torn").value = state.keys.torn || "";
-  $("key-ff").value = state.keys.ff || "";
-  if (!state.keys.torn || !state.keys.ff) $("settings").open = true;
-  const msg = $("keys-msg");
-  $("save-keys").addEventListener("click", () => {
-    const torn = $("key-torn").value.trim(), ff = $("key-ff").value.trim();
-    const bad = [torn, ff].some((k) => k && !/^[A-Za-z0-9]{8,64}$/.test(k));
-    if (bad) { msg.className = "msg err"; msg.textContent = "Keys should be letters and numbers only."; return; }
-    state.keys = { torn, ff };
-    save(LS.keys, state.keys);
-    msg.className = "msg ok"; msg.textContent = "Saved in this browser only.";
-  });
-  $("clear-keys").addEventListener("click", () => {
-    state.keys = { torn: "", ff: "" };
-    try { localStorage.removeItem(LS.keys); } catch { /* ignore */ }
-    $("key-torn").value = ""; $("key-ff").value = "";
-    msg.className = "msg info"; msg.textContent = "Keys cleared.";
-  });
 }
 
 // ---------------------------------------------------------------- watchlist
@@ -217,7 +201,7 @@ async function scan() {
   const runId = ++state.runId;
   const f = state.filters;
   if (!state.watch.length) return setScanMsg("Add at least one item ID to the watchlist.", "err");
-  if (!state.keys.torn || !state.keys.ff) { $("settings").open = true; return setScanMsg("Enter both API keys in Settings first.", "err"); }
+  if (!state.keys.torn || !state.keys.ff) return setScanMsg("Enter both API keys in Settings first.", "err");
 
   $("scan").disabled = true; $("cancel").hidden = false;
   state.rows = []; render(); setProgress(0);
@@ -286,7 +270,7 @@ async function scan() {
     // 4. Torn status + age, paced under the API limit
     const uniq = [...new Set(rows.map((r) => r.id))];
     let checked = 0, errored = false;
-    const apply = (id, p) => { for (const r of state.rows) if (r.id === id) Object.assign(r, { state: p.state, until: p.until, desc: p.desc, age: p.age }); };
+    const apply = (id, p) => { for (const r of state.rows) if (r.id === id) Object.assign(r, { state: p.state, until: p.until, desc: p.desc, age: p.age, last: p.last }); };
     for (const id of uniq) { const p = cacheGet(LS.profiles, id); if (profileFresh(p)) apply(id, p); }
     render();
     const todo = uniq.filter((id) => !profileFresh(cacheGet(LS.profiles, id)));
@@ -302,7 +286,7 @@ async function scan() {
             if ([2, 10, 13, 16].includes(p.code)) { errored = true; setScanMsg(`Torn key problem: ${p.error}`, "err"); return; }
             apply(id, { state: "Unknown", desc: p.error });
           } else {
-            const rec = { t: Date.now(), state: p.status?.state || "Okay", until: p.status?.until || 0, desc: p.status?.description || "", age: p.age };
+            const rec = { t: Date.now(), state: p.status?.state || "Okay", until: p.status?.until || 0, desc: p.status?.description || "", age: p.age, last: p.last_action?.timestamp || 0 };
             cachePut(LS.profiles, id, rec);
             apply(id, rec);
           }
@@ -378,6 +362,7 @@ function card(r, i) {
     el("dt", { text: "Est. stats" }), el("dd", { text: fmtStats(r.bs) }),
     el("dt", { text: "Fair fight" }), el("dd", { text: r.ff != null ? Number(r.ff).toFixed(2) : "?" }),
     el("dt", { text: "Account age" }), el("dd", { text: r.age != null ? `${Number(r.age).toLocaleString("en-US")} days` : "?" }),
+    el("dt", { text: "Last seen" }), el("dd", { text: r.last ? fmtAgo(Date.now() / 1000 - r.last) : "?" }),
     el("dt", { text: "Status" }), el("dd", {}, status)
   );
   const corner = (cls) => { const s = el("span", { class: `corner ${cls} ${rem === 0 ? "club-c" : "derse-c"}` }); s.append(suit(suitName)); return s; };
@@ -394,9 +379,34 @@ function card(r, i) {
   return art;
 }
 
+// Jackpot alerts: big item, weaker than you, about to be out, and offline long enough.
+let alertKey = "";
+function updateAlerts(now) {
+  const box = $("alerts");
+  const pf = state.prefs;
+  const hits = !pf.notify || !pf.myBs ? [] : state.rows.filter((r) => {
+    if (r.price < pf.minJackpot || r.bs == null || r.bs >= pf.myBs) return false;
+    const rem = remaining(r);
+    if (rem == null || rem > pf.outMinutes * 60) return false;
+    return r.last && (now - r.last) / 60 >= pf.offlineMinutes;
+  });
+  const key = hits.map((r) => `${r.id}:${r.itemId}`).join(",");
+  if (key === alertKey) return;
+  alertKey = key;
+  box.replaceChildren();
+  for (const r of hits) {
+    const links = el("a", { href: `https://www.torn.com/loader.php?sid=attack&user2ID=${r.id}`, target: "_blank", rel: "noopener noreferrer", text: "Attack" });
+    box.append(el("div", { class: "alert" },
+      el("div", { class: "face", text: ">:D JACKPOT" }),
+      el("div", { text: `${r.name} [${r.id}] has ${r.itemName} at ${fmtMoney(r.price)}. Est. stats ${fmtStats(r.bs)}, offline ${Math.round((now - r.last) / 60)}m.` }),
+      links));
+  }
+}
+
 // Local 1s countdown; no API calls.
 function tick() {
   const now = Date.now() / 1000;
+  updateAlerts(now);
   document.querySelectorAll(".status").forEach((s) => {
     if (!s.dataset.known) return;
     const until = Number(s.dataset.until);
@@ -411,11 +421,47 @@ function tick() {
   });
 }
 
+// ---------------------------------------------------------------- owner panel
+
+async function initAdmin() {
+  $("admin").hidden = false;
+  const box = $("admin-list");
+  async function refresh() {
+    const { users } = await api("/api/admin/users");
+    box.replaceChildren();
+    for (const u of users) {
+      const acts = el("div", { class: "acts" });
+      const act = (action, label, cls) => {
+        const b = el("button", { class: `btn small ${cls || ""}`, type: "button", text: label });
+        b.addEventListener("click", async () => {
+          if (action !== "approve" && !confirm(`${label} ${u.username}?`)) return;
+          b.disabled = true;
+          try { await api("/api/admin/users", { method: "POST", body: { id: u.id, action } }); await refresh(); }
+          catch (e) { alert(e.message); b.disabled = false; }
+        });
+        acts.append(b);
+      };
+      if (!u.owner) {
+        if (u.status === "pending") { act("approve", "Approve", "green"); act("deny", "Deny", "ghost"); }
+        else act("delete", "Remove", "ghost");
+      }
+      box.append(el("div", { class: "item" },
+        el("span", {}, el("span", { class: `tag ${u.status}`, text: u.owner ? "owner" : u.status }), ` ${u.username}`),
+        el("span", { class: "meta", text: u.invited_by ? `invited by ${u.invited_by}` : "" }),
+        acts));
+    }
+  }
+  try { await refresh(); } catch (e) { box.textContent = e.message; }
+}
+
 // ---------------------------------------------------------------- boot
 
 async function boot() {
-  try { const me = await api("/api/me"); $("who").textContent = me.username; } catch { return; }
-  initSettings(); initWatch(); initFilters(); render();
+  let me;
+  try { me = await api("/api/me"); $("who").textContent = me.username; } catch { return; }
+  $("setup-note").hidden = !!(state.keys.torn && state.keys.ff);
+  initWatch(); initFilters(); render();
+  if (me.isOwner) initAdmin();
   $("scan").addEventListener("click", scan);
   $("cancel").addEventListener("click", () => { state.runId++; $("scan").disabled = false; $("cancel").hidden = true; setScanMsg("Stopped.", "info"); });
   $("logout").addEventListener("click", async () => {

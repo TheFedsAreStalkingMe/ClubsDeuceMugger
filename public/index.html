@@ -28,8 +28,13 @@
 
     <section class="card dashed" aria-labelledby="apply-h">
       <h2 id="apply-h">Apply for an account</h2>
-      <p class="arrow-note">No password? Ask nicely. You wait for approval.</p>
-      <form id="apply-form" class="stack" autocomplete="off">
+
+      <div id="no-invite">
+        <p class="arrow-note">Joining is invite only. Ask a member for an invite link and open it to apply.</p>
+      </div>
+
+      <form id="apply-form" class="stack" autocomplete="off" hidden>
+        <p class="arrow-note">You have an invite. Pick a username and password.</p>
         <label>Username <span class="hint">3-24 characters: letters, numbers, _ . -</span>
           <input type="text" name="username" autocomplete="off" autocapitalize="none" required minlength="3" maxlength="24" pattern="[A-Za-z0-9_.\-]{3,24}"></label>
         <label>Password <span class="hint">At least 8 characters</span>
@@ -38,6 +43,14 @@
           <input type="password" name="confirm" autocomplete="new-password" required minlength="8" maxlength="128"></label>
         <button class="btn" type="submit">Send application</button>
         <p class="msg" id="apply-msg" role="status" aria-live="polite"></p>
+      </form>
+
+      <form id="sponsor-form" class="stack" autocomplete="off" hidden>
+        <p class="arrow-note">Last step. Enter the email of the member who gave you the invite. We send them the Approve or Deny links.</p>
+        <label>Their email
+          <input type="text" name="email" inputmode="email" autocomplete="off" autocapitalize="none" required maxlength="254"></label>
+        <button class="btn" type="submit">Send to them</button>
+        <p class="msg" id="sponsor-msg" role="status" aria-live="polite"></p>
       </form>
     </section>
   <p class="foot">Font: Fontstuck by KevinHilt, <a href="/fonts/LICENSE-fontstuck.txt">CC BY-SA 3.0</a></p>

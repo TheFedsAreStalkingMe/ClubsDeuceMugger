@@ -19,7 +19,7 @@ async function post(path) {
     return;
   }
   const approve = data.action === "approve";
-  q.textContent = `${approve ? "Approve" : "Deny"} the application from "${data.username}"?`;
+  q.textContent = `${approve ? "Approve" : "Deny"} the application from "${data.username}"${data.invitedBy ? ` (invited by ${data.invitedBy})` : ""}?`;
   btn.textContent = approve ? "Approve" : "Deny and delete";
   btn.className = "btn block " + (approve ? "green" : "");
   btn.hidden = false;

@@ -11,7 +11,8 @@
   "vars": {
     "APP_URL": "https://clubsdeuce.com",
     "ADMIN_EMAIL": "lobsterlover7170@gmail.com",
-    "FROM_EMAIL": "noreply@clubsdeuce.com"
+    "FROM_EMAIL": "noreply@clubsdeuce.com",
+    "OWNER_USERNAME": "TheFedsAreStalkingMe"
   },
   "d1_databases": [
     {

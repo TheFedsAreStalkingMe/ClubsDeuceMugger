@@ -16,25 +16,21 @@
       <h1><svg class="icon club-c"><use href="/img/sprite.svg#club"/></svg> Mug Finder</h1>
       <div class="actions">
         <span class="who" id="who"></span>
+        <a class="btn ghost small" href="/app/settings.html">Settings</a>
         <button class="btn ghost small" id="logout" type="button">Log out</button>
       </div>
     </header>
 
-    <div class="panels">
-      <details class="card panel wide" id="settings">
-        <summary>Settings</summary>
-        <p class="hint">Your keys stay in this browser only. They are sent through our server to Torn and FF Scouter for each request, and never saved.</p>
-        <div class="stack">
-          <label>Torn API key <input type="password" id="key-torn" autocomplete="off" spellcheck="false" maxlength="64"></label>
-          <label>FF Scouter key <input type="password" id="key-ff" autocomplete="off" spellcheck="false" maxlength="64"></label>
-          <div class="row">
-            <button class="btn green small" id="save-keys" type="button">Save keys</button>
-            <button class="btn ghost small" id="clear-keys" type="button">Clear keys</button>
-          </div>
-          <p class="msg" id="keys-msg" role="status" aria-live="polite"></p>
-        </div>
-      </details>
+    <div class="alerts" id="alerts" aria-live="polite"></div>
+    <p class="msg info" id="setup-note" hidden>Add your API keys in <a href="/app/settings.html">Settings</a> to start scanning.</p>
 
+    <section class="card panel" id="admin" hidden>
+      <h2>Owner panel</h2>
+      <p class="hint">Approve, deny or remove accounts.</p>
+      <div class="list" id="admin-list"></div>
+    </section>
+
+    <div class="panels">
       <section class="card panel">
         <span class="corner tl club-c"><svg class="icon"><use href="/img/sprite.svg#club"/></svg></span>
         <h2>Watchlist</h2>

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#000000">
+  <meta name="robots" content="noindex">
+  <title>Clubs Deuce Mugger | Settings</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <main class="wrap">
+    <header class="topbar">
+      <h1>Settings</h1>
+      <div class="actions"><a class="btn ghost small" href="/app/">Back to Mug Finder</a></div>
+    </header>
+
+    <div class="panels">
+      <section class="card panel">
+        <h2>API keys</h2>
+        <p class="hint">Saved in this browser only. Each request passes them through our server and they are never stored there.</p>
+        <div class="stack">
+          <label>Torn API key <input type="password" id="key-torn" autocomplete="off" spellcheck="false" maxlength="64"></label>
+          <label>FF Scouter key <input type="password" id="key-ff" autocomplete="off" spellcheck="false" maxlength="64"></label>
+          <div class="row">
+            <button class="btn green small" id="save-keys" type="button">Save keys</button>
+            <button class="btn ghost small" id="clear-keys" type="button">Clear keys</button>
+          </div>
+          <p class="msg" id="keys-msg" role="status" aria-live="polite"></p>
+        </div>
+      </section>
+
+      <section class="card panel">
+        <h2>Jackpot alerts</h2>
+        <p class="hint">Shows a message at the top of the Mug Finder when a seller has an item worth the amount below or more, and all the rules below match.</p>
+        <div class="stack">
+          <label class="check"><input type="checkbox" id="p-notify"> Alerts on</label>
+          <label>Item worth at least ($) <input type="number" id="p-minJackpot" inputmode="numeric" min="0" step="1"></label>
+          <label>Your total battle stats <span class="hint">Targets must have fewer estimated stats than this</span>
+            <input type="number" id="p-myBs" inputmode="numeric" min="0" step="1"></label>
+          <div class="row"><button class="btn ghost small" id="fetch-bs" type="button">Fetch from Torn</button></div>
+          <label>Out of hospital within (minutes) <input type="number" id="p-outMinutes" inputmode="numeric" min="0" step="1"></label>
+          <label>Offline for at least (minutes) <input type="number" id="p-offlineMinutes" inputmode="numeric" min="0" step="1"></label>
+          <button class="btn green small" id="save-prefs" type="button">Save alert settings</button>
+          <p class="msg" id="prefs-msg" role="status" aria-live="polite"></p>
+        </div>
+      </section>
+
+      <section class="card panel">
+        <h2>Your email</h2>
+        <p class="hint">People you invite enter this email to name you as their sponsor, and the approval links for them are sent here.</p>
+        <div class="stack">
+          <label>Email <input type="text" id="acct-email" inputmode="email" autocapitalize="none" autocomplete="email" maxlength="254"></label>
+          <button class="btn green small" id="save-email" type="button">Save email</button>
+          <p class="msg" id="email-msg" role="status" aria-live="polite"></p>
+        </div>
+      </section>
+
+      <section class="card panel">
+        <h2>Invite someone</h2>
+        <p class="hint">Make a single-use link that lasts 7 days. Send it to the person. They apply with it, then enter your email.</p>
+        <div class="stack">
+          <button class="btn small" id="make-invite" type="button">Make invite link</button>
+          <div class="invite-link" id="invite-link" hidden></div>
+          <p class="msg" id="invite-msg" role="status" aria-live="polite"></p>
+          <div class="list" id="invite-list"></div>
+        </div>
+      </section>
+    </div>
+    <p class="foot">Font: Fontstuck by KevinHilt, <a href="/fonts/LICENSE-fontstuck.txt">CC BY-SA 3.0</a></p>
+  </main>
+  <script src="/app/settings.js"></script>
+</body>
+</html>
