@@ -16,6 +16,7 @@ export function sortValue(r, key) {
     case "stats": return r.bs;
     case "hospital": return remaining(r);
     case "age": return r.age;
+    case "activity": return r.activity;
     default: return r.price;
   }
 }

@@ -82,6 +82,7 @@ tests/                  Automated checks (see Tests)
 | Change a database column | add a new file in `migrations/` (next number), then use it in the route code |
 | Change the scan or filters | `public/app/js/features/scan.js`, `rules.js`, `filters.js` |
 | Change what counts as a good mug | `isMug` in `public/app/js/features/rules.js` |
+| Change how "trade activity" is measured | `readBazaars` in `public/app/js/features/scan.js` (it counts listings changed in the last hour) |
 | Change defaults (filters, alert rules) | `public/app/js/state.js` |
 | Change colours or the look | `public/css/style.css` (colours are at the top) |
 | Add a Settings section | a new file in `public/app/js/settings/`, call it from `pages/settings.js` |

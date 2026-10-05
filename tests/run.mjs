@@ -150,9 +150,10 @@ async function runChecks() {
   r = await anon.get("/api/weav3r?item=1");
   check("data sources need sign-in", r.status === 401);
   r = await bob.get("/api/weav3r?item=all");
-  check("item index drops bundles", r.data.items && r.data.items.length === 1 && r.data.items[0].lowest === 19000000);
+  check("item index drops bundles", r.data.items && r.data.items.length === 2 && r.data.items[0].lowest === 19000000 && r.data.items[1].bazaars === 50);
   r = await bob.get("/api/weav3r?item=1");
   check("bazaar listings trimmed", r.data.listings.length === 2 && r.data.listings[0].uid === undefined && r.data.extra === undefined);
+  check("listings carry their last-changed time", r.data.listings[0].updated > 0 && r.data.generated_at - r.data.listings[0].updated <= 120);
   r = await bob.get("/api/weav3r?item=abc");
   check("bad item id refused", r.status === 400);
   r = await bob.get("/api/torn/user?id=7", { headers: K });

@@ -39,7 +39,7 @@ export async function weav3r({ env, url, user }) {
     item_name: data.item_name,
     market_price: data.market_price,
     generated_at: data.generated_at,
-    listings: (data.listings || []).map((l) => ({ player_id: l.player_id, player_name: l.player_name, quantity: l.quantity, price: l.price })),
+    listings: (data.listings || []).map((l) => ({ player_id: l.player_id, player_name: l.player_name, quantity: l.quantity, price: l.price, updated: l.content_updated })),
   });
 }
 

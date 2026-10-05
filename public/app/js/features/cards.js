@@ -34,6 +34,7 @@ export function card(r, index, opts = {}) {
     ...row("Price", `${fmtMoney(r.price)} × ${r.qty}`),
     ...row("Market", r.market ? `${fmtMoney(r.market)} (${Math.round((r.price / r.market) * 100)}%)` : "?"),
     ...row("Total", fmtMoney(r.total)),
+    ...row("Activity", r.activity != null ? `${r.activity} changed/hr${r.bazaars ? `, ${r.bazaars} bazaars` : ""}` : "?"),
     ...row("Stats", statsText(r)),
     ...row("Fair fight", r.ff != null ? Number(r.ff).toFixed(2) : "?"),
     ...row("Account age", r.age != null ? `${Number(r.age).toLocaleString("en-US")} days` : "?"),

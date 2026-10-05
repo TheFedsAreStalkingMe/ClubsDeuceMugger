@@ -39,9 +39,10 @@ async function chooseItems(call, f) {
       items
         .map((i) => ({ ...i, floor: i.lowest ?? i.price })) // floor = cheapest bazaar listing
         .filter((i) => i.floor >= f.minPrice && i.price >= f.minPrice && !targets.has(i.id))
-        .sort((a, b) => b.floor - a.floor)
+        // Busiest first when sorting by trade activity (more bazaars = more traded), otherwise priciest first.
+        .sort((a, b) => (f.sort === "activity" ? b.bazaars - a.bazaars || b.floor - a.floor : b.floor - a.floor))
         .slice(0, Math.max(0, f.maxItems - targets.size))
-        .forEach((i) => targets.set(i.id, { id: i.id, name: i.name, auto: true }));
+        .forEach((i) => targets.set(i.id, { id: i.id, name: i.name, auto: true, bazaars: i.bazaars }));
     } catch (e) {
       if (isCancel(e)) throw e;
       indexError = e.message;
@@ -67,12 +68,16 @@ async function readBazaars(call, list, f, runId) {
         if (!w.auto && data.item_name) w.name = data.item_name;
         const market = data.market_price || 0;
         if (market < f.minPrice) break; // not worth enough on the market to resell
+        // Trade activity: listings that changed in the last hour (a sale, a restock or a price change).
+        const asOf = data.generated_at || Date.now() / 1000;
+        const activity = data.listings.filter((l) => l.updated && asOf - l.updated <= 3600).length;
+        if (activity < f.minActivity) break; // too quiet to sell quickly
         for (const l of data.listings) {
           if (l.price < f.minPrice) continue;
           // only listings priced near what the item really sells for
           if (f.priceTol > 0 && market > 0 && Math.abs(l.price / market - 1) > f.priceTol / 100) continue;
           const key = `${l.player_id}:${w.id}`;
-          const row = rows.get(key) || { id: l.player_id, name: l.player_name, itemId: w.id, itemName: data.item_name || w.name || `#${w.id}`, market, price: l.price, qty: 0, total: 0 };
+          const row = rows.get(key) || { id: l.player_id, name: l.player_name, itemId: w.id, itemName: data.item_name || w.name || `#${w.id}`, market, activity, bazaars: w.bazaars ?? null, price: l.price, qty: 0, total: 0 };
           row.price = Math.min(row.price, l.price);
           row.qty += l.quantity;
           row.total += l.price * l.quantity;

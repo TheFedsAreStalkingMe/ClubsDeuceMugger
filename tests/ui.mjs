@@ -59,9 +59,10 @@ async function runChecks() {
   check("scan finishes", (await text("#scan-msg")).startsWith("Done."), await text("#scan-msg"));
   check("progress bar fills completely", (await page.$eval("#bar", (b) => b.style.width)) === "100%");
   const found = await cards("#results");
-  check("both sellers listed", found.length === 2, JSON.stringify(found));
+  check("all three sellers listed", found.length === 3, JSON.stringify(found));
   check("seller without a spy is marked Est.", found.some((c) => c.name === "Alpha" && /Est\./.test(c.stats)), JSON.stringify(found));
   check("seller with a spy is marked Spy", found.some((c) => c.name === "Bravo" && /10b Spy/.test(c.stats)), JSON.stringify(found));
+  check("each card shows trade activity", (await page.$$eval("#results .target dt", (d) => d.some((x) => x.textContent === "Activity"))));
   check("jackpot alert at the top", await page.waitForSelector("#alerts .alert", { timeout: 3000 }).then(() => true, () => false));
 
   section("Filters explain empty results");
@@ -71,15 +72,30 @@ async function runChecks() {
   await scanDone();
   check("empty result says why", /listings are over your max stats/.test(await text("#scan-msg")), await text("#scan-msg"));
 
+  section("Trade activity");
+  // Gold Bar changed a minute ago (busy), Silver Bar has been quiet for two days. Busiest first:
+  await setStore("cdm.filters", { ...filters, sort: "activity", dir: "desc" });
+  await page.reload();
+  await page.click("#scan");
+  await scanDone();
+  const byActivity = (await cards("#results")).map((c) => c.name);
+  check("sort by trade activity puts the busy item first", byActivity.slice(0, 2).sort().join() === "Alpha,Bravo" && byActivity[2] === "Charlie", byActivity.join());
+  await setStore("cdm.filters", { ...filters, minActivity: 1 });
+  await page.reload();
+  await page.click("#scan");
+  await scanDone();
+  const busyOnly = (await cards("#results")).map((c) => c.name).sort();
+  check("minimum activity hides quiet items", busyOnly.join() === "Alpha,Bravo", busyOnly.join());
+
   section("Auto hunt, feed and cancel");
   await setStore("cdm.filters", { ...filters, autoEvery: 30 });
   await page.reload();
   await page.click("#auto");
   await page.waitForSelector("#feed:not([hidden])", { timeout: 60000 });
-  check("good mugs land in the feed", (await cards("#feed-list")).length === 2);
-  check("tab title shows the count", (await page.title()).startsWith("(2)"));
+  check("good mugs land in the feed", (await cards("#feed-list")).length === 3);
+  check("tab title shows the count", (await page.title()).startsWith("(3)"));
   await page.click("#feed-list .x");
-  check("X dismisses one", (await cards("#feed-list")).length === 1);
+  check("X dismisses one", (await cards("#feed-list")).length === 2);
   await page.click("#feed-dismiss-all");
   check("Dismiss all clears the feed", await page.isHidden("#feed"));
   check("cancel button visible while hunting", await page.isVisible("#cancel"));

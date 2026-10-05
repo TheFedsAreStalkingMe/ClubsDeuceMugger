@@ -39,16 +39,20 @@ function fakeServer() {
     const p = u.pathname;
     const key = u.searchParams.get("key") || "";
 
-    // Weav3r: one item worth $20m with a seller who has no spy (id 7, odd) and one who has (id 8, even)
+    // Weav3r: two items worth $20m. Gold Bar (busy: one listing changed a minute ago) has sellers 7 (no spy) and
+    // 8 (has a spy). Silver Bar (quiet: nothing changed in two days) has seller 9.
     if (p === "/weav3r/marketplace") return send({ items: [
-      { item_id: 1, item_name: "Gold Bar", market_price: 20000000, lowest_price: 19000000, total_bazaars: 2 },
+      { item_id: 1, item_name: "Gold Bar", market_price: 20000000, lowest_price: 19000000, bazaar_average: 20000000, total_bazaars: 5 },
+      { item_id: 2, item_name: "Silver Bar", market_price: 20000000, lowest_price: 19000000, bazaar_average: 20000000, total_bazaars: 50 },
       { item_id: -1, item_name: "Bundle", market_price: 5, lowest_price: null, total_bazaars: 0 },
     ] });
-    if (p === "/weav3r/marketplace/1") return send({ item_id: 1, item_name: "Gold Bar", market_price: 20000000, generated_at: 1, extra: "dropped",
+    if (p === "/weav3r/marketplace/1") return send({ item_id: 1, item_name: "Gold Bar", market_price: 20000000, generated_at: now(), extra: "dropped",
       listings: [
-        { player_id: 7, player_name: "Alpha", quantity: 2, price: 19500000, uid: "x" },
-        { player_id: 8, player_name: "Bravo", quantity: 1, price: 20500000, uid: "y" },
+        { player_id: 7, player_name: "Alpha", quantity: 2, price: 19500000, uid: "x", content_updated: now() - 60 },
+        { player_id: 8, player_name: "Bravo", quantity: 1, price: 20500000, uid: "y", content_updated: now() - 2 * 86400 },
       ] });
+    if (p === "/weav3r/marketplace/2") return send({ item_id: 2, item_name: "Silver Bar", market_price: 20000000, generated_at: now(),
+      listings: [{ player_id: 9, player_name: "Charlie", quantity: 1, price: 20000000, content_updated: now() - 2 * 86400 }] });
 
     // Torn v1 (status, own stats)
     if (p.startsWith("/tornv1/user")) {

@@ -11,6 +11,7 @@ export const DEFAULT_FILTERS = {
   maxBs: NUM_MAX,
   maxFf: 10,
   priceTol: 10, // listing price must be within this % of market value (0 = off)
+  minActivity: 0, // only items with at least this many listings changed in the last hour (0 = off)
   maxSellers: 80, // sellers who get the slower status checks
   maxItems: 40, // items read per scan
   autoScan: true, // read every item whose cheapest listing is above the minimum
