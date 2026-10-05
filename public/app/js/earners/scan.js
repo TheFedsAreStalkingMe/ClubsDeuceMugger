@@ -9,7 +9,7 @@
 import { api } from "/js/core/api.js";
 import { pool } from "/js/core/async.js";
 import { estimateStats } from "../features/estimates.js";
-import { profileFresh, profiles, recordFrom } from "../features/records.js";
+import { checkStatuses } from "../features/status-stage.js";
 import { statVerdict, explainDrops } from "../features/rules.js";
 import { phase, setProgress, setScanMsg } from "../features/ui.js";
 import { tornCall } from "../features/torncall.js";
@@ -96,36 +96,6 @@ async function readEmployees(companies, f, runId) {
   return rows;
 }
 
-// ---------------------------------------------------------------- 5. Torn status and account age
-
-async function fetchStatuses(rows, runId) {
-  const todo = [];
-  for (const r of rows) {
-    const p = profiles.get(r.id);
-    if (profileFresh(p) && p.age != null) applyRecord(r.id, p); else todo.push(r.id);
-  }
-  let done = rows.length - todo.length;
-  STAGES.status(done / Math.max(1, rows.length));
-  render();
-  let keyProblem = false;
-  await pool(todo, 3, async (id) => {
-    if (runId !== state.runId || keyProblem) return;
-    try {
-      const p = await tornCall(`/api/torn/user?id=${id}`, runId);
-      const rec = recordFrom(p);
-      profiles.put(id, rec);
-      applyRecord(id, rec);
-    } catch (e) {
-      if (isCancel(e)) return;
-      if (e.fatal) { keyProblem = true; setScanMsg(e.message, "err"); return; }
-    }
-    STAGES.status(++done / rows.length);
-    setScanMsg(`Checking status ${done}/${rows.length}...`);
-  });
-  profiles.flush();
-  return keyProblem;
-}
-
 // ---------------------------------------------------------------- the scan
 
 export async function scanEarners() {
@@ -167,7 +137,7 @@ export async function scanEarners() {
     render();
     if (!rows.length) throw new Stop(explainDrops(why, seen).replace("sellers", "inactive players"), "info", 1);
 
-    const keyProblem = await fetchStatuses(rows, runId);
+    const keyProblem = await checkStatuses(rows.map((r) => r.id), runId, { apply: applyRecord, progress: STAGES.status, render });
     if (runId === state.runId && !keyProblem) {
       setScanMsg(`Done. ${rows.length} inactive player(s) from ${companies.length} companies.`, "ok");
       setProgress(1);

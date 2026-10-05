@@ -245,3 +245,9 @@ details.more[open] > summary { margin-bottom: 10px; }
 .tabs a { padding: 10px 16px; border: 2px solid var(--line); color: var(--muted); text-decoration: none; min-height: 44px; display: flex; align-items: center; }
 .tabs a[aria-current="page"] { color: var(--club); border-color: var(--club); }
 .checklist { display: grid; gap: 4px; max-height: 220px; overflow-y: auto; border: 2px solid var(--line); padding: 8px 12px; text-align: left; width: 100%; }
+
+/* ---- bonus weapon rarity ---- */
+.rarity-yellow { color: #f4e04d; }
+.rarity-orange { color: #ff9a3c; }
+.rarity-red { color: #ff5470; }
+.bonus-line { font-weight: 700; margin: 4px 0 0; }

@@ -35,10 +35,11 @@ public/                 THE WEBSITE (served as is)
   js/core/              Helpers shared by every page (api, dom, format, storage, async)
   js/pages/             Scripts for the public pages
   app/                  Signed-in pages (the Worker only serves these to members)
-    index.html          Mug Finder (bazaars)    earners.html   Inactive Earners    settings.html   Settings    leaderboard.html   Leaderboard
+    index.html          Mug Finder (bazaars)    earners.html   Inactive Earners    bonus.html   Bonus Weapon Sellers    settings.html   Settings    leaderboard.html   Leaderboard
     js/state.js         The shared state of the Mug Finder and its defaults
     js/features/        One file per feature (see below)
     js/earners/         The Inactive Earners tab: state, scan, cards, filters, cache (see below)
+    js/bonus/           The Bonus Weapon Sellers tab (see below)
     js/settings/        One file per Settings section
     js/pages/           The script each app page loads (main, settings, leaderboard)
   img/sprite.svg        Pixel suit and symbol art (original)
@@ -54,6 +55,7 @@ tests/                  Automated checks (see Tests)
 | --- | --- |
 | `scan.js` | One scan in stages: choose items, read bazaars (single items and stacks, grouped per seller, or added up to the minimum price), estimates, filter, status |
 | `buymug.js` | Buymugging: weapons and armor with a bonus, sold in bazaars by weaker players (see below) |
+| `status-stage.js` | The Torn status and account age stage shared by the Inactive Earners and Bonus Weapon Sellers scans |
 | `weav3r.js`, `torncall.js` | Shared readers: Weav3r with a "busy" gate (all reads wait together), and Torn calls under the 80 a minute limit |
 | `rules.js` | Pure rules: what is a good mug, expected profit and the good/mediocre/bad rating (`mugOutlook`), why a listing was filtered out, sorting |
 | `filters.js`, `watchlist.js` | The Hunt controls (3 basic, the rest under "More options") and the watchlist |
@@ -75,6 +77,18 @@ sellers' items asks Torn for the bonuses (`/torn/{uids}/itemdetails`, 25 per cal
 Weav3r listing). Weapons and armor come from `/torn/items?cat=` (cached a day). Temporary weapons are skipped (they cannot carry bonuses). You choose the kinds to read (Primary, Secondary, Melee,
 Armor); items are picked by highest bazaar average first, since bonus items pull the average up, and a scan reads 60
 of them by default.
+
+### Bonus Weapon Sellers tab (`public/app/js/bonus/`)
+
+Weapons and armor with bonuses for sale in bazaars, by sellers inside your battle stat range. Source: Weav3r's
+ranked weapons data, `GET https://weav3r.dev/api/ranked-weapons` (public JSON, no key; it is not formally documented,
+its own error message lists the filters it takes: tab, weaponType, rarity, bonus1, minBonus1Value, minPrice,
+maxPrice, page, limit up to 100). Each result has a `source`: `bazaar` names the seller, `market` (item market) is
+anonymous and is dropped by the server (`weav3rRanked` in `src/routes/proxies.js`). Weav3r offers no auction house
+listings in this data, and torn.bzimor.dev has no API, so there is no auction house source; Torn's own API only
+lists finished auctions. Weav3r takes one weapon type, rarity and bonus per search, so several choices become
+several searches (at most 24); each reads up to 5 pages of 100. Searches are kept in the browser for 5 minutes, the
+server allows 30 searches a minute per member and caches answers for a minute.
 
 ### Inactive Earners tab (`public/app/js/earners/`)
 

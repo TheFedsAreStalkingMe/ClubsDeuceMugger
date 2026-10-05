@@ -280,7 +280,7 @@ async function runChecks() {
   await page.goto(BASE + "/app/");
   await setStore("cdm.keys", { torn: "abcdefgh12345678", ff: "" });
   await page.evaluate(() => { localStorage.removeItem("cdm.earn.filters"); localStorage.removeItem("cdm.earn.wages"); localStorage.removeItem("cdm.earn.cache"); });
-  check("the bazaar page has both tabs", (await page.$$("nav.tabs a")).length === 2);
+  check("the bazaar page has the finder tabs", (await page.$$("nav.tabs a")).length === 3);
   await page.goto(BASE + "/app/earners.html");
   await page.waitForSelector("#types label");
   check("company types listed, Mining ticked the first time", (await page.$$("#types label")).length === 2 && (await page.isChecked("#types label:first-child input")));
@@ -324,6 +324,42 @@ async function runChecks() {
   check("a wage set in Settings changes the estimate", /~\$8m \(rough\)/.test(efound[0].text), efound[0] && efound[0].text.slice(0, 100));
   await setStore("cdm.earn.filters", { types: [12], minStars: 5, minDays: 7 });
   await setStore("cdm.earn.wages", { base: 500000, types: {} });
+
+  section("Bonus weapon sellers");
+  const bonusCards = () => page.$$eval("#results .target", (els) => els.map((e) => ({
+    name: e.querySelector(".name").textContent,
+    text: e.textContent,
+    links: [...e.querySelectorAll("a")].map((a) => a.textContent).join(),
+    rarity: e.querySelector(".sub").className,
+  })));
+  const scanBonusPage = async () => { await page.click("#scan"); await scanDone(); return bonusCards(); };
+  await page.goto(BASE + "/app/bonus.html");
+  await page.waitForFunction(() => document.getElementById("maxBs").value !== ""); // the page has started and saved its own filters
+  check("three finder tabs on the bonus page", (await page.$$("nav.tabs a")).length === 3 && (await page.$("nav.tabs a[aria-current=page]")) !== null);
+  await setStore("cdm.keys", { torn: "abcdefgh12345678", ff: "" });
+  await setStore("cdm.bonus.filters", { maxBs: 5000000000 });
+  await page.reload();
+  await page.waitForSelector("#bonuses label");
+  let bw = await scanBonusPage();
+  check("only bazaar sellers inside the stat range, cheapest first", bw.map((c) => c.name).join() === "Fake Magnum,Fake Katana", bw.map((c) => c.name).join());
+  check("cards show bonus, rarity, price, location, stats and seller", /Bloodlust 40%/.test(bw[0].text) && /rarity-yellow/.test(bw[0].rarity) && /\$30,000,000/.test(bw[0].text) && /LocationBazaar/.test(bw[0].text) && /40\.5 \/ 50\.1 \/ 60\.2/.test(bw[0].text) && /Weak \(ID 51\)/.test(bw[0].text) && /Est\. stats2b/.test(bw[0].text), bw[0].text.slice(0, 260));
+  check("cards have listing, profile and attack buttons", bw[0].links === "Listing,Profile,Attack", bw[0].links);
+  check("the anonymous item market listing is left out", !bw.some((c) => c.name === "Fake Anon"));
+  await page.selectOption("#sort", "bonus:desc");
+  check("sorting by bonus", (await bonusCards()).map((c) => c.name).join() === "Fake Magnum,Fake Katana");
+  await page.selectOption("#sort", "bonus:asc");
+  check("sorting by bonus, smallest first", (await bonusCards()).map((c) => c.name).join() === "Fake Katana,Fake Magnum");
+  await setStore("cdm.bonus.filters", { maxBs: 5000000000, bonuses: ["Expose"] });
+  await page.reload();
+  await page.waitForSelector("#bonuses label");
+  bw = await scanBonusPage();
+  check("a bonus choice finds only that bonus", bw.map((c) => c.name).join() === "Fake Katana" && /rarity-red/.test(bw[0].rarity), bw.map((c) => c.name).join());
+  await setStore("cdm.bonus.filters", { maxBs: 5000000000, rarities: ["yellow"], maxPrice: 50000000 });
+  await page.reload();
+  await page.waitForSelector("#bonuses label");
+  bw = await scanBonusPage();
+  check("rarity and price filters", bw.map((c) => c.name).join() === "Fake Magnum", bw.map((c) => c.name).join());
+  await setStore("cdm.bonus.filters", {});
 
   section("Update notice");
   let fakeBuild = "build-A";

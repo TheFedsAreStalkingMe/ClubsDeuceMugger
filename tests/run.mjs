@@ -196,6 +196,16 @@ async function runChecks() {
   check("bad company id refused", r.status === 400);
   r = await bob.get("/api/torn/companies?type=12");
   check("company calls need a Torn key", r.status === 400);
+  r = await bob.get("/api/weav3r/ranked?tab=weapons");
+  check("ranked weapons: bazaar listings with sellers only, trimmed", r.data.listings.length === 3 && r.data.read === 4 && r.data.listings[0].sellerId === 51 && r.data.listings[0].bonuses[0].name === "Bloodlust" && r.data.listings[1].rarity === "orange" && r.data.listings[0].damage === 40.5, JSON.stringify(r.data).slice(0, 300));
+  r = await bob.get("/api/weav3r/ranked?tab=weapons&weaponType=melee&rarity=red");
+  check("ranked weapons: filters reach Weav3r", r.data.listings.length === 1 && r.data.listings[0].name === "Fake Katana");
+  r = await bob.get("/api/weav3r/ranked?bonus1=Parry");
+  check("ranked weapons: a bonus filter and the default tab work", r.data.listings.length === 1 && r.data.listings[0].sellerName === "Strong");
+  r = await bob.get("/api/weav3r/ranked?rarity=purple");
+  check("ranked weapons: odd filter values refused", r.status === 400);
+  r = await anon.get("/api/weav3r/ranked?tab=weapons");
+  check("ranked weapons need sign-in", r.status === 401);
   await setFakeFlag("buymug", true);
   r = await bob.get("/api/weav3r?item=all");
   check("item index carries the bazaar average", r.data.items.some((i) => i.id === 4 && i.average === 11000000), JSON.stringify(r.data.items.slice(-1)));

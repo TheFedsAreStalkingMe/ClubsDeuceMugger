@@ -42,6 +42,7 @@ const ROUTES = [
 
   // mug finder data sources
   ["GET", "/api/weav3r", proxies.weav3r],
+  ["GET", "/api/weav3r/ranked", proxies.weav3rRanked],
   ["GET", "/api/torn/user", proxies.tornProfile],
   ["GET", "/api/torn/me", proxies.tornMe],
   ["GET", "/api/torn/itemlist", proxies.itemList],

@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#08080b">
+  <meta name="robots" content="noindex">
+  <title>Clubs Deuce Mugger | Bonus Weapon Sellers</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Cd">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <main class="wrap">
+    <header class="topbar">
+      <h1>Bonus Weapon Sellers <svg class="icon club-c"><use href="/img/sprite.svg#club"/></svg></h1>
+      <div class="who" id="who"></div>
+      <div class="actions">
+        <a class="btn ghost small" href="/app/leaderboard.html">Leaderboard</a>
+        <a class="btn ghost small" href="/app/settings.html">Settings</a>
+        <button class="btn ghost small" id="logout" type="button">Log out</button>
+      </div>
+    </header>
+
+    <nav class="tabs" aria-label="Finders">
+      <a href="/app/">Bazaar finder</a>
+      <a href="/app/earners.html">Inactive earners</a>
+      <a href="/app/bonus.html" aria-current="page">Bonus weapons</a>
+    </nav>
+
+    <p class="msg info" id="setup-note" hidden>Add your Torn key in <a href="/app/settings.html">Settings</a> to start.</p>
+
+    <section class="card hunt">
+      <h2>Hunt</h2>
+      <p class="hint">Weapons and armor with a bonus, for sale in bazaars by players inside your stat range. Buy the item, the money lands in their cash, then mug them. Bazaar listings only: item market sellers are anonymous, and no source gives live auction house listings with their sellers.</p>
+      <div class="stack">
+        <div class="label">Weapon type
+          <div class="checklist" id="kinds">
+            <label class="check"><input type="checkbox" value="Primary"> Primary</label>
+            <label class="check"><input type="checkbox" value="Secondary"> Secondary</label>
+            <label class="check"><input type="checkbox" value="Melee"> Melee</label>
+            <label class="check"><input type="checkbox" value="Armor"> Armor (any bonus)</label>
+          </div></div>
+        <div class="label">Bonus <span class="hint" id="bonus-count"></span>
+          <div class="checklist" id="bonuses"></div>
+          <button class="btn ghost small" id="bonuses-none" type="button">Any bonus</button>
+          <span class="hint">Pick none for any bonus. A bonus choice leaves armor out.</span></div>
+        <div class="label">Bonus at least (%)
+          <div class="slider-row"><input type="range" id="minBonus-r" min="0" max="200" step="1"><input type="number" id="minBonus" inputmode="numeric" min="0" step="1" aria-label="Bonus at least"></div></div>
+        <div class="label">Rarity
+          <div class="checklist" id="rarities">
+            <label class="check"><input type="checkbox" value="yellow"> Yellow</label>
+            <label class="check"><input type="checkbox" value="orange"> Orange</label>
+            <label class="check"><input type="checkbox" value="red"> Red</label>
+          </div></div>
+        <div class="label">Price at least ($)
+          <div class="slider-row"><input type="range" id="minPrice-r" min="0" max="1000"><input type="number" id="minPrice" inputmode="numeric" min="0" step="1" aria-label="Price at least"></div></div>
+        <div class="label">Price at most ($)
+          <div class="slider-row"><input type="range" id="maxPrice-r" min="0" max="1000"><input type="number" id="maxPrice" inputmode="numeric" min="0" step="1" aria-label="Price at most"></div></div>
+        <div class="label">Sellers stronger than
+          <div class="slider-row"><input type="range" id="minBs-r" min="0" max="1000"><input type="number" id="minBs" inputmode="numeric" min="0" step="1" aria-label="Sellers stronger than"></div></div>
+        <div class="label">Sellers weaker than
+          <div class="slider-row"><input type="range" id="maxBs-r" min="0" max="1000"><input type="number" id="maxBs" inputmode="numeric" min="0" step="1" aria-label="Sellers weaker than"></div>
+          <span class="hint">Their estimated total battle stats.</span></div>
+        <div class="label">Max fair fight
+          <div class="slider-row"><input type="range" id="maxFf-r" min="1" max="10" step="0.01"><input type="number" id="maxFf" inputmode="decimal" min="1" max="10" step="0.01" aria-label="Max fair fight"></div></div>
+      </div>
+
+      <details class="more">
+        <summary>More options</summary>
+        <div class="stack">
+          <label class="check"><input type="checkbox" id="includeUnknown"> Keep sellers with no stat estimate</label>
+          <label>Pages read per search <span class="hint">100 listings each, cheapest first.</span>
+            <input type="number" id="pages" inputmode="numeric" min="1" max="5" step="1"></label>
+          <label>Listings to show
+            <input type="number" id="maxListings" inputmode="numeric" min="1" max="300" step="1"></label>
+        </div>
+      </details>
+
+      <div class="progress" aria-hidden="true"><div id="bar"></div></div>
+      <div class="scanbar">
+        <button class="btn green" id="scan" type="button">Scan once &clubs;</button>
+        <button class="btn ghost" id="cancel" type="button" hidden>Cancel</button>
+      </div>
+      <p class="hint">Searches are kept for 5 minutes, so repeat scans are quick. Listings come from Weav3r's ranked weapons data.</p>
+      <p class="msg info" id="scan-msg" role="status" aria-live="polite"></p>
+    </section>
+
+    <div class="sortbar">
+      <label>Sort
+        <select id="sort">
+          <option value="price:asc">Cheapest first</option>
+          <option value="price:desc">Priciest first</option>
+          <option value="bonus:desc">Biggest bonus first</option>
+          <option value="bonus:asc">Smallest bonus first</option>
+          <option value="stats:asc">Weakest sellers first</option>
+          <option value="stats:desc">Strongest sellers first</option>
+          <option value="hospital:asc">Out of hospital soonest</option>
+          <option value="hospital:desc">Out of hospital latest</option>
+          <option value="age:asc">Newest accounts</option>
+          <option value="age:desc">Oldest accounts</option>
+        </select>
+      </label>
+    </div>
+
+    <section class="results" id="results" aria-live="polite"></section>
+  <p class="foot">Font: Fontstuck by KevinHilt, <a href="/fonts/LICENSE-fontstuck.txt">CC BY-SA 3.0</a></p>
+  </main>
+  <script type="module" src="/app/js/pages/bonus.js"></script>
+</body>
+</html>

@@ -53,6 +53,24 @@ function fakeServer() {
     //   Silver Bar $20m, quiet: Charlie one at $20m, Alpha one at $20m.
     //   Emerald $8m: Delta a stack of 5 ($40m), Echo a single, Foxtrot a stack of 2 ($16m).
     if (p === "/weav3r/marketplace" && flags.weav3rBusy) { res.setHeader("Retry-After", "2"); return send({ error: "slow down" }, 429); }
+    // Weav3r ranked weapons (Bonus Weapon Sellers). Bazaar: Weak (51) Bloodlust 40 yellow $30m, Strong (52) Parry 25 orange $80m
+    // (strong), Boss (53) Expose 12 red $300m. One item market listing (anonymous) and a Plunder bazaar listing for page 2.
+    if (p === "/weav3r/ranked-weapons") {
+      const q = u.searchParams;
+      if (![...q.keys()].some((k) => k !== "limit")) return send({ error: "Missing filter parameters" }, 400);
+      const b = (name, value) => ({ 0: { bonus: name, value, description: `${value}% ${name}` } });
+      const all = [
+        { uid: "7001", itemId: 20, itemName: "Fake Magnum", weaponType: "Secondary", rarity: "yellow", damage: "40.5", accuracy: "50.1", quality: "60.2", bonuses: b("Bloodlust", 40), price: 30000000, playerId: 51, playerName: "Weak", quantity: 1, marketPrice: 1000, lastUpdated: "2026-10-05T20:00:00Z", source: "bazaar" },
+        { uid: "7002", itemId: 21, itemName: "Fake Rifle", weaponType: "Primary", rarity: "Orange", damage: "55", accuracy: "45", quality: "70", bonuses: b("Parry", 25), price: 80000000, playerId: 52, playerName: "Strong", quantity: 1, marketPrice: 1000, lastUpdated: "2026-10-05T20:00:00Z", source: "bazaar" },
+        { uid: "7003", itemId: 22, itemName: "Fake Katana", weaponType: "Melee", rarity: "red", damage: "60", accuracy: "50", quality: "80", bonuses: b("Expose", 12), price: 300000000, playerId: 53, playerName: "Boss", quantity: 1, marketPrice: 1000, lastUpdated: "2026-10-05T20:00:00Z", source: "bazaar" },
+        { uid: "7004", itemId: 23, itemName: "Fake Anon", weaponType: "Primary", rarity: "red", damage: "60", accuracy: "50", quality: "80", bonuses: b("Plunder", 49), price: 90000000, playerId: null, playerName: null, quantity: 1, marketPrice: 90000000, lastUpdated: "2026-10-05T20:00:00Z", source: "market" },
+      ];
+      const type = q.get("weaponType"), rar = q.get("rarity"), bonus = q.get("bonus1"), maxPrice = Number(q.get("maxPrice") || Infinity), minPrice = Number(q.get("minPrice") || 0);
+      const hit = all.filter((w) => (!type || w.weaponType.toLowerCase() === type) && (!rar || w.rarity.toLowerCase() === rar) && (!bonus || w.bonuses[0].bonus === bonus) && w.price <= maxPrice && w.price >= minPrice);
+      const limit = Number(q.get("limit") || 20), page = Number(q.get("page") || 1);
+      return send({ total_count: hit.length, weapons: q.get("tab") === "armor" ? [] : hit.slice((page - 1) * limit, page * limit), response_time_ms: 1 });
+    }
+
     // Buymugging (only while the "buymug" flag is on): Gold Rifle $10m, 150 bazaar listings. The cheapest 100 are page 1.
     //   Page 2 holds the expensive ones: Weakling $30m (Plunder), Muscle $28m (Quicken, but strong), Plain $12m (no bonus).
     if (p === "/weav3r/marketplace/4") {
@@ -149,7 +167,7 @@ function fakeServer() {
     }
 
     // FF Scouter
-    if (p === "/ff/get-stats") return send(u.searchParams.get("targets").split(",").map((id) => ({ player_id: Number(id), fair_fight: 1.5, bs_estimate: Number(id) === 32 ? 9e9 : 2e9 })));
+    if (p === "/ff/get-stats") return send(u.searchParams.get("targets").split(",").map((id) => ({ player_id: Number(id), fair_fight: 1.5, bs_estimate: [32, 52].includes(Number(id)) ? 9e9 : 2e9 })));
     if (p === "/ff/check-key") return send({ is_registered: key === "REGISTEREDKEY123", is_premium: false, last_used: null });
     if (p === "/ff/register") return send({ success: true, message: "API key successfully registered." });
     send({ error: "not found" }, 404);

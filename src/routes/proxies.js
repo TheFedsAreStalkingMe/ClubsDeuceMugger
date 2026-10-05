@@ -56,6 +56,50 @@ export async function weav3r({ env, url, user }) {
   });
 }
 
+// Ranked weapons and armor with their bonuses (Weav3r's ranked-weapons data). Each result carries its source:
+// "bazaar" listings name the seller, "market" (item market) listings are anonymous and are left out here.
+// The endpoint is not formally documented: its own error message lists the filters it takes. We pass on only the
+// few we use, one page (100 rows) at a time.
+const RANKED_FILTERS = {
+  tab: /^(weapons|armor)$/,
+  weaponType: /^(primary|secondary|melee)$/,
+  rarity: /^(yellow|orange|red)$/,
+  bonus1: /^[A-Za-z][A-Za-z -]{1,24}$/,
+  minBonus1Value: /^\d{1,4}$/,
+  minPrice: /^\d{1,12}$/,
+  maxPrice: /^\d{1,12}$/,
+  page: /^\d{1,3}$/,
+};
+
+export async function weav3rRanked({ env, url, user }) {
+  const params = new URLSearchParams({ limit: "100" });
+  for (const [name, re] of Object.entries(RANKED_FILTERS)) {
+    const v = url.searchParams.get(name);
+    if (v == null || v === "") continue;
+    if (!re.test(v)) return fail(`Bad ${name}.`);
+    params.set(name, v);
+  }
+  if (!params.has("tab")) params.set("tab", "weapons"); // the endpoint needs at least one filter
+  const blocked = await throttle(env, "weav3rRanked", String(user.id), 30, 60, { maxRetry: 5 });
+  if (blocked) return blocked;
+  params.sort(); // the same question gets the same cache entry
+  const { res, data } = await fetchJson(`${upstream(env).weav3r}/ranked-weapons?${params}`, { cf: { cacheTtl: 60, cacheEverything: true } });
+  if (!res.ok) return weav3rFail(res);
+  if (!data || !Array.isArray(data.weapons)) return fail("Weav3r sent bad data.", 502);
+  return json({
+    total: data.total_count ?? null,
+    read: data.weapons.length,
+    listings: data.weapons
+      .filter((w) => w.source === "bazaar" && w.playerId)
+      .map((w) => ({
+        uid: String(w.uid), itemId: w.itemId, name: w.itemName, kind: w.weaponType, rarity: String(w.rarity || "").toLowerCase(),
+        damage: Number(w.damage) || null, accuracy: Number(w.accuracy) || null, quality: Number(w.quality) || null,
+        bonuses: Object.values(w.bonuses || {}).map((b) => ({ name: b.bonus, value: b.value, description: b.description })),
+        price: w.price, sellerId: w.playerId, sellerName: w.playerName, updated: w.lastUpdated,
+      })),
+  });
+}
+
 // ---------------------------------------------------------------- Torn (status, age, own stats)
 
 // Runs a Torn v1 call. Torn answers 200 with an error object, so key problems are passed on in the body.
