@@ -73,11 +73,13 @@
 
       <section class="card panel">
         <h2>Inactive earner wages</h2>
-        <p class="hint">Torn does not show wages, so the Inactive earners tab guesses: daily wage x company stars / 10 x days inactive. Set the wage a 10 star company pays per day. Leave a type empty to use the default.</p>
+        <p class="hint">Torn does not show wages, so the Inactive earners tab guesses: wage per day x days inactive. Unless you set a wage for a company type, the wage is a share of that company's real daily income split between its employees (Torn caps pay at $25m a day).</p>
         <div class="stack">
-          <label>Default daily wage at 10 stars ($) <input type="number" id="w-base" inputmode="numeric" min="0" step="1000"></label>
+          <label>Share of company income paid as wages (%) <span class="hint">Directors usually pay out 60 to 70%.</span>
+            <input type="number" id="w-share" inputmode="numeric" min="1" max="100" step="1"></label>
+          <label>Wage when a company's income is unknown ($ per day at 10 stars) <input type="number" id="w-base" inputmode="numeric" min="0" step="1000"></label>
           <details class="more">
-            <summary>Wage per company type</summary>
+            <summary>Fixed wage per company type (at 10 stars)</summary>
             <div class="stack" id="w-types"><span class="hint">Save your Torn key first to load the company types.</span></div>
           </details>
           <button class="btn green small" id="save-wages" type="button">Save wages</button>

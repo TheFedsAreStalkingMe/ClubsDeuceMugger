@@ -107,7 +107,7 @@ async function readEmployees(companies, f, runId) {
       if (!last || nowSec - last < minIdle) continue; // too recently active
       rows.push({
         id, name, position, daysIn, last, state: st, until, desc, age: null, checkedAt: Date.now(),
-        company: { id: c.id, name: c.name, typeId: c.type, typeName: c.typeName, stars: c.stars },
+        company: { id: c.id, name: c.name, typeId: c.type, typeName: c.typeName, stars: c.stars, income: c.income, hired: c.hired },
       });
     }
     STAGES.employees(++done / companies.length);

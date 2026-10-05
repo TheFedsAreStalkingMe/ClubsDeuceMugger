@@ -9,7 +9,8 @@ import { DEFAULT_WAGES } from "../earners/state.js";
 const wages = () => ({ ...DEFAULT_WAGES, ...load(STORE.earnWages, {}) });
 
 function saveWages() {
-  const next = { base: Math.max(0, parseFloat($("w-base").value) || DEFAULT_WAGES.base), types: {} };
+  const share = parseFloat($("w-share").value);
+  const next = { base: Math.max(0, parseFloat($("w-base").value) || DEFAULT_WAGES.base), share: share >= 1 && share <= 100 ? share : DEFAULT_WAGES.share, types: {} };
   for (const input of document.querySelectorAll("#w-types input")) {
     const v = parseFloat(input.value);
     if (Number.isFinite(v) && v >= 0) next.types[input.dataset.type] = v;
@@ -21,6 +22,7 @@ function saveWages() {
 export async function initWages() {
   const w = wages();
   $("w-base").value = w.base;
+  $("w-share").value = w.share;
   $("save-wages").addEventListener("click", saveWages);
   const key = loadKeys().torn;
   if (!key) return;

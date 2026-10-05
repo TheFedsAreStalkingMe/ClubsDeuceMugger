@@ -265,7 +265,7 @@ async function runChecks() {
   await scanDone();
   let efound = await earnCards();
   check("only inactive players at companies with enough stars", efound.map((c) => c.name).join() === "Rex,Pia", efound.map((c) => c.name).join());
-  check("estimated cash: $500k x 10/10 x days inactive, labelled rough", /~\$15m \(rough\)/.test(efound[0].text) && /~\$5m \(rough\)/.test(efound[1].text), efound.map((c) => c.text.slice(0, 120)).join(" | "));
+  check("estimated cash: 60% of $1m daily income / 3 employees = $200k a day x days inactive, labelled rough", /~\$6m \(rough\)/.test(efound[0].text) && /~\$2m \(rough\)/.test(efound[1].text), efound.map((c) => c.text.slice(0, 120)).join(" | "));
   check("cards show company, type, stars, position, profile and attack buttons", /Deep Co · Mining Corporation · 10★/.test(efound[0].text) && /Miner/.test(efound[0].text) && efound[0].link === "Profile,Attack", efound[0].link);
   check("cards show stats, fair fight, age and status", /Est\. stats2b/.test(efound[0].text) && /Fair fight1\.50/.test(efound[0].text) && /Account age\d+ days/.test(efound[0].text) && /Status(Okay|Out|Hospital)/.test(efound[0].text), efound[0].text);
   await page.selectOption("#sort", "days:asc");
@@ -284,11 +284,12 @@ async function runChecks() {
   await page.click("#scan");
   await scanDone();
   efound = await earnCards();
-  check("cash is capped by days in the company", efound.length === 1 && efound[0].name === "Tess" && /~\$2m \(rough\)/.test(efound[0].text), efound.map((c) => c.text.slice(0, 100)).join("|"));
+  check("cash is capped by days in the company", efound.length === 1 && efound[0].name === "Tess" && /~\$4\.8m \(rough\)/.test(efound[0].text), efound.map((c) => c.text.slice(0, 100)).join("|"));
   // Settings wages change the estimate.
   await page.goto(BASE + "/app/settings.html");
   await page.waitForSelector("#w-types input", { state: "attached" });
   await page.click("summary:has-text('Wage per company type')");
+  await page.fill("#w-share", "60");
   await page.fill("#w-base", "1000000");
   await page.fill("#w-types input[data-type='5']", "2000000");
   await page.click("#save-wages");

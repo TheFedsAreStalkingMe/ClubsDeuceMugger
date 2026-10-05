@@ -70,8 +70,9 @@ Finds players who have been offline a while at well starred companies, since the
 It uses Torn API v2 with the member's own key (public access is enough): `/torn/companies` (company types),
 `/company/{typeId}/companies` (100 per page, with star `rating`), and `/company/{id}/employees` (position, days in
 company, last action, status). Torn does not show wages, so **estimated cash is a rough guess**:
-`wage x stars / 10 x min(days inactive, days in company)`, where the wage is set per company type in Settings
-(default $500,000 for a 10 star company). Company lists and employees are cached in the browser for 3 hours
+`wage x min(days inactive, days in company)`. The wage is a fixed number per company type if you set one in Settings
+(for a 10 star company, scaled by stars / 10), otherwise 60% of the company's real daily income split between its
+employees (capped at Torn's $25m a day pay limit). Company lists and employees are cached in the browser for 3 hours
 (`data.js`); every Torn call goes through the shared 80 a minute limiter (`features/limits.js`).
 
 ## How it fits together
