@@ -18,7 +18,7 @@ const state = {
   keys: load(LS.keys, { torn: "", ff: "" }),
   watch: load(LS.watch, []),
   filters: Object.assign(
-    { minPrice: 0, minBs: 0, maxBs: NUM_MAX, maxFf: 3, maxSellers: 80, autoScan: true, maxItems: 40, sort: "stats", dir: "desc" },
+    { minPrice: 0, minBs: 0, maxBs: NUM_MAX, maxFf: 3, maxSellers: 80, autoScan: true, maxItems: 40, priceTol: 10, sort: "stats", dir: "desc" },
     load(LS.filters, {})
   ),
   prefs: Object.assign({ notify: true, minJackpot: 10000000, myBs: 0, outMinutes: 5, offlineMinutes: 35 }, load(LS.prefs, {})),
@@ -182,6 +182,12 @@ function initFilters() {
     const v = Math.min(150, Math.max(1, parseInt(mi.value, 10) || 40));
     state.filters.maxItems = v; save(LS.filters, state.filters);
   });
+  const pt = $("priceTol");
+  pt.value = state.filters.priceTol;
+  pt.addEventListener("input", () => {
+    const v = Math.min(100, Math.max(0, parseInt(pt.value, 10) || 0));
+    state.filters.priceTol = v; save(LS.filters, state.filters);
+  });
   const ms = $("maxSellers");
   ms.value = state.filters.maxSellers;
   ms.addEventListener("input", () => {
@@ -215,7 +221,7 @@ async function scan() {
   $("scan").disabled = true; $("cancel").hidden = false;
   state.rows = []; render(); setProgress(0);
   try {
-    // 1. work out which items to read: your watchlist plus (optionally) every item whose cheapest listing is at or above your minimum
+    // 1. work out which items to read: your watchlist plus (optionally) every item whose cheapest listing and market value are at or above the minimum
     setScanMsg("Reading bazaars...");
     const targets = new Map(state.watch.map((w) => [w.id, w]));
     if (f.autoScan) {
@@ -223,7 +229,7 @@ async function scan() {
         const { items } = await api("/api/weav3r?item=all");
         const pool_ = items
           .map((i) => ({ ...i, floor: i.lowest ?? i.price })) // cheapest bazaar listing for the item
-          .filter((i) => i.floor >= f.minPrice && !targets.has(i.id))
+          .filter((i) => i.floor >= f.minPrice && i.price >= f.minPrice && !targets.has(i.id))
           .sort((a, b) => b.floor - a.floor)
           .slice(0, Math.max(0, f.maxItems - targets.size));
         for (const i of pool_) targets.set(i.id, { id: i.id, name: i.name, auto: true });
@@ -241,10 +247,14 @@ async function scan() {
         try {
           const data = await api(`/api/weav3r?item=${w.id}`);
           if (!w.auto && data.item_name && w.name !== data.item_name) { w.name = data.item_name; }
+          const market = data.market_price || 0;
+          if (market < f.minPrice) break; // not worth enough on the market to resell
           for (const l of data.listings) {
             if (l.price < f.minPrice) continue;
+            // only listings priced near what the item really sells for
+            if (f.priceTol > 0 && market > 0 && Math.abs(l.price / market - 1) > f.priceTol / 100) continue;
             const k = `${l.player_id}:${w.id}`;
-            const g = groups.get(k) || { id: l.player_id, name: l.player_name, itemId: w.id, itemName: data.item_name || w.name || `#${w.id}`, price: l.price, qty: 0, total: 0 };
+            const g = groups.get(k) || { id: l.player_id, name: l.player_name, itemId: w.id, itemName: data.item_name || w.name || `#${w.id}`, market, price: l.price, qty: 0, total: 0 };
             g.price = Math.min(g.price, l.price); g.qty += l.quantity; g.total += l.price * l.quantity;
             groups.set(k, g);
           }
@@ -390,6 +400,7 @@ function card(r, i) {
   status.dataset.known = r.state == null ? "" : "1";
   const dl = el("dl", {},
     el("dt", { text: "Price" }), el("dd", { text: `${fmtMoney(r.price)} × ${r.qty}` }),
+    el("dt", { text: "Market" }), el("dd", { text: r.market ? `${fmtMoney(r.market)} (${Math.round(r.price / r.market * 100)}%)` : "?" }),
     el("dt", { text: "Total" }), el("dd", { text: fmtMoney(r.total) }),
     el("dt", { text: "Est. stats" }), el("dd", { text: fmtStats(r.bs) }),
     el("dt", { text: "Fair fight" }), el("dd", { text: r.ff != null ? Number(r.ff).toFixed(2) : "?" }),
