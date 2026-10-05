@@ -26,16 +26,50 @@ async function api(path, opts = {}) {
 // keys
 const keys = load(KEYS, { torn: "", ff: "" });
 $("key-torn").value = keys.torn || ""; $("key-ff").value = keys.ff || "";
-$("save-keys").addEventListener("click", () => {
+let accountSaved = false;
+(async () => {
+  try {
+    const r = await api("/api/account/key");
+    if (!r.available) {
+      $("save-account").disabled = true;
+      $("save-account-hint").textContent = "Saving to your account is not turned on yet. The site owner needs to finish setup.";
+      return;
+    }
+    accountSaved = r.saved;
+    $("save-account").checked = r.saved;
+    if (r.saved && !$("key-torn").value) {
+      $("key-torn").value = r.keys.torn || ""; $("key-ff").value = r.keys.ff || "";
+      save(KEYS, { torn: r.keys.torn || "", ff: r.keys.ff || "" });
+      say("keys-msg", "Loaded your saved key from your account.", "ok");
+    }
+  } catch { /* checkbox just stays off */ }
+})();
+$("save-keys").addEventListener("click", async () => {
   const torn = $("key-torn").value.trim(), ff = $("key-ff").value.trim();
   if (!torn) return say("keys-msg", "Paste your Torn key first.", "err");
   if ([torn, ff].some((k) => k && !/^[A-Za-z0-9]{8,64}$/.test(k))) return say("keys-msg", "Keys should be letters and numbers only.", "err");
   save(KEYS, { torn, ff });
-  say("keys-msg", "Saved in this browser only.", "ok");
+  const wantAccount = $("save-account").checked && !$("save-account").disabled;
+  try {
+    if (wantAccount) {
+      await api("/api/account/key", { method: "POST", body: { torn, ff } });
+      accountSaved = true;
+      say("keys-msg", "Saved in this browser and to your account.", "ok");
+    } else if (accountSaved) {
+      await api("/api/account/key", { method: "POST", body: { clear: true } });
+      accountSaved = false;
+      say("keys-msg", "Saved in this browser. Removed from your account.", "ok");
+    } else {
+      say("keys-msg", "Saved in this browser only.", "ok");
+    }
+  } catch (e) { say("keys-msg", `Saved in this browser, but not to your account: ${e.message}`, "err"); }
 });
-$("clear-keys").addEventListener("click", () => {
+$("clear-keys").addEventListener("click", async () => {
   try { localStorage.removeItem(KEYS); } catch { /* ignore */ }
   $("key-torn").value = ""; $("key-ff").value = "";
+  if (accountSaved) {
+    try { await api("/api/account/key", { method: "POST", body: { clear: true } }); accountSaved = false; $("save-account").checked = false; } catch { /* keep going */ }
+  }
   say("keys-msg", "Key cleared.", "info");
 });
 

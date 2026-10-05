@@ -81,6 +81,8 @@ async function api(request, env, url, path, method) {
   if (path === "/api/admin/users" && method === "GET") return adminList(env, user);
   if (path === "/api/admin/users" && method === "POST") return adminAction(request, env, user);
   if (path === "/api/torn/me" && method === "GET") return proxyTornMe(request, env, user);
+  if (path === "/api/account/key" && method === "GET") return getSavedKeys(env, user);
+  if (path === "/api/account/key" && method === "POST") return saveKeys(request, env, user);
   if (path === "/api/clicks" && method === "POST") return recordClick(request, env, user);
   if (path === "/api/leaderboard" && method === "GET") return leaderboard(env, user, url);
   if (path === "/api/leaderboard/sync" && method === "POST") return syncMugs(request, env, user);
@@ -435,6 +437,64 @@ async function adminAction(request, env, user) {
     await env.DB.prepare("DELETE FROM users WHERE id = ?").bind(id).run();
   }
   return json({ ok: true });
+}
+
+// ---------------------------------------------------------------- saved API keys (optional, encrypted)
+
+const keysAvailable = (env) => typeof env.KEY_SECRET === "string" && env.KEY_SECRET.length >= 32;
+
+async function aesKey(env) {
+  const digest = await crypto.subtle.digest("SHA-256", enc.encode(env.KEY_SECRET));
+  return crypto.subtle.importKey("raw", digest, "AES-GCM", false, ["encrypt", "decrypt"]);
+}
+
+async function sealKeys(env, userId, obj) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv, additionalData: enc.encode(`user:${userId}`) },
+    await aesKey(env),
+    enc.encode(JSON.stringify(obj))
+  );
+  return `${b64(iv)}.${b64(new Uint8Array(ct))}`;
+}
+
+async function openKeys(env, userId, sealed) {
+  const [iv, ct] = sealed.split(".");
+  const pt = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: unb64(iv), additionalData: enc.encode(`user:${userId}`) },
+    await aesKey(env),
+    unb64(ct)
+  );
+  return JSON.parse(new TextDecoder().decode(pt));
+}
+
+async function getSavedKeys(env, user) {
+  if (!keysAvailable(env)) return json({ available: false, saved: false });
+  const row = await env.DB.prepare("SELECT key_enc FROM users WHERE id = ?").bind(user.id).first();
+  if (!row || !row.key_enc) return json({ available: true, saved: false });
+  try {
+    return json({ available: true, saved: true, keys: await openKeys(env, user.id, row.key_enc) });
+  } catch {
+    return json({ available: true, saved: false }); // secret changed or data unreadable
+  }
+}
+
+async function saveKeys(request, env, user) {
+  if (!keysAvailable(env)) {
+    return json({ error: "Saving keys to your account is not set up yet. The site owner needs to add the KEY_SECRET secret." }, 503);
+  }
+  const rl = await rateLimit(env, "savekey", String(user.id), 20, 3600);
+  if (!rl.ok) return tooMany(rl);
+  const body = await readJson(request);
+  if (body.clear) {
+    await env.DB.prepare("UPDATE users SET key_enc = NULL WHERE id = ?").bind(user.id).run();
+    return json({ ok: true, saved: false });
+  }
+  const torn = typeof body.torn === "string" ? body.torn.trim() : "";
+  const ff = typeof body.ff === "string" ? body.ff.trim() : "";
+  if (!KEY_RE.test(torn) || (ff && !KEY_RE.test(ff))) return json({ error: "Keys should be letters and numbers only." }, 400);
+  await env.DB.prepare("UPDATE users SET key_enc = ? WHERE id = ?").bind(await sealKeys(env, user.id, { torn, ff }), user.id).run();
+  return json({ ok: true, saved: true });
 }
 
 // ---------------------------------------------------------------- mugging leaderboard

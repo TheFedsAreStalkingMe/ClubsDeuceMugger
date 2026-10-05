@@ -654,6 +654,15 @@ async function initAdmin() {
 async function boot() {
   let me;
   try { me = await api("/api/me"); $("who").textContent = me.username; } catch { return; }
+  if (!state.keys.torn) {
+    try {
+      const r = await api("/api/account/key");
+      if (r.saved && r.keys && r.keys.torn) {
+        state.keys = { torn: r.keys.torn, ff: r.keys.ff || "" };
+        save(LS.keys, state.keys);
+      }
+    } catch { /* no saved key */ }
+  }
   $("setup-note").hidden = !!state.keys.torn;
   // forget old dismissals (older than 2 hours) and stale feed entries
   for (const [k, t] of Object.entries(state.dismissed)) if (Date.now() - t > 2 * 3600e3) delete state.dismissed[k];

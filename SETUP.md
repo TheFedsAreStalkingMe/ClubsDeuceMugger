@@ -46,3 +46,11 @@ Worker > **Settings** > **Bindings** should show `DB` (D1: deucemugger), `EMAIL`
 - `TheFedsAreStalkingMe` is the owner and is the only account that sees the **Owner panel** on the Mug Finder. It lists every account with its email and who invited it, and can remove accounts.
 - Save your own email in **Settings > Your email** so you can recover your password.
 - The new migrations (`0002` and `0003`) run by themselves through the deploy command.
+
+## Saving API keys to accounts (one more step)
+The **Save my key to my account** checkbox in Settings needs a secret so keys are stored encrypted:
+1. Worker > **Settings** > **Variables and Secrets** > **Add**.
+2. Type: **Secret**. Name: `KEY_SECRET`. Value: a long random string of at least 32 characters (use a password manager to make one, and keep a copy somewhere safe).
+3. Save and deploy. Until this is set, the checkbox is greyed out.
+4. Never change or lose this value. If it changes, saved keys can no longer be read and members need to save theirs again.
+
