@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg">
+  <symbol id="club" viewBox="0 0 100 100">
+    <path fill="currentColor" d="M50 6a21 21 0 0 0-17 33 21 21 0 1 0 12 38c-1 9-4 15-9 17h28c-5-2-8-8-9-17a21 21 0 1 0 12-38A21 21 0 0 0 50 6z"/>
+  </symbol>
+  <symbol id="spade" viewBox="0 0 100 100">
+    <path fill="currentColor" d="M50 4C34 28 8 40 8 62a21 21 0 0 0 37 13c-1 9-4 16-9 20h28c-5-4-8-11-9-20a21 21 0 0 0 37-13C92 40 66 28 50 4z"/>
+  </symbol>
+  <symbol id="heart" viewBox="0 0 100 100">
+    <path fill="currentColor" d="M50 92C20 68 6 52 6 34a22 22 0 0 1 44-6 22 22 0 0 1 44 6c0 18-14 34-44 58z"/>
+  </symbol>
+  <symbol id="diamond" viewBox="0 0 100 100">
+    <path fill="currentColor" d="M50 3 86 50 50 97 14 50z"/>
+  </symbol>
+  <!-- faceless gentleman in a fedora -->
+  <symbol id="gent" viewBox="0 0 120 150">
+    <ellipse cx="60" cy="42" rx="52" ry="10" fill="currentColor"/>
+    <path fill="currentColor" d="M31 40C31 14 42 6 60 6s29 8 29 34z"/>
+    <path fill="#0b0b0e" opacity=".55" d="M31 33h58v7H31z"/>
+    <path fill="#0b0b0e" d="M42 46h36v20c0 16-8 26-18 26S42 82 42 66z"/>
+    <path fill="currentColor" d="M6 150c2-34 14-52 40-58l14 20 14-20c26 6 38 24 40 58z"/>
+    <path fill="#0b0b0e" d="M60 112l-8 8 6 30h4l6-30z"/>
+    <path fill="#0b0b0e" opacity=".6" d="M46 92l14 20-8 8-20-22zM74 92l-14 20 8 8 20-22z"/>
+  </symbol>
+</svg>

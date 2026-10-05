@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#08080b">
+  <title>Clubs Deuce Mugger | Sign in</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="smoke"><i></i><i></i><i></i></div><div class="suits-bg"></div>
+  <main class="wrap narrow">
+    <header class="brand">
+      <svg class="icon gent" aria-hidden="true"><use href="/img/sprite.svg#gent"/></svg>
+      <h1><span class="club">&clubs;</span> Clubs Deuce Mugger</h1>
+      <p>Members only. After hours.</p>
+    </header>
+
+    <section class="card" aria-labelledby="signin-h">
+      <span class="corner tl club-c"><svg class="icon"><use href="/img/sprite.svg#club"/></svg></span>
+      <h2 id="signin-h">Sign in</h2>
+      <form id="login-form" class="stack" autocomplete="on">
+        <label>Username <input type="text" name="username" autocomplete="username" autocapitalize="none" required maxlength="24"></label>
+        <label>Password <input type="password" name="password" autocomplete="current-password" required maxlength="128"></label>
+        <button class="btn green block" type="submit">Deal me in</button>
+        <p class="msg" id="login-msg" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+
+    <div class="divider" aria-hidden="true">&spades; &hearts; &diams; &clubs;</div>
+
+    <section class="card" aria-labelledby="apply-h">
+      <span class="corner tl derse-c"><svg class="icon"><use href="/img/sprite.svg#spade"/></svg></span>
+      <h2 id="apply-h">Apply for an account</h2>
+      <p class="hint">New accounts wait for approval before they can sign in.</p>
+      <form id="apply-form" class="stack" autocomplete="off">
+        <label>Username <span class="hint">3-24 characters: letters, numbers, _ . -</span>
+          <input type="text" name="username" autocomplete="off" autocapitalize="none" required minlength="3" maxlength="24" pattern="[A-Za-z0-9_.\-]{3,24}"></label>
+        <label>Password <span class="hint">At least 8 characters</span>
+          <input type="password" name="password" autocomplete="new-password" required minlength="8" maxlength="128"></label>
+        <label>Confirm password
+          <input type="password" name="confirm" autocomplete="new-password" required minlength="8" maxlength="128"></label>
+        <button class="btn block" type="submit">Send application</button>
+        <p class="msg" id="apply-msg" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+  </main>
+  <script src="/js/login.js"></script>
+</body>
+</html>

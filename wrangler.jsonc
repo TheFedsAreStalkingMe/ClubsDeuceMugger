@@ -1,0 +1,30 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "clubsdeucemugger",
+  "main": "src/index.js",
+  "compatibility_date": "2026-06-01",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "vars": {
+    "APP_URL": "https://clubsdeuce.com",
+    "ADMIN_EMAIL": "lobsterlover7170@gmail.com",
+    "FROM_EMAIL": "noreply@clubsdeuce.com"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "deucemugger",
+      "database_id": "1ce6fc7c-c043-4948-99b4-c2b599312596",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "send_email": [
+    {
+      "name": "EMAIL",
+      "remote": true
+    }
+  ]
+}

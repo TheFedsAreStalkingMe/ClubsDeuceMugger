@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#08080b">
+  <meta name="robots" content="noindex">
+  <title>Clubs Deuce Mugger | Mug Finder</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="smoke"><i></i><i></i><i></i></div><div class="suits-bg"></div>
+  <main class="wrap">
+    <header class="topbar">
+      <h1><svg class="icon club-c"><use href="/img/sprite.svg#club"/></svg> Mug Finder</h1>
+      <div class="actions">
+        <span class="who" id="who"></span>
+        <button class="btn ghost small" id="logout" type="button">Log out</button>
+      </div>
+    </header>
+
+    <div class="panels">
+      <details class="card panel wide" id="settings">
+        <span class="corner tl derse-c"><svg class="icon"><use href="/img/sprite.svg#spade"/></svg></span>
+        <summary>Settings</summary>
+        <p class="hint">Your keys stay in this browser only. They are sent through our server to Torn and FF Scouter for each request, and never saved.</p>
+        <div class="stack">
+          <label>Torn API key <input type="password" id="key-torn" autocomplete="off" spellcheck="false" maxlength="64"></label>
+          <label>FF Scouter key <input type="password" id="key-ff" autocomplete="off" spellcheck="false" maxlength="64"></label>
+          <div class="row">
+            <button class="btn green small" id="save-keys" type="button">Save keys</button>
+            <button class="btn ghost small" id="clear-keys" type="button">Clear keys</button>
+          </div>
+          <p class="msg" id="keys-msg" role="status" aria-live="polite"></p>
+        </div>
+      </details>
+
+      <section class="card panel">
+        <span class="corner tl club-c"><svg class="icon"><use href="/img/sprite.svg#club"/></svg></span>
+        <h2>Watchlist</h2>
+        <form class="row" id="watch-form">
+          <input type="number" id="watch-id" inputmode="numeric" min="1" step="1" placeholder="Item ID (e.g. 206)" aria-label="Item ID">
+          <button class="btn small" type="submit">Add</button>
+        </form>
+        <div class="chips" id="chips"></div>
+      </section>
+
+      <section class="card panel">
+        <span class="corner tl derse-c"><svg class="icon"><use href="/img/sprite.svg#diamond"/></svg></span>
+        <h2>Filters</h2>
+        <div class="stack">
+          <div class="label">Minimum item price ($)
+            <div class="slider-row"><input type="range" id="minPrice-r" min="0" max="1000"><input type="number" id="minPrice" inputmode="numeric" min="0" step="1" aria-label="Minimum item price"></div></div>
+          <div class="label">Min battle stats (estimate)
+            <div class="slider-row"><input type="range" id="minBs-r" min="0" max="1000"><input type="number" id="minBs" inputmode="numeric" min="0" step="1" aria-label="Minimum battle stats"></div></div>
+          <div class="label">Max battle stats (estimate)
+            <div class="slider-row"><input type="range" id="maxBs-r" min="0" max="1000"><input type="number" id="maxBs" inputmode="numeric" min="0" step="1" aria-label="Maximum battle stats"></div></div>
+          <div class="label">Max fair fight
+            <div class="slider-row"><input type="range" id="maxFf-r" min="1" max="3" step="0.01"><input type="number" id="maxFf" inputmode="decimal" min="1" max="3" step="0.01" aria-label="Maximum fair fight"></div></div>
+          <label>Max sellers to check <span class="hint">Highest value listings first</span>
+            <input type="number" id="maxSellers" inputmode="numeric" min="1" max="500" step="1"></label>
+        </div>
+      </section>
+    </div>
+
+    <div class="scanbar">
+      <button class="btn green" id="scan" type="button">&clubs; Scan bazaars</button>
+      <button class="btn ghost" id="cancel" type="button" hidden>Stop</button>
+      <span class="msg info" id="scan-msg" role="status" aria-live="polite"></span>
+    </div>
+    <div class="progress" aria-hidden="true"><div id="bar"></div></div>
+
+    <div class="sortbar">
+      <label>Sort by
+        <select id="sort">
+          <option value="stats">Battle stats</option>
+          <option value="hospital">Hospital time</option>
+          <option value="age">Account age</option>
+          <option value="price">Price</option>
+        </select>
+      </label>
+      <label>Order
+        <select id="dir">
+          <option value="asc">Ascending</option>
+          <option value="desc">Descending</option>
+        </select>
+      </label>
+    </div>
+
+    <section class="results" id="results" aria-live="polite"></section>
+  </main>
+  <script src="/app/app.js"></script>
+</body>
+</html>
