@@ -1,0 +1,30 @@
+// Keeps us under the Torn and TornStats call limits, even across tabs and reloads.
+
+import { sleep } from "/js/core/async.js";
+import { STORE, load, save } from "/js/core/storage.js";
+import { state } from "../state.js";
+import { setScanMsg } from "./ui.js";
+
+const WINDOW_MS = 60000;
+const TORN_PER_MIN = 80; // Torn's ceiling is 85
+const TORNSTATS_PER_MIN = 80; // TornStats allows 100
+
+// Waits until a call is allowed, then records it. Throws "cancelled" if the scan was cancelled.
+async function acquire(storeKey, limit, label, runId) {
+  for (;;) {
+    if (runId !== state.runId) throw new Error("cancelled");
+    const now = Date.now();
+    const calls = load(storeKey, []).filter((t) => now - t < WINDOW_MS);
+    if (calls.length < limit) {
+      calls.push(now);
+      save(storeKey, calls);
+      return;
+    }
+    const wait = WINDOW_MS - (now - calls[0]) + 50;
+    setScanMsg(`Pacing ${label} API calls... ${Math.ceil(wait / 1000)}s`);
+    await sleep(Math.min(wait, 1000));
+  }
+}
+
+export const acquireTorn = (runId) => acquire(STORE.tornCalls, TORN_PER_MIN, "Torn", runId);
+export const acquireTornStats = (runId) => acquire(STORE.tsCalls, TORNSTATS_PER_MIN, "TornStats", runId);

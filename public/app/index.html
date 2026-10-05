@@ -16,7 +16,6 @@
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-  <div class="smoke"><i></i><i></i><i></i></div><div class="suits-bg"></div>
   <main class="wrap">
     <header class="topbar">
       <h1>Mug Finder <svg class="icon club-c"><use href="/img/sprite.svg#club"/></svg></h1>
@@ -43,7 +42,6 @@
 
     <div class="panels">
       <section class="card panel">
-        <span class="corner tl club-c"><svg class="icon"><use href="/img/sprite.svg#club"/></svg></span>
         <h2>Items to scan</h2>
         <div class="stack">
           <label class="check"><input type="checkbox" id="autoScan"> Auto scan every item whose cheapest listing and market value are at or above the minimum price</label>
@@ -61,7 +59,6 @@
       </section>
 
       <section class="card panel">
-        <span class="corner tl derse-c"><svg class="icon"><use href="/img/sprite.svg#diamond"/></svg></span>
         <h2>Filters</h2>
         <div class="stack">
           <div class="label">Minimum item price ($1m or more)
@@ -110,6 +107,6 @@
     <section class="results" id="results" aria-live="polite"></section>
   <p class="foot">Font: Fontstuck by KevinHilt, <a href="/fonts/LICENSE-fontstuck.txt">CC BY-SA 3.0</a></p>
   </main>
-  <script src="/app/app.js"></script>
+  <script type="module" src="/app/js/pages/main.js"></script>
 </body>
 </html>

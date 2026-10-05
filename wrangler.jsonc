@@ -3,17 +3,22 @@
   "name": "clubsdeucemugger",
   "main": "src/index.js",
   "compatibility_date": "2026-06-01",
+
+  // The website in /public. The Worker sees every request first (it protects /app and serves /api).
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
     "run_worker_first": true
   },
+
+  // Public settings. Secrets (KEY_SECRET) are added in the Cloudflare dashboard, never here.
   "vars": {
-    "APP_URL": "https://clubsdeuce.com",
-    "ADMIN_EMAIL": "lobsterlover7170@gmail.com",
-    "FROM_EMAIL": "noreply@clubsdeuce.com",
-    "OWNER_USERNAME": "TheFedsAreStalkingMe"
+    "APP_URL": "https://clubsdeuce.com", // used in emailed links
+    "FROM_EMAIL": "noreply@clubsdeuce.com", // must be a sender set up in Email Sending
+    "OWNER_USERNAME": "TheFedsAreStalkingMe" // this account gets the Owner panel
   },
+
+  // The database. Tables come from /migrations.
   "d1_databases": [
     {
       "binding": "DB",
@@ -22,6 +27,8 @@
       "migrations_dir": "migrations"
     }
   ],
+
+  // Email sending: env.EMAIL.send()
   "send_email": [
     {
       "name": "EMAIL",
