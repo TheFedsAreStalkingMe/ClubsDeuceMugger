@@ -12,6 +12,13 @@ const WEAV3R_PER_MINUTE = 300; // bazaar answers are cached for 30 s, so this is
 
 // ---------------------------------------------------------------- Weav3r (bazaar listings)
 
+// Weav3r is busy (429/503): tell the page to wait a few seconds and ask again, instead of a hard error.
+function weav3rFail(res) {
+  if (res.status !== 429 && res.status !== 503) return fail(`Weav3r returned ${res.status}`, 502);
+  const wait = Math.min(15, Math.max(3, Number(res.headers.get("Retry-After")) || 8));
+  return json({ error: "Weav3r is busy", retryAfter: wait }, 429, { "Retry-After": String(wait) });
+}
+
 export async function weav3r({ env, url, user }) {
   const item = url.searchParams.get("item") || "";
   if (item !== "all" && !/^\d{1,7}$/.test(item)) return fail("Bad item ID.");
@@ -22,7 +29,7 @@ export async function weav3r({ env, url, user }) {
   // The index lists every item with bazaar listings, so the site can pick what to scan.
   if (item === "all") {
     const { res, data } = await fetchJson(`${base}/marketplace`, { cf: { cacheTtl: 60, cacheEverything: true } });
-    if (!res.ok) return fail(`Weav3r returned ${res.status}`, 502);
+    if (!res.ok) return weav3rFail(res);
     if (!data || !Array.isArray(data.items)) return fail("Weav3r sent bad data.", 502);
     return json({
       items: data.items
@@ -32,7 +39,7 @@ export async function weav3r({ env, url, user }) {
   }
 
   const { res, data } = await fetchJson(`${base}/marketplace/${item}`, { cf: { cacheTtl: 30, cacheEverything: true } });
-  if (!res.ok) return fail(`Weav3r returned ${res.status}`, 502);
+  if (!res.ok) return weav3rFail(res);
   if (!data) return fail("Weav3r sent bad data.", 502);
   return json({
     item_id: data.item_id,

@@ -43,7 +43,13 @@ async function chooseItems(call, f) {
   let indexError = "";
   if (f.autoScan) {
     try {
-      const { items } = await call("/api/weav3r?item=all");
+      let items;
+      for (let attempt = 0; ; attempt++) { // Weav3r sometimes says "busy": wait and ask again
+        try { ({ items } = await call("/api/weav3r?item=all")); break; } catch (e) {
+          if (!e.retryAfter || attempt >= 5) throw e;
+          await countdown(e.retryAfter, "Weav3r is busy. Waiting", state.runId);
+        }
+      }
       items
         .map((i) => ({ ...i, floor: i.lowest ?? i.price })) // floor = cheapest bazaar listing
         // With a stack worth or an add-up value set, cheaper items can still qualify, so look lower.

@@ -32,7 +32,7 @@ export const section = (title) => console.log(`\n${title}`);
 const now = () => Math.floor(Date.now() / 1000);
 // Test control: statuses the fake Torn reports, by player id. Change them with setFakeStatus().
 const statusOverride = {};
-const flags = { attacklogFail: false };
+const flags = { attacklogFail: false, weav3rBusy: false };
 export async function setFakeFlag(name, on) {
   await fetch(`http://localhost:${FAKE_PORT}/__flag?name=${name}&on=${on ? 1 : 0}`);
 }
@@ -52,6 +52,7 @@ function fakeServer() {
     //   Gold Bar $20m, busy (5 listings changed a minute ago): Alpha has five stacks of 2 at $19.5m, Bravo one at $20.5m.
     //   Silver Bar $20m, quiet: Charlie one at $20m, Alpha one at $20m.
     //   Emerald $8m: Delta a stack of 5 ($40m), Echo a single, Foxtrot a stack of 2 ($16m).
+    if (p === "/weav3r/marketplace" && flags.weav3rBusy) { res.setHeader("Retry-After", "2"); return send({ error: "slow down" }, 429); }
     if (p === "/weav3r/marketplace") return send({ items: [
       { item_id: 1, item_name: "Gold Bar", market_price: 20000000, lowest_price: 19500000, bazaar_average: 20000000, total_bazaars: 5 },
       { item_id: 2, item_name: "Silver Bar", market_price: 20000000, lowest_price: 20000000, bazaar_average: 20000000, total_bazaars: 50 },
