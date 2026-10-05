@@ -21,6 +21,10 @@ async function runChecks() {
     name: e.querySelector(".name").textContent,
     stats: [...e.querySelectorAll("dt")].map((d, i) => [d.textContent, e.querySelectorAll("dd")[i].textContent]).find(([k]) => k === "Est. stats")?.[1],
   })));
+  const itemCount = (name) => page.evaluate((n) => {
+    const card = [...document.querySelectorAll("#results .target")].find((c) => c.querySelector(".name").textContent === n);
+    return card ? card.querySelectorAll(".items li").length : -1;
+  }, name);
   const scanDone = () => page.waitForSelector("#scan:not([disabled])", { timeout: 60000 });
 
   section("Public pages");
@@ -56,7 +60,7 @@ async function runChecks() {
   check("one sort menu", (await page.$$("#sort option")).length === 8 && (await page.$("#dir")) === null);
 
   section("Scan");
-  const filters = { minPrice: 1000000, priceTol: 100, maxItems: 5, autoScan: true, maxSellers: 20 };
+  const filters = { minPrice: 15000000, priceTol: 100, maxItems: 5, autoScan: true, maxSellers: 20 };
   await page.evaluate(() => localStorage.clear());
   await setStore("cdm.keys", { torn: "abcdefgh12345678", ff: "" });
   await setStore("cdm.filters", filters);
@@ -68,8 +72,9 @@ async function runChecks() {
   check("progress bar fills completely", (await page.$eval("#bar", (b) => b.style.width)) === "100%");
   const found = await cards("#results");
   check("all three sellers listed", found.length === 3, JSON.stringify(found));
+  check("one card per seller lists all their items", (await itemCount("Alpha")) === 2 && (await itemCount("Bravo")) === 1, `${await itemCount("Alpha")}`);
   check("cards show the estimated stats", found.every((c) => c.stats === "2b"), JSON.stringify(found));
-  check("each card shows trade activity", (await page.$$eval("#results .target dt", (d) => d.some((x) => x.textContent === "Activity"))));
+  check("each item shows its trade activity", await page.$$eval("#results .items .meta", (m) => m.length > 0 && m.every((x) => /\/hr/.test(x.textContent))));
   check("jackpot alert at the top", await page.waitForSelector("#alerts .alert", { timeout: 3000 }).then(() => true, () => false));
 
   section("Filters explain empty results");
@@ -77,7 +82,24 @@ async function runChecks() {
   await page.reload();
   await page.click("#scan");
   await scanDone();
-  check("empty result says why", /listings are over your max stats/.test(await text("#scan-msg")), await text("#scan-msg"));
+  check("empty result says why", /are over your max stats/.test(await text("#scan-msg")), await text("#scan-msg"));
+
+  section("Stacks");
+  const names = async () => (await cards("#results")).map((c) => c.name).sort().join();
+  // Singles only, $20m minimum: Gold Bar's cheapest listing is $19.5m, so it is skipped. Silver Bar counts.
+  await setStore("cdm.filters", { ...filters, minPrice: 20000000 });
+  await page.reload();
+  await page.click("#scan");
+  await scanDone();
+  check("without a stack worth, only items at the minimum count", (await names()) === "Alpha,Charlie" && (await itemCount("Alpha")) === 1, await names());
+  // With a stack worth of $30m: Alpha's $39m stacks and Delta's $40m stack of cheaper Emeralds join in.
+  await setStore("cdm.filters", { ...filters, minPrice: 20000000, minStack: 30000000 });
+  await page.reload();
+  await page.click("#scan");
+  await scanDone();
+  check("stacks worth enough are included", (await names()) === "Alpha,Bravo,Charlie,Delta", await names());
+  check("a seller's singles and stacks share one card", (await itemCount("Alpha")) === 2, `${await itemCount("Alpha")}`);
+  check("small stacks and single cheap items are left out", !(await names()).includes("Echo") && !(await names()).includes("Foxtrot"));
 
   section("Trade activity");
   // Gold Bar changed a minute ago (busy), Silver Bar has been quiet for two days. Busiest first:

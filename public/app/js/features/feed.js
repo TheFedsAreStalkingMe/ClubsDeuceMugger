@@ -6,7 +6,7 @@ import { state } from "../state.js";
 import { card, refreshStatuses } from "./cards.js";
 import { isMug, rowKey } from "./rules.js";
 
-const FIELDS = ["id", "name", "itemId", "itemName", "market", "activity", "bazaars", "price", "qty", "total", "ff", "bs", "state", "until", "desc", "age", "last", "checkedAt"];
+const FIELDS = ["id", "name", "items", "total", "topPrice", "activity", "ff", "bs", "state", "until", "desc", "age", "last", "checkedAt"];
 const snapshot = (r) => Object.fromEntries(FIELDS.map((k) => [k, r[k]]));
 const GONE_AFTER = 20 * 60; // seconds a mug may be missing from the bazaars before it is dropped
 

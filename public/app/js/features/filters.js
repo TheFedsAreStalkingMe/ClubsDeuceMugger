@@ -35,6 +35,16 @@ function bindSlider(name, { to = same, from = same, floor } = {}) {
   set(state.filters[name]);
 }
 
+// A money box where 0 means "off".
+function bindAmount(name) {
+  const input = $(name);
+  input.value = state.filters[name];
+  input.addEventListener("input", () => {
+    state.filters[name] = Math.max(0, parseFloat(input.value) || 0);
+    persist();
+  });
+}
+
 // A whole-number box with limits.
 function bindNumber(name, min, max, fallback) {
   const input = $(name);
@@ -76,6 +86,7 @@ export function initFilters() {
   bindCheckbox("autoScan");
   bindCheckbox("includeUnknown");
   bindChoice("minActivity");
+  bindAmount("minStack");
   bindNumber("maxItems", 1, 150, 40);
   bindNumber("autoEvery", 30, 3600, 120);
   bindNumber("maxSellers", 1, 500, 80);

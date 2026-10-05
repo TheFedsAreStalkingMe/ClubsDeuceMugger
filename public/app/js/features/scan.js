@@ -8,7 +8,7 @@ import { api } from "/js/core/api.js";
 import { pool } from "/js/core/async.js";
 import { fmtMoney } from "/js/core/format.js";
 import { Cache, STORE, save } from "/js/core/storage.js";
-import { state } from "../state.js";
+import { MIN_PRICE, state } from "../state.js";
 import { acquireTorn } from "./limits.js";
 import { explainDrops, statVerdict } from "./rules.js";
 import { render, scheduleRender, tick } from "./results.js";
@@ -39,7 +39,8 @@ async function chooseItems(call, f) {
       const { items } = await call("/api/weav3r?item=all");
       items
         .map((i) => ({ ...i, floor: i.lowest ?? i.price })) // floor = cheapest bazaar listing
-        .filter((i) => i.floor >= f.minPrice && i.price >= f.minPrice && !targets.has(i.id))
+        // With a stack worth set, cheaper items can still qualify as stacks, so look at everything worth $1m+.
+        .filter((i) => (f.minStack > 0 ? i.price >= MIN_PRICE : i.floor >= f.minPrice && i.price >= f.minPrice) && !targets.has(i.id))
         // Busiest first when sorting by trade activity (more bazaars = more traded), otherwise priciest first.
         .sort((a, b) => (f.sort === "activity" ? b.bazaars - a.bazaars || b.floor - a.floor : b.floor - a.floor))
         .slice(0, Math.max(0, f.maxItems - targets.size))
@@ -52,15 +53,18 @@ async function chooseItems(call, f) {
   const list = [...targets.values()];
   if (list.length) return list;
   if (indexError) throw new Stop(`Could not load the item list from Weav3r: ${indexError}`, "err", "retry");
-  if (f.autoScan) throw new Stop(`No items have a cheapest listing and market value of at least ${fmtMoney(f.minPrice)}. Lower the minimum price.`);
+  if (f.autoScan) throw new Stop(`No items are worth ${fmtMoney(f.minStack > 0 ? MIN_PRICE : f.minPrice)} or more. Lower the minimum price.`);
   throw new Stop("Nothing to scan. Turn on auto scan or add an item ID.", "err", "fatal");
 }
 
 // ---------------------------------------------------------------- 2. read bazaars
 
-// Returns one row per seller and item: { id, name, itemId, itemName, market, price, qty, total }.
+// A listing qualifies as a single item worth at least the minimum price, or (with a stack worth set) as a
+// stack of 2+ worth at least that much in total. Returns one row per SELLER, holding every qualifying item:
+//   { id, name, items: [{ itemId, itemName, market, price, qty, total, activity, bazaars }], total, topPrice, activity }
 async function readBazaars(call, list, f, runId) {
-  const rows = new Map();
+  const sellers = new Map();
+  const unitFloor = f.minStack > 0 ? MIN_PRICE : f.minPrice; // cheapest item worth looking at
   let done = 0;
   await pool(list, ITEM_READS_AT_ONCE, async (w) => {
     for (let attempt = 0; attempt < 6 && runId === state.runId; attempt++) {
@@ -68,21 +72,28 @@ async function readBazaars(call, list, f, runId) {
         const data = await call(`/api/weav3r?item=${w.id}`);
         if (!w.auto && data.item_name) w.name = data.item_name;
         const market = data.market_price || 0;
-        if (market < f.minPrice) break; // not worth enough on the market to resell
+        if (market < unitFloor) break; // not worth enough on the market to resell
         // Trade activity: listings that changed in the last hour (a sale, a restock or a price change).
         const asOf = data.generated_at || Date.now() / 1000;
         const activity = data.listings.filter((l) => l.updated && asOf - l.updated <= 3600).length;
         if (activity < f.minActivity) break; // too quiet to sell quickly
         for (const l of data.listings) {
-          if (l.price < f.minPrice) continue;
+          const single = l.price >= f.minPrice;
+          const stack = f.minStack > 0 && l.quantity >= 2 && l.price >= MIN_PRICE && l.price * l.quantity >= f.minStack;
+          if (!single && !stack) continue;
           // only listings priced near what the item really sells for
           if (f.priceTol > 0 && market > 0 && Math.abs(l.price / market - 1) > f.priceTol / 100) continue;
-          const key = `${l.player_id}:${w.id}`;
-          const row = rows.get(key) || { id: l.player_id, name: l.player_name, itemId: w.id, itemName: data.item_name || w.name || `#${w.id}`, market, activity, bazaars: w.bazaars ?? null, price: l.price, qty: 0, total: 0 };
-          row.price = Math.min(row.price, l.price);
-          row.qty += l.quantity;
-          row.total += l.price * l.quantity;
-          rows.set(key, row);
+
+          const seller = sellers.get(l.player_id) || { id: l.player_id, name: l.player_name, items: new Map(), total: 0, topPrice: 0, activity: 0 };
+          const item = seller.items.get(w.id) || { itemId: w.id, itemName: data.item_name || w.name || `#${w.id}`, market, activity, bazaars: w.bazaars ?? null, price: l.price, qty: 0, total: 0 };
+          item.price = Math.min(item.price, l.price);
+          item.qty += l.quantity;
+          item.total += l.price * l.quantity;
+          seller.items.set(w.id, item);
+          seller.total += l.price * l.quantity;
+          seller.topPrice = Math.max(seller.topPrice, l.price);
+          seller.activity = Math.max(seller.activity, activity);
+          sellers.set(l.player_id, seller);
         }
         break;
       } catch (e) {
@@ -96,7 +107,9 @@ async function readBazaars(call, list, f, runId) {
   });
   save(STORE.watch, state.watch);
   renderWatch();
-  return [...rows.values()].sort((a, b) => b.total - a.total);
+  return [...sellers.values()]
+    .map((s) => ({ ...s, items: [...s.items.values()].sort((a, b) => b.total - a.total) }))
+    .sort((a, b) => b.total - a.total);
 }
 
 // ---------------------------------------------------------------- 3. FF Scouter estimates
@@ -201,8 +214,8 @@ export async function scan() {
     if (runId !== state.runId) return;
 
     // stats for every seller, then drop listings that fail the stat and fair fight limits
-    const sellers = new Set(rows.map((r) => r.id)).size;
-    const estimates = await estimateStats(call, [...new Set(rows.map((r) => r.id))], runId);
+    const sellers = rows.length;
+    const estimates = await estimateStats(call, rows.map((r) => r.id), runId);
     if (runId !== state.runId) return;
 
     const why = { noEst: 0, tooStrong: 0, tooWeak: 0, ffHigh: 0 };
@@ -229,7 +242,7 @@ export async function scan() {
     const { sellers: checked, keyProblem } = await fetchStatuses(call, rows, runId);
     if (runId === state.runId && !keyProblem) {
       state.outcome = "ok";
-      setScanMsg(`Done. ${state.rows.length} listing(s) from ${checked} seller(s).`, "ok");
+      setScanMsg(`Done. ${checked} seller(s) found.`, "ok");
       setProgress(1);
     }
     render();

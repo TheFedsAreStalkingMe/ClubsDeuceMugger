@@ -12,6 +12,7 @@ export const DEFAULT_FILTERS = {
   maxFf: 10,
   priceTol: 10, // listing price must be within this % of market value (0 = off)
   minActivity: 0, // only items with at least this many listings changed in the last hour (0 = off)
+  minStack: 0, // also count stacks of 2+ worth at least this much, even if each item is under minPrice (0 = off)
   maxSellers: 80, // sellers who get the slower status checks
   maxItems: 40, // items read per scan
   autoScan: true, // read every item whose cheapest listing is above the minimum
@@ -35,7 +36,7 @@ export const state = {
   filters: { ...DEFAULT_FILTERS, ...load(STORE.filters, {}) },
   prefs: { ...DEFAULT_PREFS, ...load(STORE.prefs, {}) },
   rows: [], // listings from the last scan
-  feed: load(STORE.feed, []), // mugs found by auto hunt
+  feed: load(STORE.feed, []).filter((e) => Array.isArray(e.items)), // mugs found by auto hunt (older shapes dropped)
   dismissed: load(STORE.dismissed, {}), // key -> time dismissed
 
   runId: 0, // changes on every scan start and cancel; old work checks it and stops

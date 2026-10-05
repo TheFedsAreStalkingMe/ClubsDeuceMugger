@@ -216,6 +216,10 @@ details.more[open] > summary { margin-bottom: 10px; }
 .target dd { margin: 0; text-align: right; }
 .target .x { position: absolute; top: 8px; right: 8px; width: 40px; height: 40px; z-index: 1; cursor: pointer; font: 700 1rem var(--font-small); color: #000; background: #c0c0c8; border: 2px solid; border-color: #fff #5a5a62 #5a5a62 #fff; }
 .target .x:active { border-color: #5a5a62 #fff #fff #5a5a62; }
+/* everything a seller has that qualifies */
+.items { list-style: none; margin: 12px 0 0; padding: 10px 0 0; border-top: 1px dashed var(--muted); text-align: left; display: grid; gap: 8px; }
+.items .line { display: flex; justify-content: space-between; gap: 10px; }
+.items .meta { display: block; color: var(--muted); font-size: .8rem; font-weight: 400; }
 .status { display: inline-block; font-weight: 700; }
 .status.okay { color: var(--club); }
 .status.out { color: var(--derse-l); }

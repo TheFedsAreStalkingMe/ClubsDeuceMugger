@@ -1,7 +1,7 @@
 // One listing as a card, and the live status text on it.
 
 import { el } from "/js/core/dom.js";
-import { fmtAgo, fmtCountdown, fmtMoney, fmtShortAgo, fmtStats } from "/js/core/format.js";
+import { fmtAgo, fmtCountdown, fmtMoney, fmtShortAgo, fmtShortMoney, fmtStats } from "/js/core/format.js";
 import { trackAttack } from "./tracking.js";
 
 export function attackLink(id) {
@@ -15,6 +15,17 @@ export function attackLink(id) {
 
 const bazaarLink = (id) =>
   el("a", { class: "btn small ghost", href: `https://www.torn.com/bazaar.php?userId=${id}`, target: "_blank", rel: "noopener noreferrer", text: "Bazaar" });
+
+// Everything this seller has that qualifies: single items and stacks.
+function itemList(r) {
+  return el("ul", { class: "items" },
+    ...r.items.map((it) => {
+      const detail = [`${fmtShortMoney(it.price)} each`, it.market ? `${Math.round((it.price / it.market) * 100)}% of market` : "", it.activity != null ? `${it.activity}/hr` : ""].filter(Boolean).join(" · ");
+      return el("li", {},
+        el("span", { class: "line" }, el("span", { text: `${it.itemName} ×${it.qty}` }), el("span", { text: fmtShortMoney(it.total) })),
+        el("span", { class: "meta", text: detail }));
+    }));
+}
 
 // opts.found: seconds since a feed mug was found. opts.dismiss: makes an X button.
 export function card(r, index, opts = {}) {
@@ -32,10 +43,7 @@ export function card(r, index, opts = {}) {
     return span;
   };
   const dl = el("dl", {},
-    ...row("Price", `${fmtMoney(r.price)} × ${r.qty}`),
-    ...row("Market", r.market ? `${fmtMoney(r.market)} (${Math.round((r.price / r.market) * 100)}%)` : "?"),
     ...row("Total", fmtMoney(r.total)),
-    ...row("Activity", r.activity != null ? `${r.activity} changed/hr${r.bazaars ? `, ${r.bazaars} bazaars` : ""}` : "?"),
     ...row("Est. stats", fmtStats(r.bs)),
     ...row("Fair fight", r.ff != null ? Number(r.ff).toFixed(2) : "?"),
     ...row("Account age", r.age != null ? `${Number(r.age).toLocaleString("en-US")} days` : "?"),
@@ -47,7 +55,8 @@ export function card(r, index, opts = {}) {
 
   const art = el("article", { class: "card hover target" },
     el("h3", { class: "name", text: r.name }),
-    el("p", { class: "sub", text: `ID ${r.id} · ${r.itemName}` }),
+    el("p", { class: "sub", text: `ID ${r.id} · ${r.items.length} item${r.items.length === 1 ? "" : "s"}` }),
+    itemList(r),
     dl,
     el("div", { class: "btns" }, bazaarLink(r.id), attackLink(r.id))
   );

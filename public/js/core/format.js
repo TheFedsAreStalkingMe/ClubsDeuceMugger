@@ -2,6 +2,14 @@
 
 export const fmtMoney = (n) => "$" + Math.round(n).toLocaleString("en-US");
 
+// 19500000 -> "$19.5m", 1234 -> "$1.2k"
+export function fmtShortMoney(n) {
+  for (const [size, unit] of [[1e9, "b"], [1e6, "m"], [1e3, "k"]]) {
+    if (n >= size) return "$" + (n / size).toFixed(n / size >= 100 ? 0 : 2).replace(/\.?0+$/, "") + unit;
+  }
+  return "$" + Math.round(n);
+}
+
 // 1234567890 -> "1.23b"
 export function fmtStats(n) {
   if (n == null) return "?";

@@ -2,7 +2,8 @@
 
 import { NUM_MAX, state } from "../state.js";
 
-export const rowKey = (r) => `${r.id}:${r.itemId}`;
+// A row is one seller with everything of theirs that qualifies: { id, name, items: [...], total, topPrice, activity, ... }
+export const rowKey = (r) => String(r.id);
 
 // Seconds until the player can be attacked: 0 = now, null = not known, Infinity = away with no timer
 // (abroad, for example).
@@ -19,7 +20,7 @@ export function sortValue(r, key) {
     case "hospital": return remaining(r);
     case "age": return r.age;
     case "activity": return r.activity;
-    default: return r.price;
+    default: return r.total; // price: the value of everything they sell that qualifies
   }
 }
 
@@ -32,7 +33,7 @@ export function isMug(r, now, jackpot) {
   const rem = remaining(r);
   if (rem == null || rem > pf.outMinutes * 60) return false;
   if (!r.last || (now - r.last) / 60 < pf.offlineMinutes) return false;
-  if (jackpot && r.price < pf.minJackpot) return false;
+  if (jackpot && r.topPrice < pf.minJackpot) return false;
   return true;
 }
 
@@ -49,9 +50,9 @@ export function statVerdict(bs, ff, f) {
 // "412 sellers checked: 380 listings are over your max stats, ..." for an empty result.
 export function explainDrops(why, sellers) {
   const parts = [];
-  if (why.noEst) parts.push(`${why.noEst} listings have no stat estimate`);
-  if (why.tooStrong) parts.push(`${why.tooStrong} listings are over your max stats`);
-  if (why.tooWeak) parts.push(`${why.tooWeak} listings are under your min stats`);
-  if (why.ffHigh) parts.push(`${why.ffHigh} listings are over your max fair fight`);
+  if (why.noEst) parts.push(`${why.noEst} have no stat estimate`);
+  if (why.tooStrong) parts.push(`${why.tooStrong} are over your max stats`);
+  if (why.tooWeak) parts.push(`${why.tooWeak} are under your min stats`);
+  if (why.ffHigh) parts.push(`${why.ffHigh} are over your max fair fight`);
   return `No targets match your filters. ${sellers} sellers checked${parts.length ? `: ${parts.join(", ")}` : ""}.`;
 }

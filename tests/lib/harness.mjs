@@ -44,20 +44,33 @@ function fakeServer() {
     const p = u.pathname;
     const key = u.searchParams.get("key") || "";
 
-    // Weav3r: two items worth $20m. Gold Bar is busy (5 listings changed a minute ago): seller 7 has five
-    // listings, seller 8 one. Silver Bar is quiet (nothing changed in two days): seller 9.
+    // Weav3r: three items.
+    //   Gold Bar $20m, busy (5 listings changed a minute ago): Alpha has five stacks of 2 at $19.5m, Bravo one at $20.5m.
+    //   Silver Bar $20m, quiet: Charlie one at $20m, Alpha one at $20m.
+    //   Emerald $8m: Delta a stack of 5 ($40m), Echo a single, Foxtrot a stack of 2 ($16m).
     if (p === "/weav3r/marketplace") return send({ items: [
-      { item_id: 1, item_name: "Gold Bar", market_price: 20000000, lowest_price: 19000000, bazaar_average: 20000000, total_bazaars: 5 },
-      { item_id: 2, item_name: "Silver Bar", market_price: 20000000, lowest_price: 19000000, bazaar_average: 20000000, total_bazaars: 50 },
+      { item_id: 1, item_name: "Gold Bar", market_price: 20000000, lowest_price: 19500000, bazaar_average: 20000000, total_bazaars: 5 },
+      { item_id: 2, item_name: "Silver Bar", market_price: 20000000, lowest_price: 20000000, bazaar_average: 20000000, total_bazaars: 50 },
+      { item_id: 3, item_name: "Emerald", market_price: 8000000, lowest_price: 8000000, bazaar_average: 8000000, total_bazaars: 20 },
       { item_id: -1, item_name: "Bundle", market_price: 5, lowest_price: null, total_bazaars: 0 },
     ] });
+    const old = () => now() - 2 * 86400;
     if (p === "/weav3r/marketplace/1") return send({ item_id: 1, item_name: "Gold Bar", market_price: 20000000, generated_at: now(), extra: "dropped",
       listings: [
         ...Array.from({ length: 5 }, () => ({ player_id: 7, player_name: "Alpha", quantity: 2, price: 19500000, uid: "x", content_updated: now() - 60 })),
-        { player_id: 8, player_name: "Bravo", quantity: 1, price: 20500000, uid: "y", content_updated: now() - 2 * 86400 },
+        { player_id: 8, player_name: "Bravo", quantity: 1, price: 20500000, uid: "y", content_updated: old() },
       ] });
     if (p === "/weav3r/marketplace/2") return send({ item_id: 2, item_name: "Silver Bar", market_price: 20000000, generated_at: now(),
-      listings: [{ player_id: 9, player_name: "Charlie", quantity: 1, price: 20000000, content_updated: now() - 2 * 86400 }] });
+      listings: [
+        { player_id: 9, player_name: "Charlie", quantity: 1, price: 20000000, content_updated: old() },
+        { player_id: 7, player_name: "Alpha", quantity: 1, price: 20000000, content_updated: old() },
+      ] });
+    if (p === "/weav3r/marketplace/3") return send({ item_id: 3, item_name: "Emerald", market_price: 8000000, generated_at: now(),
+      listings: [
+        { player_id: 10, player_name: "Delta", quantity: 5, price: 8000000, content_updated: old() },
+        { player_id: 11, player_name: "Echo", quantity: 1, price: 8000000, content_updated: old() },
+        { player_id: 12, player_name: "Foxtrot", quantity: 2, price: 8000000, content_updated: old() },
+      ] });
 
     // Test control: /__status?id=7&state=Hospital&mins=30 (state=Okay clears it)
     if (p === "/__status") {

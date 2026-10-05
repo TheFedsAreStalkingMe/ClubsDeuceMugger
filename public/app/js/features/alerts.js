@@ -15,12 +15,14 @@ export function updateAlerts(now) {
   if (key === shown) return;
   shown = key;
   $("alerts").replaceChildren(
-    ...hits.map((r) =>
-      el("div", { class: "alert" },
+    ...hits.map((r) => {
+      const best = [...r.items].sort((a, b) => b.price - a.price)[0];
+      const more = r.items.length > 1 ? ` and ${r.items.length - 1} more` : "";
+      return el("div", { class: "alert" },
         el("div", { class: "face", text: "JACKPOT >:D" }),
-        el("div", { text: `${r.name} [${r.id}] has ${r.itemName} at ${fmtMoney(r.price)}. Est. stats ${fmtStats(r.bs)}, offline ${Math.round((now - r.last) / 60)}m.` }),
+        el("div", { text: `${r.name} [${r.id}] has ${best.itemName} at ${fmtMoney(r.topPrice)}${more}. Est. stats ${fmtStats(r.bs)}, offline ${Math.round((now - r.last) / 60)}m.` }),
         attackLink(r.id)
-      )
-    )
+      );
+    })
   );
 }
