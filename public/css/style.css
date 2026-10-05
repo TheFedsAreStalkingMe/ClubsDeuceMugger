@@ -239,3 +239,9 @@ details.more[open] > summary { margin-bottom: 10px; }
 .rating.good { color: var(--club); }
 .rating.mediocre { color: var(--muted); }
 .rating.bad { color: var(--derse-l); }
+
+/* ---- finder tabs and the company type list ---- */
+.tabs { display: flex; gap: 10px; justify-content: center; margin: 0 0 16px; flex-wrap: wrap; }
+.tabs a { padding: 10px 16px; border: 2px solid var(--line); color: var(--muted); text-decoration: none; min-height: 44px; display: flex; align-items: center; }
+.tabs a[aria-current="page"] { color: var(--club); border-color: var(--club); }
+.checklist { display: grid; gap: 4px; max-height: 220px; overflow-y: auto; border: 2px solid var(--line); padding: 8px 12px; text-align: left; width: 100%; }

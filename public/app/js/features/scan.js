@@ -7,16 +7,16 @@
 import { api } from "/js/core/api.js";
 import { pool } from "/js/core/async.js";
 import { fmtMoney } from "/js/core/format.js";
-import { Cache, STORE, save } from "/js/core/storage.js";
+import { STORE, save } from "/js/core/storage.js";
 import { MIN_PRICE, state } from "../state.js";
 import { acquireTorn } from "./limits.js";
 import { explainDrops, statVerdict, visibleRows } from "./rules.js";
 import { render, scheduleRender, tick } from "./results.js";
 import { STAGES, countdown, setProgress, setScanMsg, updateRunButtons } from "./ui.js";
+import { estimateStats } from "./estimates.js";
 import { applyProfile, profileFresh, profiles, recordFrom } from "./status.js";
 import { renderWatch } from "./watchlist.js";
 
-const HOUR = 3600e3;
 const ITEM_READS_AT_ONCE = 6;
 const TORN_KEY_ERRORS = [2, 10, 13, 16];
 const isCancel = (e) => e && e.message === "cancelled";
@@ -131,38 +131,7 @@ async function readBazaars(call, list, f, runId) {
     .sort((a, b) => b.total - a.total);
 }
 
-// ---------------------------------------------------------------- 3. FF Scouter estimates
-
-// For EVERY seller (200 per request), so weak players are never skipped before the stat filter.
-async function estimateStats(call, ids, runId) {
-  const cache = new Cache(STORE.ff, 8000);
-  const need = ids.filter((id) => { const e = cache.get(id); return !e || Date.now() - e.t > 6 * HOUR; });
-  setScanMsg(`Estimating stats for ${ids.length} sellers...`);
-  for (let i = 0; i < need.length; i += 200) {
-    const batch = need.slice(i, i + 200);
-    let data;
-    try {
-      // One key is enough: FF Scouter accepts your registered Torn key unless you set a separate one.
-      data = await call("/api/ffscouter", { method: "POST", headers: { "X-FF-Key": state.keys.ff || state.keys.torn }, body: { targets: batch } });
-    } catch (e) {
-      if (e.retryAfter || isCancel(e)) throw e;
-      state.outcome = "fatal";
-      throw new Error(`FF Scouter did not accept the key (${e.message}). Open Settings and tap "Test key with FF Scouter" to register it, or add a separate FF Scouter key there.`);
-    }
-    const seen = new Set();
-    for (const s of Array.isArray(data) ? data : data.data || data.results || []) {
-      seen.add(Number(s.player_id));
-      cache.put(s.player_id, { t: Date.now(), ff: s.fair_fight ?? null, bs: s.bs_estimate ?? null });
-    }
-    for (const id of batch) if (!seen.has(id)) cache.put(id, { t: Date.now(), ff: null, bs: null });
-    cache.flush();
-    if (runId !== state.runId) return cache;
-    STAGES.estimates(Math.min(i + 200, need.length) / need.length);
-    setScanMsg(`Estimating stats ${Math.min(i + 200, need.length)}/${need.length}...`);
-  }
-  STAGES.estimates(1);
-  return cache;
-}
+// (3. FF Scouter estimates live in estimates.js)
 
 // ---------------------------------------------------------------- 5. Torn status, age, last action
 

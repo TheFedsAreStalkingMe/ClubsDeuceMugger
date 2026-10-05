@@ -114,6 +114,23 @@ function fakeServer() {
       { action: "mug", text: "Mugsy mugged Rich and stole $2,500,000" },
     ], summary: [] } });
 
+    // Torn companies (inactive earners): types 12 Mining Corporation and 5 Flower Shop
+    //   501 Deep Co (10 stars): Pia 10 days idle, Quin 2 days idle, Rex 30 days idle and in hospital
+    //   502 Shallow Co (4 stars): Sam 20 days idle        601 Petals (5 stars, Flower Shop): Tess 15 days idle
+    if (p === "/v2/torn/companies") return send({ companies: [{ id: 12, name: "Mining Corporation", cost: 1, employees: 10 }, { id: 5, name: "Flower Shop", cost: 1, employees: 10 }] });
+    let m;
+    if ((m = p.match(/^\/v2\/company\/(\d+)\/companies$/))) {
+      const co = (id, name, type, typeName, rating, hired) => ({ id, name, type: { id: type, name: typeName }, rating, employees: { hired, capacity: 10 }, income: { daily: 1000000 } });
+      const list = m[1] === "12" ? [co(501, "Deep Co", 12, "Mining Corporation", 10, 3), co(502, "Shallow Co", 12, "Mining Corporation", 4, 1)] : [co(601, "Petals", 5, "Flower Shop", 5, 1)];
+      return send({ companies: list, _metadata: { total: list.length, links: { next: null, prev: null } } });
+    }
+    if ((m = p.match(/^\/v2\/company\/(\d+)\/employees$/))) {
+      const day = 86400;
+      const emp = (id, name, days, idle, state = "Okay", until = null) => ({ id, name, position: { id: 1, name: "Miner" }, days_in_company: days, status: { description: state, details: null, state, color: "green", until }, last_action: { status: "Offline", timestamp: now() - idle * day, relative: "x" } });
+      const by = { 501: [emp(21, "Pia", 100, 10), emp(22, "Quin", 100, 2), emp(23, "Rex", 100, 30, "Hospital", now() + 3600)], 502: [emp(24, "Sam", 100, 20)], 601: [emp(25, "Tess", 8, 15)] };
+      return send({ employees: by[m[1]] || [] });
+    }
+
     // FF Scouter
     if (p === "/ff/get-stats") return send(u.searchParams.get("targets").split(",").map((id) => ({ player_id: Number(id), fair_fight: 1.5, bs_estimate: 2e9 })));
     if (p === "/ff/check-key") return send({ is_registered: key === "REGISTEREDKEY123", is_premium: false, last_used: null });

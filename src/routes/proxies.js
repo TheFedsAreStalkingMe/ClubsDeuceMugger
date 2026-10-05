@@ -4,7 +4,7 @@
 import { RE, upstream } from "../config.js";
 import { fail, json, readJson } from "../lib/http.js";
 import { throttle } from "../lib/ratelimit.js";
-import { fetchJson } from "../lib/upstream.js";
+import { fetchJson, tornV2 } from "../lib/upstream.js";
 
 const header = (request, name) => request.headers.get(name) || "";
 const TORN_PER_MINUTE = 84; // Torn allows 100 per key; the site stays under 85
@@ -83,6 +83,60 @@ export async function tornMe({ request, env, user }) {
   if (response) return response;
   const total = Number(data.total) || ["strength", "defense", "speed", "dexterity"].reduce((n, k) => n + (Number(data[k]) || 0), 0);
   return json({ total });
+}
+
+// ---------------------------------------------------------------- Torn companies (inactive earners)
+
+// A Torn API v2 call with the member's key. Key and Torn errors are passed on in the body, like the v1 calls.
+async function tornCompany(env, request, user, path, params = {}) {
+  const key = header(request, "X-Torn-Key");
+  if (!RE.tornKey.test(key)) return { response: fail("Missing or malformed Torn API key.") };
+  const blocked = await throttle(env, "torn", String(user.id), TORN_PER_MINUTE, 60);
+  if (blocked) return { response: blocked };
+  try {
+    return { data: await tornV2(upstream(env).tornV2, path, { striptags: "true", ...params }, key) };
+  } catch (e) {
+    if (e.code) return { response: json({ error: e.message, code: e.code }) };
+    return { response: fail("Torn sent bad data.", 502) };
+  }
+}
+
+// Every company type: id and name (about 40 of them; they almost never change).
+export async function companyTypes({ request, env, user }) {
+  const { data, response } = await tornCompany(env, request, user, "/torn/companies");
+  if (response) return response;
+  return json({ types: (data.companies || []).map((t) => ({ id: t.id, name: t.name })) });
+}
+
+// One page (up to 100) of the companies of one type, with their star rating.
+export async function companyList({ request, env, url, user }) {
+  const type = url.searchParams.get("type") || "";
+  const offset = url.searchParams.get("offset") || "0";
+  if (!/^\d{1,3}$/.test(type) || !/^\d{1,6}$/.test(offset)) return fail("Bad company type or offset.");
+  const { data, response } = await tornCompany(env, request, user, `/company/${type}/companies`, { limit: "100", offset });
+  if (response) return response;
+  return json({
+    total: data._metadata?.total ?? null,
+    companies: (data.companies || []).map((c) => ({
+      id: c.id, name: c.name, type: c.type?.id, typeName: c.type?.name, stars: c.rating,
+      hired: c.employees?.hired ?? 0, capacity: c.employees?.capacity ?? 0, income: c.income?.daily ?? 0,
+    })),
+  });
+}
+
+// The people who work at one company, with their status and last action.
+export async function companyEmployees({ request, env, url, user }) {
+  const id = url.searchParams.get("id") || "";
+  if (!/^\d{1,10}$/.test(id)) return fail("Bad company ID.");
+  const { data, response } = await tornCompany(env, request, user, `/company/${id}/employees`);
+  if (response) return response;
+  return json({
+    employees: (data.employees || []).map((e) => ({
+      id: e.id, name: e.name, position: e.position?.name || "", days: e.days_in_company ?? 0,
+      last: e.last_action?.timestamp || 0,
+      state: e.status?.state || "Okay", until: e.status?.until || 0, desc: e.status?.description || "",
+    })),
+  });
 }
 
 // ---------------------------------------------------------------- FF Scouter (battle stat estimates)

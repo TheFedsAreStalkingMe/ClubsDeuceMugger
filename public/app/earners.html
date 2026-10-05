@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#08080b">
+  <meta name="robots" content="noindex">
+  <title>Clubs Deuce Mugger | Inactive Earners</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Cd">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <main class="wrap">
+    <header class="topbar">
+      <h1>Inactive Earners <svg class="icon club-c"><use href="/img/sprite.svg#club"/></svg></h1>
+      <div class="who" id="who"></div>
+      <div class="actions">
+        <a class="btn ghost small" href="/app/leaderboard.html">Leaderboard</a>
+        <a class="btn ghost small" href="/app/settings.html">Settings</a>
+        <button class="btn ghost small" id="logout" type="button">Log out</button>
+      </div>
+    </header>
+
+    <nav class="tabs" aria-label="Finders">
+      <a href="/app/">Bazaar finder</a>
+      <a href="/app/earners.html" aria-current="page">Inactive earners</a>
+    </nav>
+
+    <p class="msg info" id="setup-note" hidden>Add your Torn key in <a href="/app/settings.html">Settings</a> to start.</p>
+
+    <section class="card hunt">
+      <h2>Hunt</h2>
+      <p class="hint">Players who have been offline a while at well paying companies. Their daily wages pile up as cash.</p>
+      <div class="stack">
+        <div class="label">Company types <span class="hint" id="types-count"></span>
+          <div class="checklist" id="types"><span class="hint">Add your Torn key in Settings to load the list.</span></div>
+          <button class="btn ghost small" id="types-none" type="button">Clear</button></div>
+        <div class="label">Company stars at least
+          <div class="slider-row"><input type="range" id="minStars-r" min="1" max="10" step="1"><input type="number" id="minStars" inputmode="numeric" min="1" max="10" step="1" aria-label="Company stars at least"></div></div>
+        <div class="label">Days inactive at least
+          <div class="slider-row"><input type="range" id="minDays-r" min="0" max="365" step="1"><input type="number" id="minDays" inputmode="numeric" min="0" step="1" aria-label="Days inactive at least"></div></div>
+        <div class="label">Targets stronger than
+          <div class="slider-row"><input type="range" id="minBs-r" min="0" max="1000"><input type="number" id="minBs" inputmode="numeric" min="0" step="1" aria-label="Targets stronger than"></div></div>
+        <div class="label">Targets weaker than
+          <div class="slider-row"><input type="range" id="maxBs-r" min="0" max="1000"><input type="number" id="maxBs" inputmode="numeric" min="0" step="1" aria-label="Targets weaker than"></div>
+          <span class="hint">Their estimated total battle stats.</span></div>
+        <div class="label">Max fair fight
+          <div class="slider-row"><input type="range" id="maxFf-r" min="1" max="10" step="0.01"><input type="number" id="maxFf" inputmode="decimal" min="1" max="10" step="0.01" aria-label="Max fair fight"></div></div>
+      </div>
+
+      <details class="more">
+        <summary>More options</summary>
+        <div class="stack">
+          <label class="check"><input type="checkbox" id="includeUnknown"> Keep players with no stat estimate</label>
+          <label>Companies read per type <span class="hint">100 per Torn call.</span>
+            <input type="number" id="perType" inputmode="numeric" min="100" max="1000" step="100"></label>
+          <label>Companies to check employees of <span class="hint">Most stars first.</span>
+            <input type="number" id="maxCompanies" inputmode="numeric" min="1" max="300" step="1"></label>
+          <label>Players to show <span class="hint">Biggest estimated cash first.</span>
+            <input type="number" id="maxPlayers" inputmode="numeric" min="1" max="500" step="1"></label>
+        </div>
+      </details>
+
+      <div class="progress" aria-hidden="true"><div id="bar"></div></div>
+      <div class="scanbar">
+        <button class="btn green" id="scan" type="button">Scan once &clubs;</button>
+        <button class="btn ghost" id="cancel" type="button" hidden>Cancel</button>
+      </div>
+      <p class="hint">Company lists and employees are kept for 3 hours, so repeat scans are quick.</p>
+      <p class="msg info" id="scan-msg" role="status" aria-live="polite"></p>
+    </section>
+
+    <div class="sortbar">
+      <label>Sort
+        <select id="sort">
+          <option value="cash:desc">Most estimated cash</option>
+          <option value="cash:asc">Least estimated cash</option>
+          <option value="days:desc">Longest inactive</option>
+          <option value="days:asc">Shortest inactive</option>
+          <option value="stats:asc">Weakest first</option>
+          <option value="stats:desc">Strongest first</option>
+          <option value="hospital:asc">Out of hospital soonest</option>
+          <option value="hospital:desc">Out of hospital latest</option>
+          <option value="age:asc">Newest accounts</option>
+          <option value="age:desc">Oldest accounts</option>
+        </select>
+      </label>
+    </div>
+
+    <section class="results" id="results" aria-live="polite"></section>
+  <p class="foot">Font: Fontstuck by KevinHilt, <a href="/fonts/LICENSE-fontstuck.txt">CC BY-SA 3.0</a></p>
+  </main>
+  <script type="module" src="/app/js/pages/earners.js"></script>
+</body>
+</html>

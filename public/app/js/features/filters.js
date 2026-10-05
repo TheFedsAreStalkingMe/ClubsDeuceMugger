@@ -4,36 +4,12 @@ import { $ } from "/js/core/dom.js";
 import { STORE, save } from "/js/core/storage.js";
 import { MIN_PRICE, state } from "../state.js";
 import { render } from "./results.js";
+import { fromLog, slide, toLog } from "./sliders.js";
 
 const persist = () => save(STORE.filters, state.filters);
 
-// Log-scale sliders so one slider covers 0 to 10 billion.
-const toLog = (n) => (n <= 1 ? 0 : Math.round(Math.log10(n) * 100));
-const fromLog = (v) => (v <= 0 ? 0 : Math.round(10 ** (v / 100)));
-const same = (n) => n;
-
-// A slider (id + "-r") kept in step with a number box (id). The number box is exact; `floor` is a minimum.
-function bindSlider(name, { to = same, from = same, floor } = {}) {
-  const num = $(name);
-  const range = $(`${name}-r`);
-  const set = (v, source) => {
-    if (floor != null && v < floor) v = floor;
-    state.filters[name] = v;
-    if (source !== "num") num.value = v;
-    if (source !== "range") range.value = to(v);
-    persist();
-  };
-  num.addEventListener("input", () => {
-    const v = parseFloat(num.value);
-    if (!Number.isNaN(v) && (floor == null || v >= floor)) set(v, "num");
-  });
-  num.addEventListener("change", () => { // fix an empty or too-small box when you leave it
-    const v = parseFloat(num.value);
-    set(Number.isNaN(v) ? floor ?? 0 : v);
-  });
-  range.addEventListener("input", () => set(from(+range.value), "range"));
-  set(state.filters[name]);
-}
+// A slider with a number box, kept in the Mug Finder's filters.
+const bindSlider = (name, opts = {}) => slide(name, { target: state.filters, save: persist, ...opts });
 
 // A money box where 0 means "off".
 function bindAmount(name) {

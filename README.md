@@ -26,7 +26,7 @@ src/                    THE SERVER (Cloudflare Worker, ES modules)
     account.js          profile, email change, optional saved API key (locked with the member's password)
     invites.js          make, list and close invite links
     admin.js            owner-only account list and actions
-    proxies.js          Weav3r, Torn and FF Scouter pass-throughs
+    proxies.js          Weav3r, Torn (profiles, companies) and FF Scouter pass-throughs
     leaderboard.js      Attack-tap log, mug verification against Torn, rankings
 
 public/                 THE WEBSITE (served as is)
@@ -35,9 +35,10 @@ public/                 THE WEBSITE (served as is)
   js/core/              Helpers shared by every page (api, dom, format, storage, async)
   js/pages/             Scripts for the public pages
   app/                  Signed-in pages (the Worker only serves these to members)
-    index.html          Mug Finder        settings.html   Settings        leaderboard.html   Leaderboard
+    index.html          Mug Finder (bazaars)    earners.html   Inactive Earners    settings.html   Settings    leaderboard.html   Leaderboard
     js/state.js         The shared state of the Mug Finder and its defaults
     js/features/        One file per feature (see below)
+    js/earners/         The Inactive Earners tab: state, scan, cards, filters, cache (see below)
     js/settings/        One file per Settings section
     js/pages/           The script each app page loads (main, settings, leaderboard)
   img/sprite.svg        Pixel suit and symbol art (original)
@@ -62,6 +63,16 @@ tests/                  Automated checks (see Tests)
 | `tracking.js` | Logs Attack taps and checks for new mugs (leaderboard) |
 | `admin.js` | The owner panel, built only for the owner |
 | `ui.js` | Message line, progress bar stages, run buttons |
+
+### Inactive Earners tab (`public/app/js/earners/`)
+
+Finds players who have been offline a while at well starred companies, since their wages pile up as cash.
+It uses Torn API v2 with the member's own key (public access is enough): `/torn/companies` (company types),
+`/company/{typeId}/companies` (100 per page, with star `rating`), and `/company/{id}/employees` (position, days in
+company, last action, status). Torn does not show wages, so **estimated cash is a rough guess**:
+`wage x stars / 10 x min(days inactive, days in company)`, where the wage is set per company type in Settings
+(default $500,000 for a 10 star company). Company lists and employees are cached in the browser for 3 hours
+(`data.js`); every Torn call goes through the shared 80 a minute limiter (`features/limits.js`).
 
 ## How it fits together
 

@@ -186,6 +186,16 @@ async function runChecks() {
   await setFakeFlag("weav3rBusy", false);
   r = await bob.get("/api/weav3r?item=abc");
   check("bad item id refused", r.status === 400);
+  r = await bob.get("/api/torn/company-types", { headers: K });
+  check("company types listed", r.data.types && r.data.types.length === 2 && r.data.types[0].name === "Mining Corporation", JSON.stringify(r.data));
+  r = await bob.get("/api/torn/companies?type=12", { headers: K });
+  check("companies listed with stars", r.data.companies.length === 2 && r.data.companies[0].stars === 10 && r.data.companies[0].typeName === "Mining Corporation" && r.data.total === 2, JSON.stringify(r.data));
+  r = await bob.get("/api/torn/employees?id=501", { headers: K });
+  check("employees listed with status and last action", r.data.employees.length === 3 && r.data.employees[2].state === "Hospital" && r.data.employees[0].last > 1e9 && r.data.employees[0].days === 100, JSON.stringify(r.data));
+  r = await bob.get("/api/torn/employees?id=abc", { headers: K });
+  check("bad company id refused", r.status === 400);
+  r = await bob.get("/api/torn/companies?type=12");
+  check("company calls need a Torn key", r.status === 400);
   r = await bob.get("/api/torn/user?id=7", { headers: K });
   check("Torn profile trimmed", r.data.name === "A" && r.data.secret === undefined && r.data.last_action.timestamp === 5 && r.data.status.state === "Okay");
   r = await bob.get("/api/torn/user?id=7", { headers: { "X-Torn-Key": "BADKEY1234567890" } });

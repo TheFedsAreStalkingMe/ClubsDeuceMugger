@@ -19,7 +19,7 @@
   <main class="wrap">
     <header class="topbar">
       <h1>Settings</h1>
-      <div class="actions"><a class="btn ghost small" href="/app/">Back to Mug Finder</a> <a class="btn ghost small" href="/app/leaderboard.html">Leaderboard</a></div>
+      <div class="actions"><a class="btn ghost small" href="/app/">Back to Mug Finder</a> <a class="btn ghost small" href="/app/earners.html">Inactive earners</a> <a class="btn ghost small" href="/app/leaderboard.html">Leaderboard</a></div>
     </header>
 
     <div class="panels">
@@ -68,6 +68,20 @@
           <label>Offline for at least (minutes) <input type="number" id="p-offlineMinutes" inputmode="numeric" min="0" step="1"></label>
           <button class="btn green small" id="save-prefs" type="button">Save alert settings</button>
           <p class="msg" id="prefs-msg" role="status" aria-live="polite"></p>
+        </div>
+      </section>
+
+      <section class="card panel">
+        <h2>Inactive earner wages</h2>
+        <p class="hint">Torn does not show wages, so the Inactive earners tab guesses: daily wage x company stars / 10 x days inactive. Set the wage a 10 star company pays per day. Leave a type empty to use the default.</p>
+        <div class="stack">
+          <label>Default daily wage at 10 stars ($) <input type="number" id="w-base" inputmode="numeric" min="0" step="1000"></label>
+          <details class="more">
+            <summary>Wage per company type</summary>
+            <div class="stack" id="w-types"><span class="hint">Save your Torn key first to load the company types.</span></div>
+          </details>
+          <button class="btn green small" id="save-wages" type="button">Save wages</button>
+          <p class="msg" id="wages-msg" role="status" aria-live="polite"></p>
         </div>
       </section>
 

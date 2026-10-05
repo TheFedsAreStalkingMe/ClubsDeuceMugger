@@ -248,6 +248,59 @@ async function runChecks() {
   await page.waitForFunction(() => document.getElementById("keys-msg").textContent.length > 12);
   check("FF Scouter key test answers", /FF Scouter/.test(await text("#keys-msg")), await text("#keys-msg"));
 
+  section("Inactive earners");
+  const earnCards = () => page.$$eval("#results .target", (els) => els.map((e) => ({
+    name: e.querySelector(".name").textContent,
+    text: e.textContent,
+    link: [...e.querySelectorAll("a")].map((a) => a.textContent).join(),
+  })));
+  await page.goto(BASE + "/app/");
+  await setStore("cdm.keys", { torn: "abcdefgh12345678", ff: "" });
+  await page.evaluate(() => { localStorage.removeItem("cdm.earn.filters"); localStorage.removeItem("cdm.earn.wages"); localStorage.removeItem("cdm.earn.cache"); });
+  check("the bazaar page has both tabs", (await page.$$("nav.tabs a")).length === 2);
+  await page.goto(BASE + "/app/earners.html");
+  await page.waitForSelector("#types label");
+  check("company types listed, Mining ticked the first time", (await page.$$("#types label")).length === 2 && (await page.isChecked("#types label:first-child input")));
+  await page.click("#scan");
+  await scanDone();
+  let efound = await earnCards();
+  check("only inactive players at companies with enough stars", efound.map((c) => c.name).join() === "Rex,Pia", efound.map((c) => c.name).join());
+  check("estimated cash: $500k x 10/10 x days inactive, labelled rough", /~\$15m \(rough\)/.test(efound[0].text) && /~\$5m \(rough\)/.test(efound[1].text), efound.map((c) => c.text.slice(0, 120)).join(" | "));
+  check("cards show company, type, stars, position, profile and attack buttons", /Deep Co · Mining Corporation · 10★/.test(efound[0].text) && /Miner/.test(efound[0].text) && efound[0].link === "Profile,Attack", efound[0].link);
+  check("cards show stats, fair fight, age and status", /Est\. stats2b/.test(efound[0].text) && /Fair fight1\.50/.test(efound[0].text) && /Account age\d+ days/.test(efound[0].text) && /Status(Okay|Out|Hospital)/.test(efound[0].text), efound[0].text);
+  await page.selectOption("#sort", "days:asc");
+  check("sorting by days inactive", (await earnCards()).map((c) => c.name).join() === "Pia,Rex");
+  // the second scan is served from the browser cache: no new company or employee calls
+  const tornCalls = () => page.evaluate(() => JSON.parse(localStorage.getItem("cdm.calls") || "[]").length);
+  const before = await tornCalls();
+  await page.click("#scan");
+  await scanDone();
+  const after = await tornCalls();
+  check("a repeat scan reuses the cached company data", after - before <= 2, `${after - before} Torn calls`);
+  // The days-in-company cap and the other type: Petals (5 stars), Tess idle 15 days but employed 8.
+  await setStore("cdm.earn.filters", { types: [5], minStars: 5, minDays: 7, sort: "cash", dir: "desc" });
+  await page.reload();
+  await page.waitForSelector("#types label");
+  await page.click("#scan");
+  await scanDone();
+  efound = await earnCards();
+  check("cash is capped by days in the company", efound.length === 1 && efound[0].name === "Tess" && /~\$2m \(rough\)/.test(efound[0].text), efound.map((c) => c.text.slice(0, 100)).join("|"));
+  // Settings wages change the estimate.
+  await page.goto(BASE + "/app/settings.html");
+  await page.waitForSelector("#w-types input", { state: "attached" });
+  await page.click("summary:has-text('Wage per company type')");
+  await page.fill("#w-base", "1000000");
+  await page.fill("#w-types input[data-type='5']", "2000000");
+  await page.click("#save-wages");
+  await page.goto(BASE + "/app/earners.html");
+  await page.waitForSelector("#types label");
+  await page.click("#scan");
+  await scanDone();
+  efound = await earnCards();
+  check("a wage set in Settings changes the estimate", /~\$8m \(rough\)/.test(efound[0].text), efound[0] && efound[0].text.slice(0, 100));
+  await setStore("cdm.earn.filters", { types: [12], minStars: 5, minDays: 7 });
+  await setStore("cdm.earn.wages", { base: 500000, types: {} });
+
   section("Update notice");
   let fakeBuild = "build-A";
   await page.route("**/api/me", async (route) => {
