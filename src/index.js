@@ -77,6 +77,7 @@ async function api(request, env, url, path, method) {
   if (path === "/api/account/email" && method === "POST") return setEmail(request, env, user);
   if (path === "/api/invites" && method === "POST") return createInvite(env, user, url);
   if (path === "/api/invites" && method === "GET") return listInvites(env, user);
+  if (path === "/api/invites/revoke" && method === "POST") return revokeInvite(request, env, user);
   if (path === "/api/admin/users" && method === "GET") return adminList(env, user);
   if (path === "/api/admin/users" && method === "POST") return adminAction(request, env, user);
   if (path === "/api/torn/me" && method === "GET") return proxyTornMe(request, env, user);
@@ -377,7 +378,7 @@ async function createInvite(env, user, url) {
   if (!owner) {
     const open = await env.DB.prepare("SELECT COUNT(*) AS n FROM invites WHERE inviter_id = ? AND used_by IS NULL AND expires_at > ?")
       .bind(user.id, nowSec()).first();
-    if (open.n >= 5) return json({ error: "You already have 5 unused invites. Wait for them to be used or expire." }, 429);
+    if (open.n >= 1) return json({ error: "You already have an unused invite. Wait for it to be used or expire, or close it with the X first." }, 429);
   }
   const token = randomToken();
   const now = nowSec();
@@ -385,16 +386,25 @@ async function createInvite(env, user, url) {
     .bind(await sha256(token), user.id, now, now + APPROVAL_SECONDS)
     .run();
   const base = (env.APP_URL || url.origin).replace(/\/$/, "");
-  return json({ ok: true, link: `${base}/?invite=${token}`, expires_at: now + APPROVAL_SECONDS });
+  const made = await env.DB.prepare("SELECT rowid AS id FROM invites WHERE token_hash = ?").bind(await sha256(token)).first();
+  return json({ ok: true, id: made.id, link: `${base}/?invite=${token}`, expires_at: now + APPROVAL_SECONDS });
 }
 
 async function listInvites(env, user) {
   const { results } = await env.DB.prepare(
-    `SELECT i.created_at, i.expires_at, i.used_at, u.username AS used_by_name
+    `SELECT i.rowid AS id, i.created_at, i.expires_at, i.used_at, u.username AS used_by_name
      FROM invites i LEFT JOIN users u ON u.id = i.used_by
      WHERE i.inviter_id = ? ORDER BY i.created_at DESC LIMIT 30`
   ).bind(user.id).all();
   return json({ invites: results });
+}
+
+async function revokeInvite(request, env, user) {
+  const { id } = await readJson(request);
+  if (!Number.isInteger(id)) return json({ error: "Bad request." }, 400);
+  // Only your own invites, and only ones nobody has used yet.
+  await env.DB.prepare("DELETE FROM invites WHERE rowid = ? AND inviter_id = ? AND used_by IS NULL").bind(id, user.id).run();
+  return json({ ok: true });
 }
 
 async function adminList(env, user) {

@@ -73,10 +73,13 @@
 
       <section class="card panel">
         <h2>Invite someone</h2>
-        <p class="hint">Make a single-use link that lasts 7 days. Send it to the person. They apply with it, then type your username to get in.</p>
+        <p class="hint">Make a single-use link that lasts 7 days. You can have one open at a time. Tap X to close it and make a new one. Send it to the person. They apply with it, then type your username to get in.</p>
         <div class="stack">
           <button class="btn small" id="make-invite" type="button">Make invite link</button>
-          <div class="invite-link" id="invite-link" hidden></div>
+          <div class="invite-box" id="invite-box" hidden>
+            <div class="invite-link" id="invite-link"></div>
+            <button class="btn small ghost x-btn" id="invite-close" type="button" aria-label="Close invite">X</button>
+          </div>
           <p class="msg" id="invite-msg" role="status" aria-live="polite"></p>
           <div class="list" id="invite-list"></div>
         </div>

@@ -66,6 +66,21 @@ $("fetch-bs").addEventListener("click", async () => {
 
 // email + invites
 function fmtDate(sec) { return new Date(sec * 1000).toLocaleDateString(); }
+async function revoke(id) {
+  try {
+    await api("/api/invites/revoke", { method: "POST", body: { id } });
+    if (shownInvite === id) { $("invite-box").hidden = true; shownInvite = null; }
+    say("invite-msg", "Invite closed.", "info");
+    await loadInvites();
+  } catch (e) { say("invite-msg", e.message, "err"); }
+}
+function xButton(id) {
+  const x = document.createElement("button");
+  x.type = "button"; x.className = "btn small ghost x-btn"; x.textContent = "X"; x.setAttribute("aria-label", "Close invite");
+  x.addEventListener("click", () => revoke(id));
+  return x;
+}
+let shownInvite = null;
 async function loadInvites() {
   const { invites } = await api("/api/invites");
   const box = $("invite-list");
@@ -73,10 +88,13 @@ async function loadInvites() {
   const now = Date.now() / 1000;
   for (const i of invites) {
     const item = document.createElement("div"); item.className = "item";
+    const open = !i.used_at && i.expires_at >= now;
     const status = i.used_at ? `used by ${i.used_by_name || "a deleted account"}` : i.expires_at < now ? "expired" : "unused";
     const a = document.createElement("span"); a.textContent = status;
     const b = document.createElement("span"); b.className = "meta"; b.textContent = `made ${fmtDate(i.created_at)}`;
-    item.append(a, b); box.append(item);
+    item.append(a, b);
+    if (open) item.append(xButton(i.id));
+    box.append(item);
   }
 }
 (async () => {
@@ -96,8 +114,10 @@ $("save-email").addEventListener("click", async () => {
 $("make-invite").addEventListener("click", async () => {
   try {
     const d = await api("/api/invites", { method: "POST", body: {} });
-    const box = $("invite-link");
-    box.hidden = false; box.textContent = d.link;
+    shownInvite = d.id;
+    $("invite-link").textContent = d.link;
+    $("invite-box").hidden = false;
+    $("invite-close").onclick = () => revoke(d.id);
     say("invite-msg", "Copy this link now. It is only shown once.", "ok");
     try { await navigator.clipboard.writeText(d.link); say("invite-msg", "Link copied. It is only shown once.", "ok"); } catch { /* manual copy */ }
     await loadInvites();
