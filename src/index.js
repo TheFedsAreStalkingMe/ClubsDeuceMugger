@@ -9,6 +9,7 @@ const APPROVAL_SECONDS = 7 * 24 * 3600;
 const PBKDF2_ITERATIONS = 100000;
 const USERNAME_RE = /^[A-Za-z0-9_.-]{3,24}$/;
 const KEY_RE = /^[A-Za-z0-9]{8,64}$/;
+const TS_RE = /^[A-Za-z0-9_-]{8,64}$/; // TornStats keys can contain underscores
 const TOKEN_RE = /^[A-Za-z0-9_-]{20,100}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -94,6 +95,7 @@ async function api(request, env, url, path, method) {
   if (path === "/api/torn/user" && method === "GET") return proxyTorn(request, env, user, url);
   if (path === "/api/ffscouter" && method === "POST") return proxyFF(request, env, user);
   if (path === "/api/ffscouter/check" && method === "GET") return ffCheck(request, env, user);
+  if (path === "/api/tornstats/spy" && method === "GET") return proxyTornStats(request, env, user, url);
   if (path === "/api/ffscouter/register" && method === "POST") return ffRegister(request, env, user);
 
   return json({ error: "Not found." }, 404);
@@ -494,8 +496,9 @@ async function saveKeys(request, env, user) {
   }
   const torn = typeof body.torn === "string" ? body.torn.trim() : "";
   const ff = typeof body.ff === "string" ? body.ff.trim() : "";
-  if (!KEY_RE.test(torn) || (ff && !KEY_RE.test(ff))) return json({ error: "Keys should be letters and numbers only." }, 400);
-  await env.DB.prepare("UPDATE users SET key_enc = ? WHERE id = ?").bind(await sealKeys(env, user.id, { torn, ff }), user.id).run();
+  const ts = typeof body.ts === "string" ? body.ts.trim() : "";
+  if (!KEY_RE.test(torn) || (ff && !KEY_RE.test(ff)) || (ts && !TS_RE.test(ts))) return json({ error: "Keys should be letters and numbers only." }, 400);
+  await env.DB.prepare("UPDATE users SET key_enc = ? WHERE id = ?").bind(await sealKeys(env, user.id, { torn, ff, ts }), user.id).run();
   return json({ ok: true, saved: true });
 }
 
@@ -696,6 +699,39 @@ async function proxyTornMe(request, env, user) {
   if (data.error) return json({ error: data.error.error || "Torn error", code: data.error.code }, 200);
   const total = Number(data.total) || ["strength", "defense", "speed", "dexterity"].reduce((n, k) => n + (Number(data[k]) || 0), 0);
   return json({ total });
+}
+
+// TornStats spy lookup. The key is passed through for this one call and never stored.
+async function proxyTornStats(request, env, user, url) {
+  const id = url.searchParams.get("id") || "";
+  const key = request.headers.get("X-TS-Key") || "";
+  if (!/^\d{1,10}$/.test(id)) return json({ error: "Bad player ID." }, 400);
+  if (!TS_RE.test(key)) return json({ error: "Missing or malformed TornStats key." }, 400);
+  const rl = await rateLimit(env, "tornstats", String(user.id), 80, 60); // TornStats allows 100 per minute
+  if (!rl.ok) return tooMany(rl);
+
+  const res = await fetch(`${env.TORNSTATS_API_BASE || "https://www.tornstats.com/api/v2"}/${key}/spy/user/${id}`, {
+    headers: { Accept: "application/json", "User-Agent": "ClubsDeuceMugger/1.0" },
+  });
+  const data = await res.json().catch(() => null);
+  if (!data) return json({ error: `TornStats returned ${res.status}` }, 502);
+  if (data.status === false) {
+    // A bad key is an error. Anything else (for example "no spy") just means nothing to show.
+    if (/key/i.test(String(data.message || ""))) return json({ error: data.message || "TornStats key problem." }, 200);
+    return json({ found: false });
+  }
+  const spy = data.spy;
+  if (!spy || spy.status === false) return json({ found: false });
+  const parts = ["strength", "defense", "speed", "dexterity"].map((k) => Number(spy[k]) || 0);
+  const total = Number(spy.total) || parts.reduce((a, b) => a + b, 0);
+  if (!total) return json({ found: false });
+  return json({
+    found: true,
+    total,
+    strength: parts[0], defense: parts[1], speed: parts[2], dexterity: parts[3],
+    timestamp: Number(spy.timestamp) || 0,
+    type: spy.type || null,
+  });
 }
 
 // Asks FF Scouter whether a key is registered with them.

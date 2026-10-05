@@ -2,7 +2,7 @@
 const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const LS = { prefs: "cdm.prefs", keys: "cdm.keys", watch: "cdm.watch", filters: "cdm.filters", feed: "cdm.feed", dismissed: "cdm.dismissed", profiles: "cdm.profiles", ff: "cdm.ff", calls: "cdm.calls" };
+const LS = { prefs: "cdm.prefs", keys: "cdm.keys", watch: "cdm.watch", filters: "cdm.filters", spies: "cdm.spies", tscalls: "cdm.tscalls", feed: "cdm.feed", dismissed: "cdm.dismissed", profiles: "cdm.profiles", ff: "cdm.ff", calls: "cdm.calls" };
 const TORN_CALLS_PER_MIN = 80; // hard ceiling is 85; stay under it
 const WINDOW_MS = 60000;
 const NUM_MAX = 1e10;
@@ -16,7 +16,7 @@ function save(key, value) {
 }
 
 const state = {
-  keys: load(LS.keys, { torn: "", ff: "" }),
+  keys: Object.assign({ torn: "", ff: "", ts: "" }, load(LS.keys, {})),
   watch: load(LS.watch, []),
   filters: Object.assign(
     { minPrice: MIN_PRICE, minBs: 0, maxBs: NUM_MAX, maxFf: 3, maxSellers: 80, autoScan: true, maxItems: 40, priceTol: 10, autoEvery: 120, sort: "stats", dir: "desc" },
@@ -124,21 +124,23 @@ async function api(path, opts = {}) {
 }
 
 // Sliding-window limiter shared across tabs/reloads via localStorage.
-async function acquireTornSlot(runId) {
+async function acquireSlot(lsKey, limit, label, runId) {
   for (;;) {
     if (runId !== state.runId) throw new Error("cancelled");
     const now = Date.now();
-    const calls = load(LS.calls, []).filter((t) => now - t < WINDOW_MS);
-    if (calls.length < TORN_CALLS_PER_MIN) {
+    const calls = load(lsKey, []).filter((t) => now - t < WINDOW_MS);
+    if (calls.length < limit) {
       calls.push(now);
-      save(LS.calls, calls);
+      save(lsKey, calls);
       return;
     }
     const wait = WINDOW_MS - (now - calls[0]) + 50;
-    setScanMsg(`Pacing Torn API calls... ${Math.ceil(wait / 1000)}s`);
+    setScanMsg(`Pacing ${label} API calls... ${Math.ceil(wait / 1000)}s`);
     await sleep(Math.min(wait, 1000));
   }
 }
+const acquireTornSlot = (runId) => acquireSlot(LS.calls, TORN_CALLS_PER_MIN, "Torn", runId);
+const acquireTsSlot = (runId) => acquireSlot(LS.tscalls, 80, "TornStats", runId); // TornStats allows 100 per minute
 
 // ---------------------------------------------------------------- caches
 
@@ -364,11 +366,41 @@ async function scan() {
     }
     setProgress(0.35);
 
+    // 2b. optional: real spies from TornStats beat the FF Scouter estimate
+    const spyOf = {};
+    if (state.keys.ts) {
+      const spyCache = load(LS.spies, {});
+      const fresh = (e) => e && Date.now() - e.t < (e.found ? 6 * 3600e3 : 3600e3);
+      const todoSpies = ids.filter((id) => !fresh(spyCache[id]));
+      let got = 0, tsFailed = false;
+      await pool(todoSpies, 3, async (id) => {
+        if (tsFailed || runId !== state.runId) return;
+        try {
+          await acquireTsSlot(runId);
+          const r = await api(`/api/tornstats/spy?id=${id}`, { headers: { "X-TS-Key": state.keys.ts } });
+          if (r.error) { tsFailed = true; setScanMsg(`TornStats key problem: ${r.error}. Using FF Scouter estimates.`, "err"); return; }
+          spyCache[id] = { t: Date.now(), found: !!r.found, total: r.total || 0, ts: r.timestamp || 0 };
+        } catch (e) {
+          if (e.message === "cancelled") return;
+          if (e.retryAfter) { await sleep(e.retryAfter * 1000); return; }
+          return; // skip this one, estimate will be used
+        }
+        setScanMsg(`Checking TornStats spies ${++got}/${todoSpies.length}...`);
+      });
+      if (runId !== state.runId) return;
+      save(LS.spies, spyCache);
+      for (const id of ids) if (spyCache[id] && spyCache[id].found) spyOf[id] = spyCache[id];
+    }
+
     // 3. filter on stats / fair fight (unknown estimates only pass when no stat limits are set)
     const statLimits = f.minBs > 0 || f.maxBs < NUM_MAX;
     rows = rows.filter((r) => {
       const s = ffCache[r.id] || {};
-      r.ff = s.ff; r.bs = s.bs;
+      const spy = spyOf[r.id];
+      r.ff = s.ff;
+      r.bs = spy ? spy.total : s.bs;
+      r.src = spy ? "Spy" : "Est.";
+      r.spyTs = spy ? spy.ts : 0;
       if (r.bs == null) return !statLimits && (r.ff == null || r.ff <= f.maxFf);
       if (r.bs < f.minBs || r.bs > f.maxBs) return false;
       return r.ff == null || r.ff <= f.maxFf;
@@ -424,7 +456,7 @@ async function scan() {
 // ---------------------------------------------------------------- mug feed and auto hunt
 
 const keyOf = (r) => `${r.id}:${r.itemId}`;
-const SNAP = ["id", "name", "itemId", "itemName", "market", "price", "qty", "total", "ff", "bs", "state", "until", "desc", "age", "last"];
+const SNAP = ["id", "name", "itemId", "itemName", "market", "price", "qty", "total", "ff", "bs", "src", "spyTs", "state", "until", "desc", "age", "last"];
 const snap = (r) => Object.fromEntries(SNAP.map((k) => [k, r[k]]));
 
 // A good mug: weaker than you, attackable soon, and offline long enough (rules from Settings).
@@ -556,7 +588,7 @@ function card(r, i, opts = {}) {
     el("dt", { text: "Price" }), el("dd", { text: `${fmtMoney(r.price)} × ${r.qty}` }),
     el("dt", { text: "Market" }), el("dd", { text: r.market ? `${fmtMoney(r.market)} (${Math.round(r.price / r.market * 100)}%)` : "?" }),
     el("dt", { text: "Total" }), el("dd", { text: fmtMoney(r.total) }),
-    el("dt", { text: "Est. stats" }), el("dd", { text: fmtStats(r.bs) }),
+    el("dt", { text: "Stats" }), el("dd", { text: r.bs == null ? "?" : `${fmtStats(r.bs)} ${r.src || "Est."}${r.src === "Spy" && r.spyTs ? ` (${fmtAgo(Date.now() / 1000 - r.spyTs).split(" ")[0]} old)` : ""}` }),
     el("dt", { text: "Fair fight" }), el("dd", { text: r.ff != null ? Number(r.ff).toFixed(2) : "?" }),
     el("dt", { text: "Account age" }), el("dd", { text: r.age != null ? `${Number(r.age).toLocaleString("en-US")} days` : "?" }),
     opts.found != null ? el("dt", { text: "Found" }) : null, opts.found != null ? el("dd", { text: fmtAgo(opts.found) }) : null,
@@ -596,7 +628,7 @@ function updateAlerts(now) {
     const links = attackLink(r.id);
     box.append(el("div", { class: "alert" },
       el("div", { class: "face", text: "JACKPOT >:D" }),
-      el("div", { text: `${r.name} [${r.id}] has ${r.itemName} at ${fmtMoney(r.price)}. Est. stats ${fmtStats(r.bs)}, offline ${Math.round((now - r.last) / 60)}m.` }),
+      el("div", { text: `${r.name} [${r.id}] has ${r.itemName} at ${fmtMoney(r.price)}. ${r.src === "Spy" ? "Spy" : "Est."} stats ${fmtStats(r.bs)}, offline ${Math.round((now - r.last) / 60)}m.` }),
       links));
   }
 }
@@ -668,7 +700,7 @@ async function boot() {
     try {
       const r = await api("/api/account/key");
       if (r.saved && r.keys && r.keys.torn) {
-        state.keys = { torn: r.keys.torn, ff: r.keys.ff || "" };
+        state.keys = { torn: r.keys.torn, ff: r.keys.ff || "", ts: r.keys.ts || "" };
         save(LS.keys, state.keys);
       }
     } catch { /* no saved key */ }

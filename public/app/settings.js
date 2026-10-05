@@ -24,8 +24,8 @@ async function api(path, opts = {}) {
 }
 
 // keys
-const keys = load(KEYS, { torn: "", ff: "" });
-$("key-torn").value = keys.torn || ""; $("key-ff").value = keys.ff || "";
+const keys = load(KEYS, { torn: "", ff: "", ts: "" });
+$("key-torn").value = keys.torn || ""; $("key-ff").value = keys.ff || ""; $("key-ts").value = keys.ts || "";
 let accountSaved = false;
 (async () => {
   try {
@@ -38,21 +38,22 @@ let accountSaved = false;
     accountSaved = r.saved;
     $("save-account").checked = r.saved;
     if (r.saved && !$("key-torn").value) {
-      $("key-torn").value = r.keys.torn || ""; $("key-ff").value = r.keys.ff || "";
-      save(KEYS, { torn: r.keys.torn || "", ff: r.keys.ff || "" });
+      $("key-torn").value = r.keys.torn || ""; $("key-ff").value = r.keys.ff || ""; $("key-ts").value = r.keys.ts || "";
+      save(KEYS, { torn: r.keys.torn || "", ff: r.keys.ff || "", ts: r.keys.ts || "" });
       say("keys-msg", "Loaded your saved key from your account.", "ok");
     }
   } catch { /* checkbox just stays off */ }
 })();
 $("save-keys").addEventListener("click", async () => {
-  const torn = $("key-torn").value.trim(), ff = $("key-ff").value.trim();
+  const torn = $("key-torn").value.trim(), ff = $("key-ff").value.trim(), ts = $("key-ts").value.trim();
   if (!torn) return say("keys-msg", "Paste your Torn key first.", "err");
   if ([torn, ff].some((k) => k && !/^[A-Za-z0-9]{8,64}$/.test(k))) return say("keys-msg", "Keys should be letters and numbers only.", "err");
-  save(KEYS, { torn, ff });
+  if (ts && !/^[A-Za-z0-9_-]{8,64}$/.test(ts)) return say("keys-msg", "The TornStats key has odd characters. Check it.", "err");
+  save(KEYS, { torn, ff, ts });
   const wantAccount = $("save-account").checked && !$("save-account").disabled;
   try {
     if (wantAccount) {
-      await api("/api/account/key", { method: "POST", body: { torn, ff } });
+      await api("/api/account/key", { method: "POST", body: { torn, ff, ts } });
       accountSaved = true;
       say("keys-msg", "Saved in this browser and to your account.", "ok");
     } else if (accountSaved) {
@@ -66,7 +67,7 @@ $("save-keys").addEventListener("click", async () => {
 });
 $("clear-keys").addEventListener("click", async () => {
   try { localStorage.removeItem(KEYS); } catch { /* ignore */ }
-  $("key-torn").value = ""; $("key-ff").value = "";
+  $("key-torn").value = ""; $("key-ff").value = ""; $("key-ts").value = "";
   if (accountSaved) {
     try { await api("/api/account/key", { method: "POST", body: { clear: true } }); accountSaved = false; $("save-account").checked = false; } catch { /* keep going */ }
   }
