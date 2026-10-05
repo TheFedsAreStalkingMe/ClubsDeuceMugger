@@ -38,3 +38,4 @@ Worker > **Settings** > **Bindings** should show `DB` (D1: deucemugger), `EMAIL`
 - Password hashing is PBKDF2-SHA256 at 100,000 iterations, the maximum Cloudflare Workers allows.
 - Limits: 10 login tries per 10 minutes and 5 applications per hour per IP.
 - Torn calls are capped at 80 per minute in the browser, with a server backstop at 84.
+
