@@ -210,6 +210,18 @@ async function runChecks() {
   await dana.post("/api/signup/vouch", { applyToken: dSignup.data.applyToken, inviter: OWNER.name });
   r = await dana.post("/api/leaderboard/sync", {}, { headers: { "X-Torn-Key": "DANAKEY12345678" } });
   check("one Torn player per member", r.status === 409);
+
+  section("Bazaar read limit");
+  // 330 quick reads against a limit of 300 a minute: some must be refused, with a short retry hint.
+  const results = [];
+  for (let i = 0; i < 330; i += 30) {
+    results.push(...(await Promise.all(Array.from({ length: 30 }, () => bob.get("/api/weav3r?item=1")))));
+  }
+  const refused = results.filter((x) => x.status === 429);
+  const allowed = results.length - refused.length;
+  check("reads over the limit are refused", refused.length >= 20, `${refused.length} refused`);
+  check("most reads are allowed (limit is generous)", allowed >= 280, `${allowed} allowed`);
+  check("retry hint is short", refused.length > 0 && refused.every((x) => x.data.retryAfter <= 5 && Number(x.res.headers.get("retry-after")) <= 5));
 }
 
 

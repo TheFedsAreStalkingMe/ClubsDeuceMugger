@@ -8,13 +8,14 @@ import { fetchJson } from "../lib/upstream.js";
 
 const header = (request, name) => request.headers.get(name) || "";
 const TORN_PER_MINUTE = 84; // Torn allows 100 per key; the site stays under 85
+const WEAV3R_PER_MINUTE = 300; // bazaar answers are cached for 30 s, so this is cheap
 
 // ---------------------------------------------------------------- Weav3r (bazaar listings)
 
 export async function weav3r({ env, url, user }) {
   const item = url.searchParams.get("item") || "";
   if (item !== "all" && !/^\d{1,7}$/.test(item)) return fail("Bad item ID.");
-  const blocked = await throttle(env, "weav3r", String(user.id), 75, 60);
+  const blocked = await throttle(env, "weav3r", String(user.id), WEAV3R_PER_MINUTE, 60, { maxRetry: 5 });
   if (blocked) return blocked;
   const base = upstream(env).weav3r;
 

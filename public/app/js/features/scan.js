@@ -16,6 +16,7 @@ import { STAGES, countdown, setProgress, setScanMsg, updateRunButtons } from "./
 import { renderWatch } from "./watchlist.js";
 
 const HOUR = 3600e3;
+const ITEM_READS_AT_ONCE = 6;
 const TORN_KEY_ERRORS = [2, 10, 13, 16];
 const isCancel = (e) => e && e.message === "cancelled";
 
@@ -59,8 +60,8 @@ async function chooseItems(call, f) {
 async function readBazaars(call, list, f, runId) {
   const rows = new Map();
   let done = 0;
-  await pool(list, 3, async (w) => {
-    for (let attempt = 0; attempt < 3 && runId === state.runId; attempt++) {
+  await pool(list, ITEM_READS_AT_ONCE, async (w) => {
+    for (let attempt = 0; attempt < 6 && runId === state.runId; attempt++) {
       try {
         const data = await call(`/api/weav3r?item=${w.id}`);
         if (!w.auto && data.item_name) w.name = data.item_name;
@@ -79,7 +80,7 @@ async function readBazaars(call, list, f, runId) {
         }
         break;
       } catch (e) {
-        if (e.retryAfter && attempt < 2) { await countdown(e.retryAfter, "Pacing item reads...", runId); continue; }
+        if (e.retryAfter && attempt < 5) { await countdown(e.retryAfter, "Pacing item reads...", runId); continue; }
         if (runId === state.runId) setScanMsg(`Item ${w.id}: ${e.message}`, "err");
         break;
       }
