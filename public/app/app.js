@@ -6,6 +6,7 @@ const LS = { prefs: "cdm.prefs", keys: "cdm.keys", watch: "cdm.watch", filters: 
 const TORN_CALLS_PER_MIN = 80; // hard ceiling is 85; stay under it
 const WINDOW_MS = 60000;
 const NUM_MAX = 1e10;
+const MIN_PRICE = 1000000; // mugs below $1m are not worth the effort
 
 function load(key, fallback) {
   try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
@@ -18,7 +19,7 @@ const state = {
   keys: load(LS.keys, { torn: "", ff: "" }),
   watch: load(LS.watch, []),
   filters: Object.assign(
-    { minPrice: 0, minBs: 0, maxBs: NUM_MAX, maxFf: 3, maxSellers: 80, autoScan: true, maxItems: 40, priceTol: 10, autoEvery: 120, sort: "stats", dir: "desc" },
+    { minPrice: MIN_PRICE, minBs: 0, maxBs: NUM_MAX, maxFf: 3, maxSellers: 80, autoScan: true, maxItems: 40, priceTol: 10, autoEvery: 120, sort: "stats", dir: "desc" },
     load(LS.filters, {})
   ),
   prefs: Object.assign({ notify: true, minJackpot: 10000000, myBs: 0, outMinutes: 5, offlineMinutes: 35 }, load(LS.prefs, {})),
@@ -192,20 +193,29 @@ function initWatch() {
 const toSlider = (n) => (n <= 1 ? 0 : Math.round(Math.log10(n) * 100));
 const fromSlider = (v) => (v <= 0 ? 0 : Math.round(10 ** (v / 100)));
 
-function bindFilter(name, { log }) {
+function bindFilter(name, { log, to, from, floor }) {
   const num = $(name), range = $(name + "-r");
-  const set = (v, from) => {
+  const toS = to || (log ? toSlider : (n) => n);
+  const fromS = from || (log ? fromSlider : (n) => n);
+  const set = (v, source) => {
+    if (floor != null && v < floor) v = floor;
     state.filters[name] = v;
-    if (from !== "num") num.value = v;
-    if (from !== "range") range.value = log ? toSlider(v) : v;
+    if (source !== "num") num.value = v;
+    if (source !== "range") range.value = toS(v);
     save(LS.filters, state.filters);
   };
-  num.addEventListener("input", () => { const v = parseFloat(num.value); if (!Number.isNaN(v)) set(v, "num"); });
-  range.addEventListener("input", () => set(log ? fromSlider(+range.value) : +range.value, "range"));
+  num.addEventListener("input", () => { const v = parseFloat(num.value); if (!Number.isNaN(v) && (floor == null || v >= floor)) set(v, "num"); });
+  num.addEventListener("change", () => { const v = parseFloat(num.value); set(Number.isNaN(v) ? (floor ?? 0) : v); });
+  range.addEventListener("input", () => set(fromS(+range.value), "range"));
   set(state.filters[name]);
 }
 function initFilters() {
-  bindFilter("minPrice", { log: true });
+  // Minimum price: starts at $1m, then jumps in $5m steps (5m, 10m, 15m ... 500m). The number box is exact.
+  bindFilter("minPrice", {
+    floor: MIN_PRICE,
+    to: (n) => (n <= MIN_PRICE ? 0 : Math.min(100, Math.round(n / 5e6))),
+    from: (v) => (v <= 0 ? MIN_PRICE : v * 5e6),
+  });
   bindFilter("minBs", { log: true });
   bindFilter("maxBs", { log: true });
   bindFilter("maxFf", { log: false });
