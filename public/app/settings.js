@@ -28,6 +28,7 @@ const keys = load(KEYS, { torn: "", ff: "" });
 $("key-torn").value = keys.torn || ""; $("key-ff").value = keys.ff || "";
 $("save-keys").addEventListener("click", () => {
   const torn = $("key-torn").value.trim(), ff = $("key-ff").value.trim();
+  if (!torn) return say("keys-msg", "Paste your Torn key first.", "err");
   if ([torn, ff].some((k) => k && !/^[A-Za-z0-9]{8,64}$/.test(k))) return say("keys-msg", "Keys should be letters and numbers only.", "err");
   save(KEYS, { torn, ff });
   say("keys-msg", "Saved in this browser only.", "ok");
@@ -35,7 +36,7 @@ $("save-keys").addEventListener("click", () => {
 $("clear-keys").addEventListener("click", () => {
   try { localStorage.removeItem(KEYS); } catch { /* ignore */ }
   $("key-torn").value = ""; $("key-ff").value = "";
-  say("keys-msg", "Keys cleared.", "info");
+  say("keys-msg", "Key cleared.", "info");
 });
 
 // alert prefs

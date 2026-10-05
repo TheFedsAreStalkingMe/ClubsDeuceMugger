@@ -216,7 +216,7 @@ async function scan() {
   const runId = ++state.runId;
   const f = state.filters;
   if (!state.watch.length && !f.autoScan) return setScanMsg("Turn on auto scan or add an item ID to the watchlist.", "err");
-  if (!state.keys.torn || !state.keys.ff) return setScanMsg("Enter both API keys in Settings first.", "err");
+  if (!state.keys.torn) return setScanMsg("Add your Torn key in Settings first.", "err");
 
   $("scan").disabled = true; $("cancel").hidden = false;
   state.rows = []; render(); setProgress(0);
@@ -284,7 +284,14 @@ async function scan() {
     const need = ids.filter((id) => !ffCache[id] || Date.now() - ffCache[id].t > 6 * 3600e3);
     for (let i = 0; i < need.length; i += 200) {
       const batch = need.slice(i, i + 200);
-      const data = await api("/api/ffscouter", { method: "POST", headers: { "X-FF-Key": state.keys.ff }, body: { targets: batch } });
+      let data;
+      try {
+        // One key is enough: FF Scouter accepts your registered Torn key unless you set a separate one.
+        data = await api("/api/ffscouter", { method: "POST", headers: { "X-FF-Key": state.keys.ff || state.keys.torn }, body: { targets: batch } });
+      } catch (e) {
+        if (e.retryAfter) throw e;
+        throw new Error(`FF Scouter did not accept the key (${e.message}). Register once at ffscouter.com with your Torn key, wait about 5 minutes, or add a separate FF Scouter key in Settings.`);
+      }
       const list = Array.isArray(data) ? data : data.data || data.results || [];
       const seen = new Set();
       for (const s of list) {
@@ -508,7 +515,7 @@ async function initAdmin() {
 async function boot() {
   let me;
   try { me = await api("/api/me"); $("who").textContent = me.username; } catch { return; }
-  $("setup-note").hidden = !!(state.keys.torn && state.keys.ff);
+  $("setup-note").hidden = !!state.keys.torn;
   initWatch(); initFilters(); render();
   if (me.isOwner) initAdmin();
   $("scan").addEventListener("click", scan);
