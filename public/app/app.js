@@ -215,15 +215,16 @@ async function scan() {
   $("scan").disabled = true; $("cancel").hidden = false;
   state.rows = []; render(); setProgress(0);
   try {
-    // 1. work out which items to read: your watchlist plus (optionally) every item priced at or above your minimum
+    // 1. work out which items to read: your watchlist plus (optionally) every item whose cheapest listing is at or above your minimum
     setScanMsg("Reading bazaars...");
     const targets = new Map(state.watch.map((w) => [w.id, w]));
     if (f.autoScan) {
       try {
         const { items } = await api("/api/weav3r?item=all");
         const pool_ = items
-          .filter((i) => i.price >= f.minPrice && !targets.has(i.id))
-          .sort((a, b) => b.price - a.price)
+          .map((i) => ({ ...i, floor: i.lowest ?? i.price })) // cheapest bazaar listing for the item
+          .filter((i) => i.floor >= f.minPrice && !targets.has(i.id))
+          .sort((a, b) => b.floor - a.floor)
           .slice(0, Math.max(0, f.maxItems - targets.size));
         for (const i of pool_) targets.set(i.id, { id: i.id, name: i.name, auto: true });
       } catch (e) {

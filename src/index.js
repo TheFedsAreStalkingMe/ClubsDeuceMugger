@@ -444,7 +444,7 @@ async function proxyWeav3r(env, user, url) {
     return json({
       items: data.items
         .filter((i) => i.item_id > 0 && i.total_bazaars > 0 && i.market_price > 0)
-        .map((i) => ({ id: i.item_id, name: i.item_name, price: i.market_price, bazaars: i.total_bazaars })),
+        .map((i) => ({ id: i.item_id, name: i.item_name, price: i.market_price, lowest: i.lowest_price, bazaars: i.total_bazaars })),
     });
   }
   const res = await fetch(`https://weav3r.dev/api/marketplace/${item}`, {
