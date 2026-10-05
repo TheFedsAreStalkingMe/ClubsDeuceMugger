@@ -19,6 +19,7 @@ export const DEFAULT_FILTERS = {
   plunder: 0, // percent of Plunder on your weapon (extra mug money)
   minStack: 0, // also count stacks of 2+ worth at least this much, even if each item is under minPrice (0 = off)
   maxSellers: 80, // sellers who get the slower status checks
+  bazaarPages: 3, // pages of 100 listings read per item (it stops early once listings are above the price band)
   maxItems: 40, // items read per scan
   autoScan: true, // read every item whose cheapest listing is above the minimum
   includeUnknown: false, // keep players that have no stat estimate

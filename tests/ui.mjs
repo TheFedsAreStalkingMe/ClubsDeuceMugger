@@ -3,7 +3,7 @@
 //
 //   PLAYWRIGHT=/path/to/playwright/index.mjs CHROMIUM=/path/to/chromium WRANGLER=... node tests/ui.mjs
 
-import { BASE, OWNER, check, fail, finish, section, setFakeStatus, startEnvironment } from "./lib/harness.mjs";
+import { BASE, OWNER, check, fail, finish, section, setFakeFlag, setFakeStatus, startEnvironment } from "./lib/harness.mjs";
 
 const playwright = await import(process.env.PLAYWRIGHT || "playwright");
 const chromium = playwright.chromium || playwright.default.chromium;
@@ -356,6 +356,40 @@ async function runChecks() {
   bw = await scanBonusPage();
   check("rarity and price filters", bw.map((c) => c.name).join() === "Fake Magnum", bw.map((c) => c.name).join());
   await setStore("cdm.bonus.filters", {});
+
+  section("Deeper pages and new sellers");
+  // Bazaar finder: Big Item has 250 listings over 3 pages. The next page is read while listings are inside the price band.
+  await page.goto(BASE + "/app/");
+  await page.waitForFunction(() => document.getElementById("maxBs").value !== "");
+  await setFakeFlag("deep", true);
+  await setStore("cdm.filters", { ...filters, minPrice: 25000000, priceTol: 10, maxItems: 5 });
+  await page.reload();
+  await page.click("#scan");
+  await scanDone();
+  check("sellers beyond the first page are found, ones above the price band are not", (await names()) === "PageOne,PageThree,PageTwo", await names());
+  await setStore("cdm.filters", { ...filters, minPrice: 25000000, priceTol: 10, maxItems: 5, bazaarPages: 1 });
+  await page.reload();
+  await page.click("#scan");
+  await scanDone();
+  check("one page per item reads only the cheapest listings", (await names()) === "PageOne", await names());
+  // Bonus weapon sellers: each scan carries on with the next pages of the same search.
+  await page.goto(BASE + "/app/bonus.html");
+  await page.waitForFunction(() => document.getElementById("maxBs").value !== "");
+  await page.evaluate(() => { localStorage.removeItem("cdm.bonus.cursor"); localStorage.removeItem("cdm.bonus.cache"); });
+  await setStore("cdm.bonus.filters", { maxBs: 5000000000, rarities: ["yellow"], pages: 2 });
+  await page.reload();
+  await page.waitForSelector("#bonuses label");
+  const seen = [];
+  for (let i = 0; i < 3; i++) {
+    await page.click("#scan");
+    await scanDone();
+    seen.push((await bonusCards()).map((c) => c.text.match(/Seller \d/)[0]).sort().join());
+  }
+  check("each bonus scan reads the next pages, then starts over", seen[0] === "Seller 1,Seller 2" && seen[1] === "Seller 3,Seller 4" && seen[2] === "Seller 1,Seller 2", seen.join(" | "));
+  await setFakeFlag("deep", false);
+  await setStore("cdm.bonus.filters", {});
+  await page.evaluate(() => { localStorage.removeItem("cdm.bonus.cursor"); localStorage.removeItem("cdm.bonus.cache"); });
+  await setStore("cdm.filters", filters);
 
   section("Update notice");
   let fakeBuild = "build-A";

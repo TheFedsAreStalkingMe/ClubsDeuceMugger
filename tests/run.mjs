@@ -184,6 +184,12 @@ async function runChecks() {
   r = await bob.get("/api/weav3r?item=all");
   check("a busy Weav3r becomes a short wait, not an error", r.status === 429 && r.data.retryAfter >= 3 && r.data.retryAfter <= 15, JSON.stringify(r.data));
   await setFakeFlag("weav3rBusy", false);
+  await setFakeFlag("deep", true);
+  r = await bob.get("/api/weav3r?item=5&page=3");
+  check("weav3r pages come through with the total", r.data.page === 3 && r.data.total === 250 && r.data.listings.length === 50 && r.data.listings[0].player_name === "PageThree", JSON.stringify(r.data).slice(0, 200));
+  r = await bob.get("/api/weav3r?item=5&page=0");
+  check("bad page refused", r.status === 400);
+  await setFakeFlag("deep", false);
   r = await bob.get("/api/weav3r?item=abc");
   check("bad item id refused", r.status === 400);
   r = await bob.get("/api/torn/company-types", { headers: K });

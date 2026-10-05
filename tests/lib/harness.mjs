@@ -32,7 +32,7 @@ export const section = (title) => console.log(`\n${title}`);
 const now = () => Math.floor(Date.now() / 1000);
 // Test control: statuses the fake Torn reports, by player id. Change them with setFakeStatus().
 const statusOverride = {};
-const flags = { attacklogFail: false, weav3rBusy: false };
+const flags = { attacklogFail: false, weav3rBusy: false, deep: false };
 export async function setFakeFlag(name, on) {
   await fetch(`http://localhost:${FAKE_PORT}/__flag?name=${name}&on=${on ? 1 : 0}`);
 }
@@ -53,11 +53,24 @@ function fakeServer() {
     //   Silver Bar $20m, quiet: Charlie one at $20m, Alpha one at $20m.
     //   Emerald $8m: Delta a stack of 5 ($40m), Echo a single, Foxtrot a stack of 2 ($16m).
     if (p === "/weav3r/marketplace" && flags.weav3rBusy) { res.setHeader("Retry-After", "2"); return send({ error: "slow down" }, 429); }
+    // Deep bazaar lists (only while the "deep" flag is on): item 5 "Big Item" $30m has 250 listings over 3 pages.
+    //   page 1 PageOne $29.5m (100), page 2 PageTwo $30.5m (100), page 3 PageThree $31m (49) and Far $45m (1, above the price band)
+    if (p === "/weav3r/marketplace/5") {
+      const page = Number(u.searchParams.get("page") || 1);
+      const mk = (n, id, name, price) => Array.from({ length: n }, () => ({ player_id: id, player_name: name, quantity: 1, price, uid: "x", content_updated: now() - 86400 }));
+      const pages = { 1: mk(100, 61, "PageOne", 29500000), 2: mk(100, 62, "PageTwo", 30500000), 3: [...mk(49, 63, "PageThree", 31000000), ...mk(1, 64, "Far", 45000000)] };
+      return send({ item_id: 5, item_name: "Big Item", market_price: 30000000, generated_at: now(), page, total_count: 250, has_more: page < 3, listings: pages[page] || [] });
+    }
     // Weav3r ranked weapons (Bonus Weapon Sellers). Bazaar: Weak (51) Bloodlust 40 yellow $30m, Strong (52) Parry 25 orange $80m
     // (strong), Boss (53) Expose 12 red $300m. One item market listing (anonymous) and a Plunder bazaar listing for page 2.
     if (p === "/weav3r/ranked-weapons") {
       const q = u.searchParams;
       if (![...q.keys()].some((k) => k !== "limit")) return send({ error: "Missing filter parameters" }, 400);
+      if (flags.deep && q.get("rarity") === "yellow") { // 350 yellow weapons, one bazaar listing per page: Seller 1..4
+        const page = Number(q.get("page") || 1);
+        const one = { uid: `80${page}`, itemId: 30, itemName: "Deep Gun", weaponType: "Primary", rarity: "yellow", damage: "40", accuracy: "40", quality: "40", bonuses: { 0: { bonus: "Plunder", value: 30, description: "30% Plunder" } }, price: page * 10000000, playerId: 70 + page, playerName: `Seller ${page}`, quantity: 1, lastUpdated: "2026-10-05T20:00:00Z", source: "bazaar" };
+        return send({ total_count: 350, weapons: page <= 4 ? [one] : [], response_time_ms: 1 });
+      }
       const b = (name, value) => ({ 0: { bonus: name, value, description: `${value}% ${name}` } });
       const all = [
         { uid: "7001", itemId: 20, itemName: "Fake Magnum", weaponType: "Secondary", rarity: "yellow", damage: "40.5", accuracy: "50.1", quality: "60.2", bonuses: b("Bloodlust", 40), price: 30000000, playerId: 51, playerName: "Weak", quantity: 1, marketPrice: 1000, lastUpdated: "2026-10-05T20:00:00Z", source: "bazaar" },
@@ -72,6 +85,7 @@ function fakeServer() {
     }
 
     if (p === "/weav3r/marketplace") return send({ items: [
+      ...(flags.deep ? [{ item_id: 5, item_name: "Big Item", market_price: 30000000, lowest_price: 29500000, bazaar_average: 30000000, total_bazaars: 100 }] : []),
       { item_id: 1, item_name: "Gold Bar", market_price: 20000000, lowest_price: 19500000, bazaar_average: 20000000, total_bazaars: 5 },
       { item_id: 2, item_name: "Silver Bar", market_price: 20000000, lowest_price: 20000000, bazaar_average: 20000000, total_bazaars: 50 },
       { item_id: 3, item_name: "Emerald", market_price: 8000000, lowest_price: 8000000, bazaar_average: 8000000, total_bazaars: 20 },

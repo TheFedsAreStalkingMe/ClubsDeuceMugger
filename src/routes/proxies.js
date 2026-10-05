@@ -38,7 +38,10 @@ export async function weav3r({ env, url, user }) {
     });
   }
 
-  const { res, data } = await fetchJson(`${base}/marketplace/${item}`, { cf: { cacheTtl: 30, cacheEverything: true } });
+  // Weav3r lists 100 bazaar listings per page, cheapest first. Page 1 is the default.
+  const page = url.searchParams.get("page") || "1";
+  if (!/^\d{1,3}$/.test(page) || Number(page) < 1) return fail("Bad page.");
+  const { res, data } = await fetchJson(`${base}/marketplace/${item}${page === "1" ? "" : `?page=${page}`}`, { cf: { cacheTtl: 30, cacheEverything: true } });
   if (!res.ok) return weav3rFail(res);
   if (!data) return fail("Weav3r sent bad data.", 502);
   return json({
@@ -46,6 +49,8 @@ export async function weav3r({ env, url, user }) {
     item_name: data.item_name,
     market_price: data.market_price,
     generated_at: data.generated_at,
+    page: data.page ?? Number(page),
+    total: data.total_count ?? null,
     listings: (data.listings || []).map((l) => ({ player_id: l.player_id, player_name: l.player_name, quantity: l.quantity, price: l.price, updated: l.content_updated })),
   });
 }

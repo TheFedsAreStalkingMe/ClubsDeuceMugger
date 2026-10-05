@@ -78,6 +78,7 @@ export function initFilters() {
   bindAmount("minPart");
   bindCheckbox("merits", render);
   bindDecimal("plunder", 0, 100, render);
+  bindNumber("bazaarPages", 1, 8, 3);
   bindNumber("maxItems", 1, 150, 40);
   bindNumber("autoEvery", 30, 3600, 120);
   bindNumber("maxSellers", 1, 500, 80);

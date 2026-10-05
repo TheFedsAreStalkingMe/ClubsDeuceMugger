@@ -95,7 +95,16 @@ async function readBazaars(call, list, f, runId) {
         const asOf = data.generated_at || Date.now() / 1000;
         const activity = data.listings.filter((l) => l.updated && asOf - l.updated <= 3600).length;
         if (activity < f.minActivity) throw DONE; // too quiet to sell quickly
-        for (const l of data.listings) {
+        // Listings come cheapest first, 100 a page. Read the next page while the last listing is still inside the
+        // price band (so more matches may follow), up to the page limit.
+        const band = f.priceTol > 0 && market > 0 ? market * (1 + f.priceTol / 100) : Infinity;
+        const listings = [...data.listings];
+        let last = data;
+        for (let page = 2; page <= f.bazaarPages && last.listings.length >= 100 && last.listings[last.listings.length - 1].price <= band; page++) {
+          last = await weav3rRead(call, `/api/weav3r?item=${w.id}&page=${page}`, runId, "Weav3r is busy. Waiting");
+          listings.push(...last.listings);
+        }
+        for (const l of listings) {
           const single = l.price >= f.minPrice;
           const stack = f.minStack > 0 && l.quantity >= 2 && l.price >= MIN_PRICE && l.price * l.quantity >= f.minStack;
           const adds = part > 0 && l.price >= part; // counts toward the added-up total
