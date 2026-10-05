@@ -19,7 +19,7 @@ const state = {
   keys: Object.assign({ torn: "", ff: "", ts: "" }, load(LS.keys, {})),
   watch: load(LS.watch, []),
   filters: Object.assign(
-    { minPrice: MIN_PRICE, minBs: 0, maxBs: NUM_MAX, maxFf: 3, maxSellers: 80, autoScan: true, maxItems: 40, priceTol: 10, autoEvery: 120, sort: "stats", dir: "desc" },
+    { minPrice: MIN_PRICE, minBs: 0, maxBs: NUM_MAX, maxFf: 10, maxSellers: 80, autoScan: true, maxItems: 40, priceTol: 10, autoEvery: 120, sort: "stats", dir: "desc" },
     load(LS.filters, {})
   ),
   prefs: Object.assign({ notify: true, minJackpot: 10000000, myBs: 0, outMinutes: 5, offlineMinutes: 35 }, load(LS.prefs, {})),
@@ -32,6 +32,8 @@ const state = {
   feed: load(LS.feed, []),
   dismissed: load(LS.dismissed, {}),
 };
+
+if (state.filters.maxFf === 3) state.filters.maxFf = 10; // 3 used to be the highest the slider went
 
 // ---------------------------------------------------------------- DOM helpers
 
