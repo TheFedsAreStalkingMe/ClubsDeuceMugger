@@ -30,6 +30,16 @@
     <div class="alerts" id="alerts" aria-live="polite"></div>
     <p class="msg info" id="setup-note" hidden>Add your Torn API key in <a href="/app/settings.html">Settings</a> to start scanning.</p>
 
+    <section class="feed" id="feed" hidden>
+      <div class="feed-head">
+        <h2>Mug feed</h2>
+        <span class="hint" id="feed-count"></span>
+        <button class="btn ghost small" id="feed-dismiss-all" type="button">Dismiss all</button>
+      </div>
+      <p class="hint">Found by auto hunt. Weaker than you, out of hospital soon and offline long enough (set in Settings). Tap X to dismiss one.</p>
+      <div class="results" id="feed-list"></div>
+    </section>
+
     <div class="panels">
       <section class="card panel">
         <span class="corner tl club-c"><svg class="icon"><use href="/img/sprite.svg#club"/></svg></span>
@@ -39,6 +49,8 @@
           <label>Max items per scan <span class="hint">Most valuable first. The watchlist below is always included.</span>
             <input type="number" id="maxItems" inputmode="numeric" min="1" max="150" step="1"></label>
         </div>
+        <label>Auto hunt rescans every (seconds) <span class="hint">Auto hunt keeps scanning and collects good mugs in the feed.</span>
+          <input type="number" id="autoEvery" inputmode="numeric" min="30" max="3600" step="1"></label>
         <h3 class="sub-h">Watchlist (always scanned)</h3>
         <form class="row" id="watch-form">
           <input type="number" id="watch-id" inputmode="numeric" min="1" step="1" placeholder="Item ID (e.g. 206)" aria-label="Item ID">
@@ -70,7 +82,8 @@
 
     <div class="scanbar">
       <button class="btn green" id="scan" type="button">Scan bazaars &clubs;</button>
-      <button class="btn ghost" id="cancel" type="button" hidden>Stop</button>
+      <button class="btn ghost" id="auto" type="button">Start auto hunt</button>
+      <button class="btn ghost" id="cancel" type="button" hidden>Cancel scan</button>
       <span class="msg info" id="scan-msg" role="status" aria-live="polite"></span>
     </div>
     <div class="progress" aria-hidden="true"><div id="bar"></div></div>

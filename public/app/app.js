@@ -2,7 +2,7 @@
 const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const LS = { prefs: "cdm.prefs", keys: "cdm.keys", watch: "cdm.watch", filters: "cdm.filters", profiles: "cdm.profiles", ff: "cdm.ff", calls: "cdm.calls" };
+const LS = { prefs: "cdm.prefs", keys: "cdm.keys", watch: "cdm.watch", filters: "cdm.filters", feed: "cdm.feed", dismissed: "cdm.dismissed", profiles: "cdm.profiles", ff: "cdm.ff", calls: "cdm.calls" };
 const TORN_CALLS_PER_MIN = 80; // hard ceiling is 85; stay under it
 const WINDOW_MS = 60000;
 const NUM_MAX = 1e10;
@@ -18,12 +18,18 @@ const state = {
   keys: load(LS.keys, { torn: "", ff: "" }),
   watch: load(LS.watch, []),
   filters: Object.assign(
-    { minPrice: 0, minBs: 0, maxBs: NUM_MAX, maxFf: 3, maxSellers: 80, autoScan: true, maxItems: 40, priceTol: 10, sort: "stats", dir: "desc" },
+    { minPrice: 0, minBs: 0, maxBs: NUM_MAX, maxFf: 3, maxSellers: 80, autoScan: true, maxItems: 40, priceTol: 10, autoEvery: 120, sort: "stats", dir: "desc" },
     load(LS.filters, {})
   ),
   prefs: Object.assign({ notify: true, minJackpot: 10000000, myBs: 0, outMinutes: 5, offlineMinutes: 35 }, load(LS.prefs, {})),
   rows: [],
   runId: 0,
+  ctrl: null,        // aborts in-flight requests when a scan is cancelled
+  scanning: false,
+  auto: false,       // auto hunt running
+  outcome: "retry",  // how the last scan ended: ok | retry | fatal
+  feed: load(LS.feed, []),
+  dismissed: load(LS.dismissed, {}),
 };
 
 // ---------------------------------------------------------------- DOM helpers
@@ -69,12 +75,19 @@ function fmtCountdown(sec) {
 // ---------------------------------------------------------------- API
 
 async function api(path, opts = {}) {
-  const res = await fetch(path, {
-    method: opts.method || "GET",
-    headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
-    body: opts.body ? JSON.stringify(opts.body) : undefined,
-    credentials: "same-origin",
-  });
+  let res;
+  try {
+    res = await fetch(path, {
+      method: opts.method || "GET",
+      headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+      credentials: "same-origin",
+      signal: state.ctrl ? state.ctrl.signal : undefined,
+    });
+  } catch (e) {
+    if (e && e.name === "AbortError") throw new Error("cancelled");
+    throw e;
+  }
   if (res.status === 401) { location.href = "/"; throw new Error("Signed out"); }
   const data = await res.json().catch(() => ({}));
   if (res.status === 429) {
@@ -183,6 +196,12 @@ function initFilters() {
     const v = Math.min(150, Math.max(1, parseInt(mi.value, 10) || 40));
     state.filters.maxItems = v; save(LS.filters, state.filters);
   });
+  const ae = $("autoEvery");
+  ae.value = state.filters.autoEvery;
+  ae.addEventListener("input", () => {
+    const v = Math.min(3600, Math.max(30, parseInt(ae.value, 10) || 120));
+    state.filters.autoEvery = v; save(LS.filters, state.filters);
+  });
   const ms = $("maxSellers");
   ms.value = state.filters.maxSellers;
   ms.addEventListener("input", () => {
@@ -210,15 +229,18 @@ async function pool(items, limit, fn) {
 async function scan() {
   const runId = ++state.runId;
   const f = state.filters;
-  if (!state.watch.length && !f.autoScan) return setScanMsg("Turn on auto scan or add an item ID to the watchlist.", "err");
-  if (!state.keys.torn) return setScanMsg("Add your Torn key in Settings first.", "err");
+  state.outcome = "retry";
+  if (!state.keys.torn) { state.outcome = "fatal"; return setScanMsg("Add your Torn key in Settings first.", "err"); }
+  if (!state.watch.length && !f.autoScan) { state.outcome = "fatal"; return setScanMsg("Turn on auto scan or add an item ID to the watchlist.", "err"); }
 
-  $("scan").disabled = true; $("cancel").hidden = false;
+  state.ctrl = new AbortController();
+  state.scanning = true; $("scan").disabled = true; updateRunButtons();
   state.rows = []; render(); setProgress(0);
   try {
     // 1. work out which items to read: your watchlist plus (optionally) every item whose cheapest listing and market value are at or above the minimum
     setScanMsg("Reading bazaars...");
     const targets = new Map(state.watch.map((w) => [w.id, w]));
+    let indexError = "";
     if (f.autoScan) {
       try {
         const { items } = await api("/api/weav3r?item=all");
@@ -229,11 +251,20 @@ async function scan() {
           .slice(0, Math.max(0, f.maxItems - targets.size));
         for (const i of pool_) targets.set(i.id, { id: i.id, name: i.name, auto: true });
       } catch (e) {
-        setScanMsg(`Could not load the item list: ${e.message}`, "err");
+        if (e.message === "cancelled") return;
+        indexError = e.message;
       }
     }
     const list = [...targets.values()];
-    if (!list.length) return setScanMsg("Nothing to scan. Turn on auto scan or add an item ID.", "err");
+    if (!list.length) {
+      if (indexError) return setScanMsg(`Could not load the item list from Weav3r: ${indexError}`, "err");
+      if (f.autoScan) {
+        state.outcome = "ok";
+        return setScanMsg(`No items have a cheapest listing and market value of at least ${fmtMoney(f.minPrice)}. Lower the minimum price.`, "info");
+      }
+      state.outcome = "fatal";
+      return setScanMsg("Nothing to scan. Turn on auto scan or add an item ID.", "err");
+    }
     const groups = new Map(); // seller:item -> row
     let done = 0;
     await pool(list, 3, async (w) => {
@@ -284,7 +315,8 @@ async function scan() {
         // One key is enough: FF Scouter accepts your registered Torn key unless you set a separate one.
         data = await api("/api/ffscouter", { method: "POST", headers: { "X-FF-Key": state.keys.ff || state.keys.torn }, body: { targets: batch } });
       } catch (e) {
-        if (e.retryAfter) throw e;
+        if (e.retryAfter || e.message === "cancelled") throw e;
+        state.outcome = "fatal";
         throw new Error(`FF Scouter did not accept the key (${e.message}). Register once at ffscouter.com with your Torn key, wait about 5 minutes, or add a separate FF Scouter key in Settings.`);
       }
       const list = Array.isArray(data) ? data : data.data || data.results || [];
@@ -309,7 +341,7 @@ async function scan() {
       return r.ff == null || r.ff <= f.maxFf;
     });
     state.rows = rows; render();
-    if (!rows.length) { setScanMsg("No targets match your filters.", "info"); setProgress(1); return; }
+    if (!rows.length) { state.outcome = "ok"; setScanMsg("No targets match your filters.", "info"); setProgress(1); return; }
 
     // 4. Torn status + age, paced under the API limit
     const uniq = [...new Set(rows.map((r) => r.id))];
@@ -327,7 +359,7 @@ async function scan() {
           const p = await api(`/api/torn/user?id=${id}`, { headers: { "X-Torn-Key": state.keys.torn } });
           if (p.error) {
             if (p.code === 5) { setScanMsg("Torn says slow down. Waiting 30s...", "info"); await sleep(30000); continue; }
-            if ([2, 10, 13, 16].includes(p.code)) { errored = true; setScanMsg(`Torn key problem: ${p.error}`, "err"); return; }
+            if ([2, 10, 13, 16].includes(p.code)) { errored = true; state.outcome = "fatal"; setScanMsg(`Torn key problem: ${p.error}`, "err"); return; }
             apply(id, { state: "Unknown", desc: p.error });
           } else {
             const rec = { t: Date.now(), state: p.status?.state || "Okay", until: p.status?.until || 0, desc: p.status?.description || "", age: p.age, last: p.last_action?.timestamp || 0 };
@@ -346,12 +378,93 @@ async function scan() {
       setScanMsg(`Checking status ${checked}/${uniq.length}...`);
       scheduleRender();
     });
-    if (runId === state.runId && !errored) { setScanMsg(`Done. ${state.rows.length} listing(s) from ${uniq.length} seller(s).`, "ok"); setProgress(1); }
+    if (runId === state.runId && !errored) { state.outcome = "ok"; setScanMsg(`Done. ${state.rows.length} listing(s) from ${uniq.length} seller(s).`, "ok"); setProgress(1); }
     render();
+    collectMugs(Date.now() / 1000);
   } catch (e) {
     if (e.message !== "cancelled" && runId === state.runId) setScanMsg(e.message, "err");
   } finally {
-    if (runId === state.runId) { $("scan").disabled = false; $("cancel").hidden = true; }
+    if (runId === state.runId) { state.scanning = false; $("scan").disabled = false; updateRunButtons(); }
+  }
+}
+
+// ---------------------------------------------------------------- mug feed and auto hunt
+
+const keyOf = (r) => `${r.id}:${r.itemId}`;
+const SNAP = ["id", "name", "itemId", "itemName", "market", "price", "qty", "total", "ff", "bs", "state", "until", "desc", "age", "last"];
+const snap = (r) => Object.fromEntries(SNAP.map((k) => [k, r[k]]));
+
+// A good mug: weaker than you, attackable soon, and offline long enough (rules from Settings).
+function isMug(r, now, jackpot) {
+  const pf = state.prefs;
+  if (r.bs == null) return false;
+  if (pf.myBs && r.bs >= pf.myBs) return false;
+  const rem = remaining(r);
+  if (rem == null || rem > pf.outMinutes * 60) return false;
+  if (!r.last || (now - r.last) / 60 < pf.offlineMinutes) return false;
+  if (jackpot && r.price < pf.minJackpot) return false;
+  return true;
+}
+
+function collectMugs(now) {
+  if (!state.auto) return;
+  let changed = false;
+  for (const r of state.rows) {
+    const k = keyOf(r);
+    const old = state.feed.find((e) => e.key === k);
+    if (old) {
+      if (r.state != null) Object.assign(old, snap(r), { seen: now });
+    } else if (!state.dismissed[k] && isMug(r, now, false)) {
+      state.feed.unshift({ key: k, found: now, seen: now, ...snap(r) });
+      changed = true;
+    }
+  }
+  const before = state.feed.length;
+  state.feed = state.feed.filter((e) => now - e.seen < 20 * 60); // gone from the bazaars for 20 min
+  if (state.feed.length !== before) changed = true;
+  if (changed) { save(LS.feed, state.feed); renderFeed(); }
+}
+
+function dismissOne(key) {
+  state.dismissed[key] = Date.now();
+  state.feed = state.feed.filter((e) => e.key !== key);
+  save(LS.dismissed, state.dismissed); save(LS.feed, state.feed); renderFeed();
+}
+function dismissAll() {
+  for (const e of state.feed) state.dismissed[e.key] = Date.now();
+  state.feed = [];
+  save(LS.dismissed, state.dismissed); save(LS.feed, state.feed); renderFeed();
+}
+
+function renderFeed() {
+  const box = $("feed-list");
+  box.replaceChildren();
+  $("feed").hidden = !state.feed.length;
+  $("feed-count").textContent = `${state.feed.length} waiting`;
+  document.title = state.feed.length ? `(${state.feed.length}) Clubs Deuce Mugger | Mug Finder` : "Clubs Deuce Mugger | Mug Finder";
+  const now = Date.now() / 1000;
+  state.feed.forEach((e, i) => box.append(card(e, i, { found: now - e.found, dismiss: () => dismissOne(e.key) })));
+  tick();
+}
+
+function updateRunButtons() {
+  const auto = $("auto");
+  auto.textContent = state.auto ? "Stop auto hunt" : "Start auto hunt";
+  auto.disabled = state.scanning && !state.auto;
+  $("cancel").hidden = !(state.scanning || state.auto);
+}
+
+async function autoHunt() {
+  if (state.auto) { state.auto = false; updateRunButtons(); setScanMsg("Auto hunt stopped.", "info"); return; }
+  state.auto = true; updateRunButtons();
+  while (state.auto) {
+    await scan();
+    if (!state.auto) break;
+    if (state.outcome === "fatal") { state.auto = false; updateRunButtons(); break; }
+    for (let t = state.filters.autoEvery; t > 0 && state.auto; t--) {
+      setScanMsg(`Auto hunt on. Next scan in ${t}s`, "info");
+      await sleep(1000);
+    }
   }
 }
 
@@ -393,7 +506,7 @@ function render() {
   tick();
 }
 
-function card(r, i) {
+function card(r, i, opts = {}) {
   const rem = remaining(r);
   const suitName = rem == null ? "diamond" : rem === 0 ? "club" : r.state === "Hospital" ? "heart" : "spade";
   const status = el("span", { class: "status pending", text: "Checking..." });
@@ -407,6 +520,7 @@ function card(r, i) {
     el("dt", { text: "Est. stats" }), el("dd", { text: fmtStats(r.bs) }),
     el("dt", { text: "Fair fight" }), el("dd", { text: r.ff != null ? Number(r.ff).toFixed(2) : "?" }),
     el("dt", { text: "Account age" }), el("dd", { text: r.age != null ? `${Number(r.age).toLocaleString("en-US")} days` : "?" }),
+    opts.found != null ? el("dt", { text: "Found" }) : null, opts.found != null ? el("dd", { text: fmtAgo(opts.found) }) : null,
     el("dt", { text: "Last seen" }), el("dd", { text: r.last ? fmtAgo(Date.now() / 1000 - r.last) : "?" }),
     el("dt", { text: "Status" }), el("dd", {}, status)
   );
@@ -420,6 +534,11 @@ function card(r, i) {
       el("a", { class: "btn small ghost", href: `https://www.torn.com/bazaar.php?userId=${r.id}`, target: "_blank", rel: "noopener noreferrer", text: "Bazaar" }),
       el("a", { class: "btn small", href: `https://www.torn.com/loader.php?sid=attack&user2ID=${r.id}`, target: "_blank", rel: "noopener noreferrer", text: "Attack" }))
   );
+  if (opts.dismiss) {
+    const x = el("button", { class: "x", type: "button", "aria-label": "Dismiss", text: "X" });
+    x.addEventListener("click", opts.dismiss);
+    art.prepend(x);
+  }
   art.style.animationDelay = `${Math.min(i, 12) * 40}ms`; // CSSOM is CSP-safe, unlike a style attribute
   return art;
 }
@@ -429,12 +548,7 @@ let alertKey = "";
 function updateAlerts(now) {
   const box = $("alerts");
   const pf = state.prefs;
-  const hits = !pf.notify || !pf.myBs ? [] : state.rows.filter((r) => {
-    if (r.price < pf.minJackpot || r.bs == null || r.bs >= pf.myBs) return false;
-    const rem = remaining(r);
-    if (rem == null || rem > pf.outMinutes * 60) return false;
-    return r.last && (now - r.last) / 60 >= pf.offlineMinutes;
-  });
+  const hits = !pf.notify || !pf.myBs ? [] : state.rows.filter((r) => isMug(r, now, true));
   const key = hits.map((r) => `${r.id}:${r.itemId}`).join(",");
   if (key === alertKey) return;
   alertKey = key;
@@ -452,6 +566,7 @@ function updateAlerts(now) {
 function tick() {
   const now = Date.now() / 1000;
   updateAlerts(now);
+  collectMugs(now);
   document.querySelectorAll(".status").forEach((s) => {
     if (!s.dataset.known) return;
     const until = Number(s.dataset.until);
@@ -511,10 +626,20 @@ async function boot() {
   let me;
   try { me = await api("/api/me"); $("who").textContent = me.username; } catch { return; }
   $("setup-note").hidden = !!state.keys.torn;
-  initWatch(); initFilters(); render();
+  // forget old dismissals (older than 2 hours) and stale feed entries
+  for (const [k, t] of Object.entries(state.dismissed)) if (Date.now() - t > 2 * 3600e3) delete state.dismissed[k];
+  save(LS.dismissed, state.dismissed);
+  initWatch(); initFilters(); render(); renderFeed(); updateRunButtons();
   if (me.isOwner) initAdmin();
   $("scan").addEventListener("click", scan);
-  $("cancel").addEventListener("click", () => { state.runId++; $("scan").disabled = false; $("cancel").hidden = true; setScanMsg("Stopped.", "info"); });
+  $("auto").addEventListener("click", autoHunt);
+  $("feed-dismiss-all").addEventListener("click", dismissAll);
+  $("cancel").addEventListener("click", () => {
+    state.auto = false; state.runId++; state.scanning = false;
+    if (state.ctrl) state.ctrl.abort();
+    $("scan").disabled = false; updateRunButtons(); setProgress(0);
+    setScanMsg("Scan cancelled.", "info");
+  });
   $("logout").addEventListener("click", async () => {
     try { await api("/api/logout", { method: "POST", body: {} }); } catch { /* fall through */ }
     location.href = "/";
