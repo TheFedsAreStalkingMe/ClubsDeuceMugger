@@ -142,7 +142,7 @@ function fakeServer() {
     }
 
     // Torn items (buymugging): weapons list, and bonuses for specific unique items
-    if (p === "/v2/torn/items") return send({ items: u.searchParams.get("cat") === "Weapon" ? [{ id: 4, name: "Gold Rifle", type: "Weapon", sub_type: "Rifle", is_tradable: true, value: { market_price: 10000000 } }] : [] });
+    if (p === "/v2/torn/items") return send({ items: u.searchParams.get("cat") === "Weapon" ? [{ id: 4, name: "Gold Rifle", type: "Weapon", sub_type: "Rifle", is_tradable: true, details: { category: "Primary" }, value: { market_price: 10000000 } }, { id: 5, name: "Gold Grenade", type: "Weapon", sub_type: "Temporary", is_tradable: true, details: { category: "Temporary" }, value: { market_price: 10000000 } }] : [] });
     if ((m = p.match(/^\/v2\/torn\/([\d,]+)\/itemdetails$/))) {
       const bonus = { 9001: [{ id: 1, title: "Plunder", description: "+25% mug money", value: 25 }], 9002: [{ id: 2, title: "Quicken", description: "faster", value: 20 }] };
       return send({ itemdetails: m[1].split(",").map((uid) => ({ uid: Number(uid), id: 4, name: "Gold Rifle", type: "Weapon", sub_type: "Rifle", rarity: bonus[uid] ? "orange" : null, stats: { damage: 60, accuracy: 55, armor: null, quality: 20 }, bonuses: bonus[uid] || [] })) });

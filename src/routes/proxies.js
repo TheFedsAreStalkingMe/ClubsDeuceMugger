@@ -99,7 +99,12 @@ export async function itemList({ request, env, url, user }) {
   if (!["Weapon", "Armor"].includes(cat)) return fail("Bad category.");
   const { data, response } = await tornPublic(env, request, user, "/torn/items", { cat });
   if (response) return response;
-  return json({ items: (data.items || []).filter((i) => i.is_tradable !== false).map((i) => ({ id: i.id, name: i.name, type: i.type, sub: i.sub_type || null, market: i.value?.market_price ?? 0 })) });
+  // Temporary weapons (grenades, flash bombs) cannot carry bonuses, so they are left out.
+  return json({
+    items: (data.items || [])
+      .filter((i) => i.is_tradable !== false && i.details?.category !== "Temporary" && i.sub_type !== "Temporary")
+      .map((i) => ({ id: i.id, name: i.name, type: i.type, cat: cat === "Armor" ? "Armor" : i.details?.category || "Primary", market: i.value?.market_price ?? 0 })),
+  });
 }
 
 // Bonuses and stats of specific items (by the unique id Weav3r shows on each listing). 25 at a time.

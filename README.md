@@ -72,8 +72,9 @@ Bonus weapons and armor cost far more than the plain market price, so they hide 
 bazaar list. Weav3r lists cheapest first, 100 per page, so the scan reads the LAST page (and the one before it if
 the last is short). It then asks FF Scouter about those sellers, applies your stat limits, and only for the weak
 sellers' items asks Torn for the bonuses (`/torn/{uids}/itemdetails`, 25 per call; the unique item id is on each
-Weav3r listing). Weapons and armor come from `/torn/items?cat=` (cached a day). Items are picked by highest bazaar
-average first, since bonus items pull the average up.
+Weav3r listing). Weapons and armor come from `/torn/items?cat=` (cached a day). Temporary weapons are skipped (they cannot carry bonuses). You choose the kinds to read (Primary, Secondary, Melee,
+Armor); items are picked by highest bazaar average first, since bonus items pull the average up, and a scan reads 60
+of them by default.
 
 ### Inactive Earners tab (`public/app/js/earners/`)
 

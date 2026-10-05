@@ -204,7 +204,7 @@ async function runChecks() {
   r = await bob.get("/api/weav3r?item=4&page=0");
   check("bad page refused", r.status === 400);
   r = await bob.get("/api/torn/itemlist?cat=Weapon", { headers: K });
-  check("weapon list", r.data.items.length === 1 && r.data.items[0].name === "Gold Rifle" && r.data.items[0].type === "Weapon", JSON.stringify(r.data));
+  check("weapon list leaves out temporary weapons and names the category", r.data.items.length === 1 && r.data.items[0].name === "Gold Rifle" && r.data.items[0].cat === "Primary", JSON.stringify(r.data));
   r = await bob.get("/api/torn/itemlist?cat=Plant", { headers: K });
   check("bad category refused", r.status === 400);
   r = await bob.get("/api/torn/itemdetails?uids=9001,9003", { headers: K });

@@ -2,7 +2,7 @@
 // You buy the item, the price lands in their cash, then you mug them. Bonus items sell far above the plain
 // market price, so they are found differently from the bazaar finder:
 //
-//   1 pick items   Torn's weapon and armor lists (cached a day) + Weav3r's index; the priciest bazaar averages first
+//   1 pick items   Torn's weapon and armor lists (cached a day, kinds you ticked) + Weav3r's index; the priciest bazaar averages first
 //   2 read bazaars Weav3r lists cheapest first, so the LAST page holds the expensive listings (bonus items are there)
 //   3 estimates    FF Scouter for every seller of a listing at/above your minimum price, then the stat filter
 //   4 bonuses      Torn's item details (25 per call) for the weak sellers' items only; keep items with a bonus
@@ -34,26 +34,27 @@ class Stop extends Error {
 
 // ---------------------------------------------------------------- 1. pick items
 
-// Weapon and armor ids from Torn, remembered for a day.
-async function weaponIds(runId) {
+// Weapon and armor ids with their kind (Primary, Secondary, Melee, Armor) from Torn, remembered for a day.
+// Temporary weapons are left out by the server: they cannot carry bonuses.
+async function itemKinds(runId) {
   const cache = new Cache(STORE.items, 20);
-  const hit = cache.get("ids");
-  if (hit && Date.now() - hit.t < DAY) return new Set(hit.ids);
-  const ids = [];
+  const hit = cache.get("kinds");
+  if (hit && Date.now() - hit.t < DAY) return hit.kinds;
+  const kinds = {};
   for (const cat of ["Weapon", "Armor"]) {
     const r = await tornCall(`/api/torn/itemlist?cat=${cat}`, runId);
-    ids.push(...r.items.map((i) => i.id));
+    for (const i of r.items) kinds[i.id] = i.cat;
   }
-  cache.put("ids", { t: Date.now(), ids });
+  cache.put("kinds", { t: Date.now(), kinds });
   cache.flush();
-  return new Set(ids);
+  return kinds;
 }
 
 async function pickItems(call, f, runId) {
-  const ids = await weaponIds(runId);
+  const kinds = await itemKinds(runId);
   const { items } = await weav3rRead(call, "/api/weav3r?item=all", runId);
   const picked = items
-    .filter((i) => ids.has(i.id) && i.bazaars > 0)
+    .filter((i) => f.bmCats.includes(kinds[i.id]) && i.bazaars > 0)
     .sort((a, b) => (b.average || b.price) - (a.average || a.price)) // bonus items pull the bazaar average up
     .slice(0, f.bmItems);
   if (!picked.length) throw new Stop("No weapons or armor are listed in bazaars right now.", "info", 1);

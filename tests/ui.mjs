@@ -250,6 +250,7 @@ async function runChecks() {
 
   section("Buymugging");
   await page.goto(BASE + "/app/");
+  await page.waitForFunction(() => document.getElementById("maxBs").value !== ""); // the page has finished starting (it saves its own filters then)
   await setStore("cdm.keys", { torn: "abcdefgh12345678", ff: "" });
   await setFakeFlag("buymug", true);
   // Weakling ($30m, Plunder) is weak enough. Muscle ($28m, Quicken) is too strong. Plain ($12m) has no bonus.

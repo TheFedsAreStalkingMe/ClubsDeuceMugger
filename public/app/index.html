@@ -114,14 +114,22 @@
       <div class="stack">
         <label>Listing priced at least ($)
           <input type="number" id="bmMinPrice" inputmode="numeric" min="1000000" step="1000000"></label>
-        <label>Only these bonuses <span class="hint">Words from the bonus name, separated by commas. Empty = any bonus.</span>
+        <div class="label">Look at
+          <div class="checklist" id="bmCats">
+            <label class="check"><input type="checkbox" value="Primary"> Primary weapons</label>
+            <label class="check"><input type="checkbox" value="Secondary"> Secondary weapons</label>
+            <label class="check"><input type="checkbox" value="Melee"> Melee weapons</label>
+            <label class="check"><input type="checkbox" value="Armor"> Armor</label>
+          </div>
+          <span class="hint">Many weapons and armor can carry bonuses. Temporary weapons cannot.</span></div>
+        <label>Only these bonuses <span class="hint">Words from the bonus name, separated by commas. Empty = any bonus. Common: Plunder, Quicken, Deadeye, Execute, Expose, Stun, Warlord, Weaken, Achilles, Bleed, Cripple.</span>
           <input type="text" id="bmBonus" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="plunder, quicken" maxlength="120"></label>
       </div>
       <details class="more">
         <summary>More options</summary>
         <div class="stack">
           <label>Weapons and armor read per scan <span class="hint">Highest bazaar average first.</span>
-            <input type="number" id="bmItems" inputmode="numeric" min="1" max="100" step="1"></label>
+            <input type="number" id="bmItems" inputmode="numeric" min="1" max="200" step="1"></label>
           <label>Items to check for bonuses <span class="hint">Priciest first. 25 per Torn call.</span>
             <input type="number" id="bmChecks" inputmode="numeric" min="25" max="500" step="25"></label>
         </div>

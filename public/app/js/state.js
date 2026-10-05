@@ -26,7 +26,8 @@ export const DEFAULT_FILTERS = {
   autoEvery: 120, // seconds between auto hunt scans
   bmMinPrice: 5000000, // buymugging: only listings priced at least this much
   bmBonus: "", // buymugging: only bonuses whose name contains one of these words (comma separated, empty = any)
-  bmItems: 25, // buymugging: weapons and armor read per scan
+  bmCats: ["Primary", "Secondary", "Melee", "Armor"], // buymugging: which kinds of items to read
+  bmItems: 60, // buymugging: weapons and armor read per scan
   bmChecks: 100, // buymugging: items whose bonuses are looked up per scan
   sort: "stats",
   dir: "desc",

@@ -85,7 +85,14 @@ export function initFilters() {
   bindAmount("minPart");
   bindAmount("bmMinPrice");
   bindText("bmBonus");
-  bindNumber("bmItems", 1, 100, 25);
+  for (const box of document.querySelectorAll("#bmCats input")) { // which kinds of items to read
+    box.checked = state.filters.bmCats.includes(box.value);
+    box.addEventListener("change", () => {
+      state.filters.bmCats = [...document.querySelectorAll("#bmCats input:checked")].map((b) => b.value);
+      persist();
+    });
+  }
+  bindNumber("bmItems", 1, 200, 60);
   bindNumber("bmChecks", 25, 500, 100);
   bindCheckbox("merits", render);
   bindDecimal("plunder", 0, 100, render);
