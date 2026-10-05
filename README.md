@@ -51,7 +51,7 @@ tests/                  Automated checks (see Tests)
 
 | File | Job |
 | --- | --- |
-| `scan.js` | One scan in stages: choose items, read bazaars, estimates, filter, spies, status |
+| `scan.js` | One scan in stages: choose items, read bazaars (single items and stacks, grouped per seller), estimates, filter, status |
 | `rules.js` | Pure rules: what is a good mug, why a listing was filtered out, sorting |
 | `filters.js`, `watchlist.js` | The Hunt controls (3 basic, the rest under "More options") and the watchlist |
 | `cards.js`, `results.js` | A result card, the results grid, the once-a-second tick |
