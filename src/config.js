@@ -12,7 +12,6 @@ export const PBKDF2_ITERATIONS = 100000;
 export const RE = {
   username: /^[A-Za-z0-9_.-]{3,24}$/,
   tornKey: /^[A-Za-z0-9]{8,64}$/, // Torn and FF Scouter keys
-  tornStatsKey: /^[A-Za-z0-9_-]{8,64}$/, // TornStats keys can contain underscores
   token: /^[A-Za-z0-9_-]{20,100}$/, // our own random tokens
   email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
 };
@@ -24,6 +23,5 @@ export const upstream = (env) => ({
   weav3r: env.WEAV3R_API_BASE || "https://weav3r.dev/api",
   tornV1: env.TORN_V1_API_BASE || "https://api.torn.com",
   tornV2: env.TORN_API_BASE || "https://api.torn.com/v2",
-  tornStats: env.TORNSTATS_API_BASE || "https://www.tornstats.com/api/v2",
   ffScouter: env.FFSCOUTER_API_BASE || "https://ffscouter.com/api/v1",
 });

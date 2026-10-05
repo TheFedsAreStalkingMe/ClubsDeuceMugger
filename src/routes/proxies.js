@@ -1,4 +1,4 @@
-// Passes requests to Weav3r, Torn, FF Scouter and TornStats for signed-in members.
+// Passes requests to Weav3r, Torn and FF Scouter for signed-in members.
 // Members' API keys travel in request headers for one call and are never stored here.
 
 import { RE, upstream } from "../config.js";
@@ -76,31 +76,6 @@ export async function tornMe({ request, env, user }) {
   if (response) return response;
   const total = Number(data.total) || ["strength", "defense", "speed", "dexterity"].reduce((n, k) => n + (Number(data[k]) || 0), 0);
   return json({ total });
-}
-
-// ---------------------------------------------------------------- TornStats (real spies)
-
-export async function tornStatsSpy({ request, env, url, user }) {
-  const id = url.searchParams.get("id") || "";
-  const key = header(request, "X-TS-Key");
-  if (!/^\d{1,10}$/.test(id)) return fail("Bad player ID.");
-  if (!RE.tornStatsKey.test(key)) return fail("Missing or malformed TornStats key.");
-  const blocked = await throttle(env, "tornstats", String(user.id), 80, 60); // TornStats allows 100 per minute
-  if (blocked) return blocked;
-
-  const { res, data } = await fetchJson(`${upstream(env).tornStats}/${key}/spy/user/${id}`);
-  if (!data) return fail(`TornStats returned ${res.status}`, 502);
-  if (data.status === false) {
-    // A bad key is an error. Anything else (for example "no spy") just means there is nothing to show.
-    if (/key/i.test(String(data.message || ""))) return json({ error: data.message || "TornStats key problem." });
-    return json({ found: false });
-  }
-  const spy = data.spy;
-  if (!spy || spy.status === false) return json({ found: false });
-  const [strength, defense, speed, dexterity] = ["strength", "defense", "speed", "dexterity"].map((k) => Number(spy[k]) || 0);
-  const total = Number(spy.total) || strength + defense + speed + dexterity;
-  if (!total) return json({ found: false });
-  return json({ found: true, total, strength, defense, speed, dexterity, timestamp: Number(spy.timestamp) || 0, type: spy.type || null });
 }
 
 // ---------------------------------------------------------------- FF Scouter (battle stat estimates)

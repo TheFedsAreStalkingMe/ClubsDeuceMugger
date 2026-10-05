@@ -1,7 +1,7 @@
 // Sign up (by invite), sign in, password recovery.
 
 import { RE, INVITE_SECONDS, APPLY_SESSION_SECONDS, RESET_SECONDS } from "../config.js";
-import { burnPasswordTime, checkPassword, hashPassword, randomToken, sha256 } from "../lib/crypto.js";
+import { burnPasswordTime, checkPassword, hashPassword, randomToken, sha256, vaultKeyFrom } from "../lib/crypto.js";
 import { createSession, passwordProblem, validToken } from "../lib/auth.js";
 import { isUniqueError } from "../lib/db.js";
 import { baseUrl, clientIp, fail, json, nowSec, readJson, str } from "../lib/http.js";
@@ -119,7 +119,7 @@ export async function login({ request, env }) {
   if (!username || !password || password.length > 128 || username.length > 64) return wrong();
 
   const row = await env.DB.prepare(
-    "SELECT id, password_hash, salt, iterations, status FROM users WHERE username = ?"
+    "SELECT id, password_hash, salt, iterations, status, key_salt FROM users WHERE username = ?"
   ).bind(username).first();
   if (!row) {
     await burnPasswordTime(password);
@@ -131,7 +131,9 @@ export async function login({ request, env }) {
     // Applied but never finished naming the member who invited them: let them continue.
     return json({ error: "Account pending approval", applyToken: await newApplySession(env, row.id) }, 403);
   }
-  return json({ ok: true }, 200, { "Set-Cookie": await createSession(env, row.id) });
+  // Members with a saved API key: unlock it for this session with their password.
+  const vaultKey = row.key_salt ? await vaultKeyFrom(password, row.key_salt) : null;
+  return json({ ok: true }, 200, { "Set-Cookie": await createSession(env, row.id, vaultKey) });
 }
 
 // Always answers the same way, so it cannot be used to find out who has an account.
@@ -175,7 +177,7 @@ export async function resetPassword({ request, env }) {
 
   const creds = await hashPassword(str(body.password));
   await env.DB.batch([
-    env.DB.prepare("UPDATE users SET password_hash = ?, salt = ?, iterations = ? WHERE id = ?").bind(creds.password_hash, creds.salt, creds.iterations, row.user_id),
+    env.DB.prepare("UPDATE users SET password_hash = ?, salt = ?, iterations = ?, key_enc = NULL, key_salt = NULL WHERE id = ?").bind(creds.password_hash, creds.salt, creds.iterations, row.user_id), // the saved key was locked with the old password
     env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(row.user_id), // signs out every device
     env.DB.prepare("DELETE FROM password_resets WHERE user_id = ?").bind(row.user_id),
   ]);

@@ -19,7 +19,7 @@ async function runChecks() {
   const setStore = (key, value) => page.evaluate(([k, v]) => localStorage.setItem(k, JSON.stringify(v)), [key, value]);
   const cards = (sel) => page.$$eval(`${sel} .target`, (els) => els.map((e) => ({
     name: e.querySelector(".name").textContent,
-    stats: [...e.querySelectorAll("dt")].map((d, i) => [d.textContent, e.querySelectorAll("dd")[i].textContent]).find(([k]) => k === "Stats")?.[1],
+    stats: [...e.querySelectorAll("dt")].map((d, i) => [d.textContent, e.querySelectorAll("dd")[i].textContent]).find(([k]) => k === "Est. stats")?.[1],
   })));
   const scanDone = () => page.waitForSelector("#scan:not([disabled])", { timeout: 60000 });
 
@@ -47,10 +47,18 @@ async function runChecks() {
   check("signed in and sent to the Mug Finder", true);
   check("owner panel built for the owner", await page.waitForSelector("#admin", { timeout: 5000 }).then(() => true, () => false));
 
+  section("Hunt screen");
+  check("three basic controls are visible", (await page.isVisible("#minPrice")) && (await page.isVisible("#maxBs")) && (await page.isVisible("#minActivity")));
+  check("other controls are folded away", (await page.isHidden("#maxFf")) && (await page.isHidden("#maxSellers")));
+  await page.click("details.more > summary");
+  check("More options opens", (await page.isVisible("#maxFf")) && (await page.isVisible("#watch-form")));
+  await page.click("details.more > summary");
+  check("one sort menu", (await page.$$("#sort option")).length === 8 && (await page.$("#dir")) === null);
+
   section("Scan");
   const filters = { minPrice: 1000000, priceTol: 100, maxItems: 5, autoScan: true, maxSellers: 20 };
   await page.evaluate(() => localStorage.clear());
-  await setStore("cdm.keys", { torn: "abcdefgh12345678", ff: "", ts: "TS_goodkey12345" });
+  await setStore("cdm.keys", { torn: "abcdefgh12345678", ff: "" });
   await setStore("cdm.filters", filters);
   await setStore("cdm.prefs", { notify: true, minJackpot: 10000000, myBs: 50e9, outMinutes: 5, offlineMinutes: 35 });
   await page.reload();
@@ -60,8 +68,7 @@ async function runChecks() {
   check("progress bar fills completely", (await page.$eval("#bar", (b) => b.style.width)) === "100%");
   const found = await cards("#results");
   check("all three sellers listed", found.length === 3, JSON.stringify(found));
-  check("seller without a spy is marked Est.", found.some((c) => c.name === "Alpha" && /Est\./.test(c.stats)), JSON.stringify(found));
-  check("seller with a spy is marked Spy", found.some((c) => c.name === "Bravo" && /10b Spy/.test(c.stats)), JSON.stringify(found));
+  check("cards show the estimated stats", found.every((c) => c.stats === "2b"), JSON.stringify(found));
   check("each card shows trade activity", (await page.$$eval("#results .target dt", (d) => d.some((x) => x.textContent === "Activity"))));
   check("jackpot alert at the top", await page.waitForSelector("#alerts .alert", { timeout: 3000 }).then(() => true, () => false));
 
@@ -80,7 +87,7 @@ async function runChecks() {
   await scanDone();
   const byActivity = (await cards("#results")).map((c) => c.name);
   check("sort by trade activity puts the busy item first", byActivity.slice(0, 2).sort().join() === "Alpha,Bravo" && byActivity[2] === "Charlie", byActivity.join());
-  await setStore("cdm.filters", { ...filters, minActivity: 1 });
+  await setStore("cdm.filters", { ...filters, minActivity: 5 });
   await page.reload();
   await page.click("#scan");
   await scanDone();
@@ -134,12 +141,36 @@ async function runChecks() {
   await page.goto(BASE + "/app/settings.html");
   check("settings page loads", await page.isVisible("#save-keys"));
   check("saved key shown", (await page.inputValue("#key-torn")) === "abcdefgh12345678");
+  check("no TornStats box", (await page.$("#key-ts")) === null);
+
+  section("Key on the account");
+  check("password box hidden until the box is ticked", await page.isHidden("#pass-row"));
+  await page.check("#save-account");
+  check("password box appears", await page.isVisible("#pass-row"));
+  await page.click("#save-keys");
+  check("password is asked for", /password/i.test(await text("#keys-msg")), await text("#keys-msg"));
+  await page.fill("#key-pass", "wrong-password");
+  await page.click("#save-keys");
+  await page.waitForFunction(() => /Wrong password/.test(document.getElementById("keys-msg").textContent));
+  check("wrong password is explained", true);
+  await page.fill("#key-pass", OWNER.pass);
+  await page.click("#save-keys");
+  await page.waitForFunction(() => /on your account/.test(document.getElementById("keys-msg").textContent));
+  check("key saved on the account", true);
+  // like a new phone: nothing stored in this browser
+  await page.evaluate(() => localStorage.removeItem("cdm.keys"));
+  await page.goto(BASE + "/app/settings.html");
+  await page.waitForFunction(() => document.getElementById("key-torn").value !== "");
+  check("key comes back from the account", (await page.inputValue("#key-torn")) === "abcdefgh12345678" && /Loaded your saved key/.test(await text("#keys-msg")));
+  check("box is ticked again", await page.isChecked("#save-account"));
   await page.click("#make-invite");
   await page.waitForSelector("#invite-box:not([hidden])");
   check("invite link made, with Copy and Share", (await text("#invite-link")).includes("?invite=") && (await page.isVisible("#invite-copy")));
   await page.click("#invite-list .x-btn");
   await page.waitForFunction(() => document.getElementById("invite-box").hidden || document.getElementById("invite-list").children.length === 0);
   check("X closes the invite", true);
+  check("FF Scouter section is folded away", await page.isHidden("#test-ff"));
+  await page.click("details.more > summary");
   await page.click("#test-ff");
   await page.waitForFunction(() => document.getElementById("keys-msg").textContent.length > 12);
   check("FF Scouter key test answers", /FF Scouter/.test(await text("#keys-msg")), await text("#keys-msg"));

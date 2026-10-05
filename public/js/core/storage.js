@@ -9,9 +9,7 @@ export const STORE = {
   dismissed: "cdm.dismissed",
   profiles: "cdm.profiles", // Torn status cache
   ff: "cdm.ff", // FF Scouter estimate cache
-  spies: "cdm.spies", // TornStats spy cache
   tornCalls: "cdm.calls", // timestamps of recent Torn calls (rate limiter)
-  tsCalls: "cdm.tscalls", // timestamps of recent TornStats calls
   lastClick: "cdm.lastClick",
   lastSync: "cdm.lastSync",
 };
@@ -33,8 +31,8 @@ export function remove(key) {
   try { localStorage.removeItem(key); } catch { /* ignore */ }
 }
 
-// The stored API keys, always with all three fields.
-export const loadKeys = () => ({ torn: "", ff: "", ts: "", ...load(STORE.keys, {}) });
+// The stored API keys, always with both fields.
+export const loadKeys = () => ({ torn: "", ff: "", ...load(STORE.keys, {}) });
 
 // A cache kept in memory and written to localStorage in one go (not on every change).
 // Entries look like { t: savedAtMs, ... }. The oldest are dropped past `max`.

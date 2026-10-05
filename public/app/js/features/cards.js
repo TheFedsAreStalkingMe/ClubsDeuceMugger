@@ -16,12 +16,6 @@ export function attackLink(id) {
 const bazaarLink = (id) =>
   el("a", { class: "btn small ghost", href: `https://www.torn.com/bazaar.php?userId=${id}`, target: "_blank", rel: "noopener noreferrer", text: "Bazaar" });
 
-function statsText(r) {
-  if (r.bs == null) return "?";
-  const spyAge = r.src === "Spy" && r.spyTs ? ` (${fmtAgo(Date.now() / 1000 - r.spyTs).split(" ")[0]} old)` : "";
-  return `${fmtStats(r.bs)} ${r.src || "Est."}${spyAge}`;
-}
-
 // opts.found: seconds since a feed mug was found. opts.dismiss: makes an X button.
 export function card(r, index, opts = {}) {
   const status = el("span", { class: "status pending", text: "Checking..." });
@@ -42,7 +36,7 @@ export function card(r, index, opts = {}) {
     ...row("Market", r.market ? `${fmtMoney(r.market)} (${Math.round((r.price / r.market) * 100)}%)` : "?"),
     ...row("Total", fmtMoney(r.total)),
     ...row("Activity", r.activity != null ? `${r.activity} changed/hr${r.bazaars ? `, ${r.bazaars} bazaars` : ""}` : "?"),
-    ...row("Stats", statsText(r)),
+    ...row("Est. stats", fmtStats(r.bs)),
     ...row("Fair fight", r.ff != null ? Number(r.ff).toFixed(2) : "?"),
     ...row("Account age", r.age != null ? `${Number(r.age).toLocaleString("en-US")} days` : "?"),
     ...(opts.found != null ? row("Found", fmtAgo(opts.found)) : []),

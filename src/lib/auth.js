@@ -1,7 +1,7 @@
 // Sessions, the signed-in user and the owner check.
 
 import { SESSION_COOKIE, SESSION_SECONDS, RE } from "../config.js";
-import { randomToken, sha256 } from "./crypto.js";
+import { randomToken, sha256, wrapForSession } from "./crypto.js";
 import { nowSec } from "./http.js";
 
 export const isOwner = (env, username) =>
@@ -22,15 +22,16 @@ export async function getUser(request, env) {
     `SELECT u.id, u.username, u.email FROM sessions s JOIN users u ON u.id = s.user_id
      WHERE s.token_hash = ? AND s.expires_at > ? AND u.status = 'active'`
   ).bind(tokenHash, nowSec()).first();
-  return row ? { id: row.id, username: row.username, email: row.email, tokenHash } : null;
+  return row ? { id: row.id, username: row.username, email: row.email, tokenHash, token: m[1] } : null;
 }
 
-// Starts a session and returns the Set-Cookie value.
-export async function createSession(env, userId) {
+// Starts a session and returns the Set-Cookie value. With a vault key, the session can read saved API keys.
+export async function createSession(env, userId, vaultKey = null) {
   const token = randomToken();
   const now = nowSec();
-  await env.DB.prepare("INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)")
-    .bind(await sha256(token), userId, now, now + SESSION_SECONDS)
+  const wrapped = vaultKey ? await wrapForSession(token, vaultKey, userId) : null;
+  await env.DB.prepare("INSERT INTO sessions (token_hash, user_id, created_at, expires_at, vault_key) VALUES (?, ?, ?, ?, ?)")
+    .bind(await sha256(token), userId, now, now + SESSION_SECONDS, wrapped)
     .run();
   return sessionCookie(token, SESSION_SECONDS);
 }

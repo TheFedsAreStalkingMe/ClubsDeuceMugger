@@ -1,5 +1,5 @@
 // Test harness shared by tests/run.mjs (backend) and tests/ui.mjs (browser).
-// Starts fake Torn / Weav3r / FF Scouter / TornStats servers and a local copy of the Worker with a
+// Starts fake Torn / Weav3r / FF Scouter servers and a local copy of the Worker with a
 // local database. Nothing here touches your real Cloudflare account, database or email.
 
 import { spawn, spawnSync } from "node:child_process";
@@ -44,8 +44,8 @@ function fakeServer() {
     const p = u.pathname;
     const key = u.searchParams.get("key") || "";
 
-    // Weav3r: two items worth $20m. Gold Bar (busy: one listing changed a minute ago) has sellers 7 (no spy) and
-    // 8 (has a spy). Silver Bar (quiet: nothing changed in two days) has seller 9.
+    // Weav3r: two items worth $20m. Gold Bar is busy (5 listings changed a minute ago): seller 7 has five
+    // listings, seller 8 one. Silver Bar is quiet (nothing changed in two days): seller 9.
     if (p === "/weav3r/marketplace") return send({ items: [
       { item_id: 1, item_name: "Gold Bar", market_price: 20000000, lowest_price: 19000000, bazaar_average: 20000000, total_bazaars: 5 },
       { item_id: 2, item_name: "Silver Bar", market_price: 20000000, lowest_price: 19000000, bazaar_average: 20000000, total_bazaars: 50 },
@@ -53,7 +53,7 @@ function fakeServer() {
     ] });
     if (p === "/weav3r/marketplace/1") return send({ item_id: 1, item_name: "Gold Bar", market_price: 20000000, generated_at: now(), extra: "dropped",
       listings: [
-        { player_id: 7, player_name: "Alpha", quantity: 2, price: 19500000, uid: "x", content_updated: now() - 60 },
+        ...Array.from({ length: 5 }, () => ({ player_id: 7, player_name: "Alpha", quantity: 2, price: 19500000, uid: "x", content_updated: now() - 60 })),
         { player_id: 8, player_name: "Bravo", quantity: 1, price: 20500000, uid: "y", content_updated: now() - 2 * 86400 },
       ] });
     if (p === "/weav3r/marketplace/2") return send({ item_id: 2, item_name: "Silver Bar", market_price: 20000000, generated_at: now(),
@@ -91,14 +91,6 @@ function fakeServer() {
       { action: "hit", text: "Mugsy hit Rich for 100" },
       { action: "mug", text: "Mugsy mugged Rich and stole $2,500,000" },
     ], summary: [] } });
-
-    // TornStats
-    const spy = p.match(/^\/tornstats\/([^/]+)\/spy\/user\/(\d+)/);
-    if (spy) {
-      if (spy[1] === "BADKEY123456") return send({ status: false, message: "Error: API key not found" });
-      if (Number(spy[2]) % 2 === 0) return send({ status: true, spy: { status: true, type: "faction-spy", strength: 1e9, defense: 2e9, speed: 3e9, dexterity: 4e9, total: 1e10, timestamp: 1700000000 } });
-      return send({ status: true, spy: { status: false, message: "Spy not found." } });
-    }
 
     // FF Scouter
     if (p === "/ff/get-stats") return send(u.searchParams.get("targets").split(",").map((id) => ({ player_id: Number(id), fair_fight: 1.5, bs_estimate: 2e9 })));
@@ -150,10 +142,9 @@ function writeConfig() {
   const f = `http://localhost:${FAKE_PORT}`;
   Object.assign(cfg.vars, {
     WEAV3R_API_BASE: `${f}/weav3r`, TORN_V1_API_BASE: `${f}/tornv1`, TORN_API_BASE: `${f}/v2`,
-    TORNSTATS_API_BASE: `${f}/tornstats`, FFSCOUTER_API_BASE: `${f}/ff`,
+    FFSCOUTER_API_BASE: `${f}/ff`,
   });
   fs.writeFileSync(path.join(TMP, "wrangler.jsonc"), JSON.stringify(cfg, null, 2));
-  fs.writeFileSync(path.join(TMP, ".dev.vars"), "KEY_SECRET=0123456789abcdef0123456789abcdef-test\n");
 }
 
 const wr = (...args) => sh([...WRANGLER, ...args, "-c", ".test-tmp/wrangler.jsonc", "--persist-to", ".test-tmp/state"]);
@@ -204,9 +195,9 @@ function emailFiles() {
   return out.filter((p) => p.endsWith(".txt") && p.includes("email")).map((p) => ({ p, t: fs.statSync(p).mtimeMs, text: fs.readFileSync(p, "utf8") })).sort((a, b) => a.t - b.t);
 }
 // Local mail is saved as body-text files (the subject is not in them). Waits briefly for the file to appear.
-export async function waitForMail(re, ms = 5000) {
+export async function waitForMail(re, ms = 5000, since = 0) {
   for (let waited = 0; waited <= ms; waited += 250) {
-    const found = emailFiles().reverse().find((f) => re.test(f.text));
+    const found = emailFiles().reverse().find((f) => re.test(f.text) && f.t >= since);
     if (found) return found;
     await new Promise((r) => setTimeout(r, 250));
   }

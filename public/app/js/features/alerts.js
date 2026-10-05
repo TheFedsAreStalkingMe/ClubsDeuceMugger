@@ -18,7 +18,7 @@ export function updateAlerts(now) {
     ...hits.map((r) =>
       el("div", { class: "alert" },
         el("div", { class: "face", text: "JACKPOT >:D" }),
-        el("div", { text: `${r.name} [${r.id}] has ${r.itemName} at ${fmtMoney(r.price)}. ${r.src === "Spy" ? "Spy" : "Est."} stats ${fmtStats(r.bs)}, offline ${Math.round((now - r.last) / 60)}m.` }),
+        el("div", { text: `${r.name} [${r.id}] has ${r.itemName} at ${fmtMoney(r.price)}. Est. stats ${fmtStats(r.bs)}, offline ${Math.round((now - r.last) / 60)}m.` }),
         attackLink(r.id)
       )
     )

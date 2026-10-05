@@ -1,4 +1,4 @@
-// Keeps us under the Torn and TornStats call limits, even across tabs and reloads.
+// Keeps us under the Torn call limit, even across tabs and reloads.
 
 import { sleep } from "/js/core/async.js";
 import { STORE, load, save } from "/js/core/storage.js";
@@ -7,7 +7,6 @@ import { setScanMsg } from "./ui.js";
 
 const WINDOW_MS = 60000;
 const TORN_PER_MIN = 80; // Torn's ceiling is 85
-const TORNSTATS_PER_MIN = 80; // TornStats allows 100
 
 // Waits until a call is allowed, then records it. Throws "cancelled" if the scan was cancelled.
 async function acquire(storeKey, limit, label, runId) {
@@ -37,4 +36,3 @@ export function tryAcquireTorn(max) {
 }
 
 export const acquireTorn = (runId) => acquire(STORE.tornCalls, TORN_PER_MIN, "Torn", runId);
-export const acquireTornStats = (runId) => acquire(STORE.tsCalls, TORNSTATS_PER_MIN, "TornStats", runId);

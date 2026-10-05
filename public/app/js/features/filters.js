@@ -45,6 +45,16 @@ function bindNumber(name, min, max, fallback) {
   });
 }
 
+// A dropdown whose options are numbers. A saved value between options snaps to the nearest one below.
+function bindChoice(name) {
+  const select = $(name);
+  const options = [...select.options].map((o) => Number(o.value));
+  state.filters[name] = Math.max(...options.filter((v) => v <= state.filters[name]), options[0]);
+  select.value = String(state.filters[name]);
+  persist();
+  select.addEventListener("change", () => { state.filters[name] = Number(select.value); persist(); });
+}
+
 function bindCheckbox(name) {
   const box = $(name);
   box.checked = !!state.filters[name];
@@ -65,13 +75,18 @@ export function initFilters() {
 
   bindCheckbox("autoScan");
   bindCheckbox("includeUnknown");
-  bindNumber("minActivity", 0, 100, 0);
+  bindChoice("minActivity");
   bindNumber("maxItems", 1, 150, 40);
   bindNumber("autoEvery", 30, 3600, 120);
   bindNumber("maxSellers", 1, 500, 80);
 
-  for (const id of ["sort", "dir"]) {
-    $(id).value = state.filters[id];
-    $(id).addEventListener("change", () => { state.filters[id] = $(id).value; persist(); render(); });
-  }
+  // One sort menu holds both the field and the direction ("stats:asc").
+  const sort = $("sort");
+  sort.value = `${state.filters.sort}:${state.filters.dir}`;
+  if (!sort.value) sort.value = "stats:desc"; // a saved combination the menu no longer offers
+  sort.addEventListener("change", () => {
+    [state.filters.sort, state.filters.dir] = sort.value.split(":");
+    persist();
+    render();
+  });
 }

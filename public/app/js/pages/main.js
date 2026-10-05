@@ -21,7 +21,7 @@ async function loadAccountKeys() {
   try {
     const r = await api("/api/account/key");
     if (r.saved && r.keys && r.keys.torn) {
-      state.keys = { torn: r.keys.torn, ff: r.keys.ff || "", ts: r.keys.ts || "" };
+      state.keys = { torn: r.keys.torn, ff: r.keys.ff || "" };
       save(STORE.keys, state.keys);
     }
   } catch { /* no saved key */ }

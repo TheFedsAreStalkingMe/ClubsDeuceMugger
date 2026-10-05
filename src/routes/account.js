@@ -1,11 +1,10 @@
 // The signed-in member's own account: profile, email, saved API keys, sign out.
 
 import { RE } from "../config.js";
-import { checkPassword } from "../lib/crypto.js";
+import { checkPassword, newSalt, openKeys, sealKeys, unwrapFromSession, vaultKeyFrom, wrapForSession } from "../lib/crypto.js";
 import { clearCookie, isOwner } from "../lib/auth.js";
 import { isUniqueError } from "../lib/db.js";
 import { fail, json, readJson, str } from "../lib/http.js";
-import { open, seal, vaultAvailable } from "../lib/crypto.js";
 import { sendMail } from "../lib/mail.js";
 import { throttle } from "../lib/ratelimit.js";
 
@@ -45,37 +44,48 @@ export async function setEmail({ request, env, user }) {
   return json({ ok: true, email });
 }
 
-// ---- optional: API keys saved to the account, encrypted with the KEY_SECRET secret ----
+// ---- optional: an API key saved to the account, locked with the member's password ----
 
 export async function getSavedKeys({ env, user }) {
-  if (!vaultAvailable(env)) return json({ available: false, saved: false });
   const row = await env.DB.prepare("SELECT key_enc FROM users WHERE id = ?").bind(user.id).first();
-  if (!row || !row.key_enc) return json({ available: true, saved: false });
+  if (!row || !row.key_enc) return json({ saved: false });
+  const session = await env.DB.prepare("SELECT vault_key FROM sessions WHERE token_hash = ?").bind(user.tokenHash).first();
+  if (!session || !session.vault_key) return json({ saved: true, locked: true }); // signed in before the key was saved
   try {
-    return json({ available: true, saved: true, keys: await open(env, user.id, row.key_enc) });
+    const vaultKey = await unwrapFromSession(user.token, session.vault_key, user.id);
+    return json({ saved: true, keys: await openKeys(vaultKey, user.id, row.key_enc) });
   } catch {
-    return json({ available: true, saved: false }); // secret changed or data unreadable
+    return json({ saved: true, locked: true });
   }
 }
 
 export async function saveKeys({ request, env, user }) {
-  if (!vaultAvailable(env)) {
-    return fail("Saving keys to your account is not set up yet. The site owner needs to add the KEY_SECRET secret.", 503);
-  }
   const blocked = await throttle(env, "savekey", String(user.id), 20, 3600);
   if (blocked) return blocked;
 
   const body = await readJson(request);
   if (body.clear) {
-    await env.DB.prepare("UPDATE users SET key_enc = NULL WHERE id = ?").bind(user.id).run();
+    await env.DB.batch([
+      env.DB.prepare("UPDATE users SET key_enc = NULL, key_salt = NULL WHERE id = ?").bind(user.id),
+      env.DB.prepare("UPDATE sessions SET vault_key = NULL WHERE user_id = ?").bind(user.id),
+    ]);
     return json({ ok: true, saved: false });
   }
+
   const torn = str(body.torn).trim();
   const ff = str(body.ff).trim();
-  const ts = str(body.ts).trim();
-  if (!RE.tornKey.test(torn) || (ff && !RE.tornKey.test(ff)) || (ts && !RE.tornStatsKey.test(ts))) {
-    return fail("Keys should be letters and numbers only.");
-  }
-  await env.DB.prepare("UPDATE users SET key_enc = ? WHERE id = ?").bind(await seal(env, user.id, { torn, ff, ts }), user.id).run();
+  const password = str(body.password);
+  if (!RE.tornKey.test(torn) || (ff && !RE.tornKey.test(ff))) return fail("Keys should be letters and numbers only.");
+  if (!password || password.length > 128) return fail("Enter your password to lock the saved key.");
+
+  const row = await env.DB.prepare("SELECT password_hash, salt, iterations, key_salt FROM users WHERE id = ?").bind(user.id).first();
+  if (!(await checkPassword(password, row))) return fail("Wrong password.", 403);
+
+  const keySalt = row.key_salt || newSalt();
+  const vaultKey = await vaultKeyFrom(password, keySalt);
+  await env.DB.batch([
+    env.DB.prepare("UPDATE users SET key_enc = ?, key_salt = ? WHERE id = ?").bind(await sealKeys(vaultKey, user.id, { torn, ff }), keySalt, user.id),
+    env.DB.prepare("UPDATE sessions SET vault_key = ? WHERE token_hash = ?").bind(await wrapForSession(user.token, vaultKey, user.id), user.tokenHash),
+  ]);
   return json({ ok: true, saved: true });
 }

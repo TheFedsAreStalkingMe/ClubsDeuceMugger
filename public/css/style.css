@@ -145,6 +145,12 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 24px; background: #
 .msg.ok::after { content: " <3"; }
 .msg.err::after { content: " :("; }
 
+/* "More options" fold-out */
+details.more { margin: 14px 0 6px; text-align: center; }
+details.more > summary { cursor: pointer; text-decoration: underline; color: var(--derse-l); min-height: 40px; display: flex; align-items: center; justify-content: center; list-style: none; }
+details.more > summary::-webkit-details-marker { display: none; }
+details.more[open] > summary { margin-bottom: 10px; }
+
 /* ---------- 5. Components ---------- */
 
 /* small removable tags (watchlist items) */

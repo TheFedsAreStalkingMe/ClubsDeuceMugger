@@ -1,4 +1,4 @@
-// Backend test run: every Worker feature end to end, against fake Torn / Weav3r / FF Scouter / TornStats.
+// Backend test run: every Worker feature end to end, against fake Torn / Weav3r / FF Scouter.
 //
 //   node tests/run.mjs                      (Node 20+; fetches wrangler with npx unless WRANGLER is set)
 //   WRANGLER="/path/to/wrangler" node tests/run.mjs
@@ -132,18 +132,44 @@ async function runChecks() {
   r = await bob.post("/api/login", { username: "bob", password: "newpassword99" });
   check("sign in with the new password", r.status === 200);
 
-  section("Saved API keys");
+  section("Saved API key");
+  const tablet = new Client("10.0.0.8");
+  await tablet.post("/api/login", { username: "bob", password: "newpassword99" }); // signed in before anything is saved
   r = await bob.get("/api/account/key");
-  check("nothing saved yet", r.data.available === true && r.data.saved === false);
-  r = await bob.post("/api/account/key", { torn: "short!" });
+  check("nothing saved yet", r.data.saved === false);
+  r = await bob.post("/api/account/key", { torn: "short!", password: "newpassword99" });
   check("bad key refused", r.status === 400);
-  r = await bob.post("/api/account/key", { torn: KEY, ff: "", ts: "TS_goodkey12345" });
+  r = await bob.post("/api/account/key", { torn: KEY, ff: "" });
+  check("password is required", r.status === 400);
+  r = await bob.post("/api/account/key", { torn: KEY, ff: "", password: "wrong-password" });
+  check("wrong password refused", r.status === 403);
+  r = await bob.post("/api/account/key", { torn: KEY, ff: "", password: "newpassword99" });
   check("key saved", r.status === 200 && r.data.saved === true);
   r = await bob.get("/api/account/key");
-  check("key reads back", r.data.saved && r.data.keys.torn === KEY && r.data.keys.ts === "TS_goodkey12345");
-  r = await bob.post("/api/account/key", { clear: true });
+  check("key reads back", r.data.saved && r.data.keys.torn === KEY);
+  const phone = new Client("10.0.0.7");
+  await phone.post("/api/login", { username: "bob", password: "newpassword99" });
+  r = await phone.get("/api/account/key");
+  check("key follows the member to another device", r.data.saved && r.data.keys.torn === KEY);
+  r = await tablet.get("/api/account/key");
+  check("a session from before saving is locked until it signs in again", r.data.saved === true && r.data.locked === true && !r.data.keys);
+  await tablet.post("/api/login", { username: "bob", password: "newpassword99" });
+  r = await tablet.get("/api/account/key");
+  check("signing in again unlocks it", r.data.saved && r.data.keys.torn === KEY);
+  // a password reset cannot unlock the old key, so it is cleared
+  const before = Date.now();
+  await anon.post("/api/recover", { who: "bob" });
+  const reset2 = await waitForMail(/reset\.html\?t=/, 5000, before);
+  const resetToken2 = reset2.text.match(/reset\.html\?t=([A-Za-z0-9_-]+)/)[1];
+  r = await anon.post("/api/reset", { token: resetToken2, password: "thirdpassword77", confirm: "thirdpassword77" });
+  check("password reset works", r.status === 200);
+  r = await bob.post("/api/login", { username: "bob", password: "thirdpassword77" });
   r = await bob.get("/api/account/key");
-  check("key cleared", r.data.saved === false);
+  check("a password reset clears the saved key", r.data.saved === false);
+  await bob.post("/api/account/key", { torn: KEY, ff: "", password: "thirdpassword77" });
+  await bob.post("/api/account/key", { clear: true });
+  r = await bob.get("/api/account/key");
+  check("key can be removed", r.data.saved === false);
 
   section("Data sources");
   const K = { "X-Torn-Key": KEY };
@@ -152,7 +178,7 @@ async function runChecks() {
   r = await bob.get("/api/weav3r?item=all");
   check("item index drops bundles", r.data.items && r.data.items.length === 2 && r.data.items[0].lowest === 19000000 && r.data.items[1].bazaars === 50);
   r = await bob.get("/api/weav3r?item=1");
-  check("bazaar listings trimmed", r.data.listings.length === 2 && r.data.listings[0].uid === undefined && r.data.extra === undefined);
+  check("bazaar listings trimmed", r.data.listings.length === 6 && r.data.listings[0].uid === undefined && r.data.extra === undefined);
   check("listings carry their last-changed time", r.data.listings[0].updated > 0 && r.data.generated_at - r.data.listings[0].updated <= 120);
   r = await bob.get("/api/weav3r?item=abc");
   check("bad item id refused", r.status === 400);
@@ -162,14 +188,6 @@ async function runChecks() {
   check("Torn key error passed on", r.data.code === 2);
   r = await bob.get("/api/torn/me", { headers: K });
   check("own battle stats", r.data.total === 10);
-  r = await bob.get("/api/tornstats/spy?id=2", { headers: { "X-TS-Key": "TS_goodkey12345" } });
-  check("TornStats spy found", r.data.found === true && r.data.total === 1e10);
-  r = await bob.get("/api/tornstats/spy?id=3", { headers: { "X-TS-Key": "TS_goodkey12345" } });
-  check("TornStats no spy", r.data.found === false);
-  r = await bob.get("/api/tornstats/spy?id=2", { headers: { "X-TS-Key": "BADKEY123456" } });
-  check("TornStats key error", /key/i.test(r.data.error || ""));
-  r = await bob.get("/api/tornstats/spy?id=2", { headers: { "X-TS-Key": "no!" } });
-  check("TornStats key format checked", r.status === 400);
   r = await bob.post("/api/ffscouter", { targets: [1, 2, 3] }, { headers: { "X-FF-Key": KEY } });
   check("FF Scouter estimates", Array.isArray(r.data) && r.data.length === 3 && r.data[0].bs_estimate === 2e9);
   r = await bob.post("/api/ffscouter", { targets: ["x"] }, { headers: { "X-FF-Key": KEY } });

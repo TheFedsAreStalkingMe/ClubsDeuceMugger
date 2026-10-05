@@ -11,7 +11,7 @@
     "run_worker_first": true
   },
 
-  // Public settings. Secrets (KEY_SECRET) are added in the Cloudflare dashboard, never here.
+  // Public settings. There are no secrets to add.
   "vars": {
     "APP_URL": "https://clubsdeuce.com", // used in emailed links
     "FROM_EMAIL": "noreply@clubsdeuce.com", // must be a sender set up in Email Sending

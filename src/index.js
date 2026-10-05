@@ -44,7 +44,6 @@ const ROUTES = [
   ["GET", "/api/weav3r", proxies.weav3r],
   ["GET", "/api/torn/user", proxies.tornProfile],
   ["GET", "/api/torn/me", proxies.tornMe],
-  ["GET", "/api/tornstats/spy", proxies.tornStatsSpy],
   ["POST", "/api/ffscouter", proxies.ffStats],
   ["GET", "/api/ffscouter/check", proxies.ffCheck],
   ["POST", "/api/ffscouter/register", proxies.ffRegister],

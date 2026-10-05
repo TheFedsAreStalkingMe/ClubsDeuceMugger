@@ -23,10 +23,10 @@ src/                    THE SERVER (Cloudflare Worker, ES modules)
     db.js               small database helpers and cleanup of expired rows
   routes/               One file per area
     auth.js             sign up (invite + name your inviter), sign in, password recovery
-    account.js          profile, email change, optional saved API keys
+    account.js          profile, email change, optional saved API key (locked with the member's password)
     invites.js          make, list and close invite links
     admin.js            owner-only account list and actions
-    proxies.js          Weav3r, Torn, TornStats and FF Scouter pass-throughs
+    proxies.js          Weav3r, Torn and FF Scouter pass-throughs
     leaderboard.js      Attack-tap log, mug verification against Torn, rankings
 
 public/                 THE WEBSITE (served as is)
@@ -53,12 +53,12 @@ tests/                  Automated checks (see Tests)
 | --- | --- |
 | `scan.js` | One scan in stages: choose items, read bazaars, estimates, filter, spies, status |
 | `rules.js` | Pure rules: what is a good mug, why a listing was filtered out, sorting |
-| `filters.js`, `watchlist.js` | The Filters panel and the watchlist |
+| `filters.js`, `watchlist.js` | The Hunt controls (3 basic, the rest under "More options") and the watchlist |
 | `cards.js`, `results.js` | A result card, the results grid, the once-a-second tick |
 | `feed.js`, `alerts.js` | The auto hunt mug feed and the jackpot banners |
 | `status.js`, `refresh.js` | Torn status records, and the background re-check that keeps statuses on screen true between scans |
 | `runner.js` | Scan, auto hunt and cancel buttons |
-| `limits.js` | Keeps Torn and TornStats calls under their per-minute limits |
+| `limits.js` | Keeps Torn calls under the per-minute limit |
 | `tracking.js` | Logs Attack taps and checks for new mugs (leaderboard) |
 | `admin.js` | The owner panel, built only for the owner |
 | `ui.js` | Message line, progress bar stages, run buttons |
@@ -68,9 +68,10 @@ tests/                  Automated checks (see Tests)
 - **Every request goes through the Worker** (`run_worker_first`). `/api/*` goes to a route handler; anything
   else is a file from `public/`, and `/app/*` needs a signed-in session.
 - **Handlers** get `{ request, env, url, user }`. Public routes are marked in the table in `src/index.js`.
-- **API keys** (Torn, FF Scouter, TornStats) live in the browser's localStorage and are sent in headers for one
-  request at a time. If a member ticks "save to my account", they are also stored encrypted with the
-  `KEY_SECRET` secret.
+- **API keys** (Torn, FF Scouter) live in the browser's localStorage and are sent in headers for one request
+  at a time. If a member ticks "keep it on my account", the key is also stored encrypted with a key made from
+  their password (`src/lib/crypto.js`). The server can read it only while they are signed in, and a password
+  reset clears it. There is no server secret to manage.
 - **Passwords** use PBKDF2. Sessions, invite links and reset links are random tokens; only their hashes are stored.
 - **The browser code** is plain ES modules (`<script type="module">`), so there is nothing to build.
 
@@ -100,7 +101,7 @@ tests/                  Automated checks (see Tests)
 ## Tests
 
 `tests/run.mjs` checks every server feature end to end, and `tests/ui.mjs` drives the real pages in a browser.
-Both start a local copy of the Worker, a local database, and fake Torn, Weav3r, FF Scouter and TornStats servers,
+Both start a local copy of the Worker, a local database, and fake Torn, Weav3r and FF Scouter servers,
 so they never touch your real Cloudflare account, database, email, or any real API.
 
 ```

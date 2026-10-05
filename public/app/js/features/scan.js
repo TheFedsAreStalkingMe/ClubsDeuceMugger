@@ -1,6 +1,6 @@
 // One scan, in stages:
 //   1 choose items  ->  2 read bazaars  ->  3 FF Scouter estimates (every seller)
-//   4 stat filter + keep the highest-value sellers  ->  5 TornStats spies  ->  6 Torn status
+//   4 stat filter + keep the highest-value sellers  ->  5 Torn status
 //
 // Every stage checks `runId` so a cancelled scan stops quickly. "cancelled" errors are silent.
 
@@ -9,7 +9,7 @@ import { pool } from "/js/core/async.js";
 import { fmtMoney } from "/js/core/format.js";
 import { Cache, STORE, save } from "/js/core/storage.js";
 import { state } from "../state.js";
-import { acquireTorn, acquireTornStats } from "./limits.js";
+import { acquireTorn } from "./limits.js";
 import { explainDrops, statVerdict } from "./rules.js";
 import { render, scheduleRender, tick } from "./results.js";
 import { STAGES, countdown, setProgress, setScanMsg, updateRunButtons } from "./ui.js";
@@ -132,34 +132,7 @@ async function estimateStats(call, ids, runId) {
   return cache;
 }
 
-// ---------------------------------------------------------------- 5. TornStats spies
-
-// A real spy beats an estimate. Returns the spy cache (found spies have .found true).
-async function fetchSpies(call, ids, runId) {
-  const cache = new Cache(STORE.spies, 4000);
-  const fresh = (e) => e && Date.now() - e.t < (e.found ? 6 * HOUR : HOUR);
-  const todo = ids.filter((id) => !fresh(cache.get(id)));
-  let done = 0;
-  let failed = false;
-  await pool(todo, 3, async (id) => {
-    if (failed || runId !== state.runId) return;
-    try {
-      await acquireTornStats(runId);
-      const r = await call(`/api/tornstats/spy?id=${id}`, { headers: { "X-TS-Key": state.keys.ts } });
-      if (r.error) { failed = true; setScanMsg(`TornStats key problem: ${r.error}. Using FF Scouter estimates.`, "err"); return; }
-      cache.put(id, { t: Date.now(), found: !!r.found, total: r.total || 0, ts: r.timestamp || 0 });
-    } catch (e) {
-      if (!isCancel(e) && e.retryAfter) await countdown(e.retryAfter, "Pacing TornStats calls...", runId);
-      return; // skip this one, the estimate is used
-    }
-    STAGES.spies(++done / todo.length);
-    setScanMsg(`Checking TornStats spies ${done}/${todo.length}...`);
-  });
-  cache.flush();
-  return cache;
-}
-
-// ---------------------------------------------------------------- 6. Torn status, age, last action
+// ---------------------------------------------------------------- 5. Torn status, age, last action
 
 async function fetchStatuses(call, rows, runId) {
   const ids = [...new Set(rows.map((r) => r.id))];
@@ -240,7 +213,7 @@ export async function scan() {
     };
     rows = rows.filter((r) => {
       const e = estimates.get(r.id) || {};
-      Object.assign(r, { ff: e.ff, bs: e.bs, src: "Est.", spyTs: 0 });
+      Object.assign(r, { ff: e.ff, bs: e.bs });
       return passes(r);
     });
 
@@ -248,17 +221,6 @@ export async function scan() {
     const keep = new Set();
     for (const r of rows) { if (keep.size >= f.maxSellers && !keep.has(r.id)) continue; keep.add(r.id); }
     rows = rows.filter((r) => keep.has(r.id));
-
-    if (state.keys.ts && keep.size) {
-      const spies = await fetchSpies(call, [...keep], runId);
-      if (runId !== state.runId) return;
-      // a real spy replaces the estimate, so check the limits again with it
-      rows = rows.filter((r) => {
-        const spy = spies.get(r.id);
-        if (spy && spy.found) Object.assign(r, { bs: spy.total, src: "Spy", spyTs: spy.ts });
-        return passes(r);
-      });
-    }
 
     state.rows = rows;
     render();

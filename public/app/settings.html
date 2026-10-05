@@ -25,31 +25,33 @@
     <div class="panels">
       <section class="card panel">
         <h2>API key</h2>
-        <p class="hint">One key does everything. It is saved in this browser only. Each request passes through our server and is never stored there.</p>
         <div class="stack">
           <a class="btn green small" id="make-key" target="_blank" rel="noopener noreferrer"
-             href="https://www.torn.com/preferences.php#tab=api?step=addNewKey&amp;title=ClubsDeuceMugger&amp;user=basic,profile,battlestats,attacks">Make my Torn key</a>
-          <p class="hint">Opens Torn with the right permissions filled in (including attacks, which the leaderboard uses to read your mugs). Tap Create there, copy the key, and paste it below.</p>
-          <label>Torn API key <input type="password" id="key-torn" autocomplete="off" spellcheck="false" maxlength="64"></label>
-          <p class="hint">Stat estimates come from FF Scouter, which uses this same key once you have registered at <a href="https://ffscouter.com" target="_blank" rel="noopener noreferrer">ffscouter.com</a> (one time, free).</p>
-          <label>TornStats key (optional) <span class="hint">If TornStats has a real spy on a seller, it shows those stats marked "Spy" instead of the FF Scouter estimate marked "Est."</span>
-            <input type="password" id="key-ts" autocomplete="off" spellcheck="false" maxlength="64"></label>
-          <div class="row"><button class="btn small" id="test-ff" type="button">Test key with FF Scouter</button></div>
-          <div class="stack" id="register-box" hidden>
-            <label class="check"><input type="checkbox" id="ff-agree"> I read FF Scouter's <a href="https://ffscouter.com" target="_blank" rel="noopener noreferrer">data policy and terms</a> and agree</label>
-            <button class="btn green small" id="ff-register" type="button">Register this key with FF Scouter</button>
-          </div>
-          <details>
-            <summary class="hint">Advanced: separate FF Scouter key</summary>
-            <label>FF Scouter key (only if different) <input type="password" id="key-ff" autocomplete="off" spellcheck="false" maxlength="64"></label>
-          </details>
-          <label class="check"><input type="checkbox" id="save-account"> Save my key to my account so it follows me to other devices</label>
-          <p class="hint" id="save-account-hint">The key is stored encrypted on our server. Leave this off to keep it in this browser only.</p>
+             href="https://www.torn.com/preferences.php#tab=api?step=addNewKey&amp;title=ClubsDeuceMugger&amp;user=basic,profile,battlestats,attacks">1. Make my Torn key</a>
+          <p class="hint">Opens Torn with the right permissions. Tap Create, copy the key.</p>
+          <label>2. Paste it here <input type="password" id="key-torn" autocomplete="off" spellcheck="false" maxlength="64"></label>
+          <label class="check"><input type="checkbox" id="save-account"> Keep it on my account for other devices</label>
+          <label id="pass-row" hidden>Your password <span class="hint">Locks the saved key. Only you can unlock it.</span>
+            <input type="password" id="key-pass" autocomplete="current-password" maxlength="128"></label>
           <div class="row">
-            <button class="btn green small" id="save-keys" type="button">Save key</button>
-            <button class="btn ghost small" id="clear-keys" type="button">Clear key</button>
+            <button class="btn green small" id="save-keys" type="button">3. Save</button>
+            <button class="btn ghost small" id="clear-keys" type="button">Clear</button>
           </div>
           <p class="msg" id="keys-msg" role="status" aria-live="polite"></p>
+
+          <details class="more">
+            <summary>FF Scouter (stat estimates)</summary>
+            <div class="stack">
+              <p class="hint">FF Scouter needs a free one-time sign up with your Torn key.</p>
+              <button class="btn small" id="test-ff" type="button">Check my key</button>
+              <div class="stack" id="register-box" hidden>
+                <label class="check"><input type="checkbox" id="ff-agree"> I agree to FF Scouter's <a href="https://ffscouter.com" target="_blank" rel="noopener noreferrer">policy</a></label>
+                <button class="btn green small" id="ff-register" type="button">Sign up with FF Scouter</button>
+              </div>
+              <label>Separate FF Scouter key <span class="hint">Only if they gave you a different one.</span>
+                <input type="password" id="key-ff" autocomplete="off" spellcheck="false" maxlength="64"></label>
+            </div>
+          </details>
         </div>
       </section>
 

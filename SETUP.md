@@ -29,22 +29,14 @@ skipped, so it is safe on every deploy.
    links, and notices when an email address changes. Check spam the first time.
 
 ## 4. Check the bindings
-Worker > **Settings** > **Bindings** should show `DB` (D1: deucemugger), `EMAIL` and `ASSETS`.
+Worker > **Settings** > **Bindings** should show `DB` (D1: deucemugger), `EMAIL` and `ASSETS`. There are no secrets to add.
 
-## 5. Optional: let members save their API key to their account
-The **Save my key to my account** checkbox in Settings needs a secret so keys are stored encrypted:
-1. Worker > **Settings** > **Variables and Secrets** > **Add**.
-2. Type **Secret**, name `KEY_SECRET`, value a long random string of at least 32 characters (a password
-   manager can make one). Keep a copy somewhere safe.
-3. Save and deploy. Until this is set, the checkbox is greyed out.
-4. Never change or lose the value. If it changes, saved keys cannot be read and members must save theirs again.
-
-## 6. Try it
+## 5. Try it
 1. Open `https://clubsdeuce.com` and sign in as `TheFedsAreStalkingMe`.
 2. **Settings** > save your email, then **Invite someone** to make a link.
 3. The new person opens the link, picks a username, email and password, then types the username of the member
    who invited them. If it matches, they are in.
-4. In **Settings**, paste your Torn API key (use **Make my Torn key**), add your battle stats, then go back and scan.
+4. In **Settings**, tap **Make my Torn key**, paste the key and save it. Tick **Keep it on my account** (it asks for your password) to use it on other devices. Add your own battle stats under Jackpot alerts, then go back and hunt.
 
 ## How accounts work
 - Signup is invite only. Members can have one open invite at a time. The owner has no limit.
@@ -54,3 +46,4 @@ The **Save my key to my account** checkbox in Settings needs a secret so keys ar
 - Limits per IP: 10 sign-in tries per 10 minutes, 5 sign-ups per hour. Torn calls stay under 80 per minute in the
   browser, with a server limit of 84.
 - Invite links last 7 days. An application that is never finished is deleted after 7 days.
+- A key kept on the account is locked with the member's password. The server can read it only while they are signed in, and a password reset clears it (they save it again).

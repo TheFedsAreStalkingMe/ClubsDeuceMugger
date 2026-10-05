@@ -17,8 +17,7 @@ export const phase = (from, to) => (fraction) => setProgress(from + (to - from) 
 export const STAGES = {
   items: phase(0, 0.25), // reading bazaars
   estimates: phase(0.25, 0.5), // FF Scouter
-  spies: phase(0.5, 0.6), // TornStats
-  status: phase(0.6, 1), // Torn status checks
+  status: phase(0.5, 1), // Torn status checks
 };
 
 // Waits while counting down on screen, once a second. Stops early if the scan is cancelled.

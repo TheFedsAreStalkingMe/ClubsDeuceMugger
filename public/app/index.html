@@ -28,7 +28,7 @@
     </header>
 
     <div class="alerts" id="alerts" aria-live="polite"></div>
-    <p class="msg info" id="setup-note" hidden>Add your Torn API key in <a href="/app/settings.html">Settings</a> to start scanning.</p>
+    <p class="msg info" id="setup-note" hidden>Add your Torn key in <a href="/app/settings.html">Settings</a> to start.</p>
 
     <section class="feed" id="feed" hidden>
       <div class="feed-head">
@@ -36,73 +36,76 @@
         <span class="hint" id="feed-count"></span>
         <button class="btn ghost small" id="feed-dismiss-all" type="button">Dismiss all</button>
       </div>
-      <p class="hint">Found by auto hunt. Weaker than you, out of hospital soon and offline long enough (set in Settings). Tap X to dismiss one.</p>
+      <p class="hint">Weaker than you, out soon, offline a while (rules in Settings). X dismisses one.</p>
       <div class="results" id="feed-list"></div>
     </section>
 
-    <div class="panels">
-      <section class="card panel">
-        <h2>Items to scan</h2>
-        <div class="stack">
-          <label class="check"><input type="checkbox" id="autoScan"> Auto scan every item whose cheapest listing and market value are at or above the minimum price</label>
-          <label>Max items per scan <span class="hint">Most valuable first. The watchlist below is always included.</span>
-            <input type="number" id="maxItems" inputmode="numeric" min="1" max="150" step="1"></label>
-        </div>
-        <label>Auto hunt rescans every (seconds) <span class="hint">Auto hunt keeps scanning and collects good mugs in the feed.</span>
-          <input type="number" id="autoEvery" inputmode="numeric" min="30" max="3600" step="1"></label>
-        <h3 class="sub-h">Watchlist (always scanned)</h3>
-        <form class="row" id="watch-form">
-          <input type="number" id="watch-id" inputmode="numeric" min="1" step="1" placeholder="Item ID (e.g. 206)" aria-label="Item ID">
-          <button class="btn small" type="submit">Add</button>
-        </form>
-        <div class="chips" id="chips"></div>
-      </section>
+    <section class="card hunt">
+      <h2>Hunt</h2>
+      <div class="stack">
+        <div class="label">Items worth at least
+          <div class="slider-row"><input type="range" id="minPrice-r" min="0" max="100" step="1"><input type="number" id="minPrice" inputmode="numeric" min="1000000" step="1000000" aria-label="Items worth at least"></div>
+          <span class="hint">Skips cheap items. $1m or more.</span></div>
+        <div class="label">Targets weaker than
+          <div class="slider-row"><input type="range" id="maxBs-r" min="0" max="1000"><input type="number" id="maxBs" inputmode="numeric" min="0" step="1" aria-label="Targets weaker than"></div>
+          <span class="hint">Their estimated total battle stats.</span></div>
+        <label>Item sells
+          <select id="minActivity">
+            <option value="0">at any speed</option>
+            <option value="5">fast</option>
+            <option value="15">very fast</option>
+          </select>
+          <span class="hint">How often its listings change.</span></label>
+      </div>
 
-      <section class="card panel">
-        <h2>Filters</h2>
+      <details class="more">
+        <summary>More options</summary>
         <div class="stack">
-          <div class="label">Minimum item price ($1m or more)
-            <div class="slider-row"><input type="range" id="minPrice-r" min="0" max="100" step="1"><input type="number" id="minPrice" inputmode="numeric" min="1000000" step="1000000" aria-label="Minimum item price"></div></div>
-          <div class="label">Min battle stats (estimate)
-            <div class="slider-row"><input type="range" id="minBs-r" min="0" max="1000"><input type="number" id="minBs" inputmode="numeric" min="0" step="1" aria-label="Minimum battle stats"></div></div>
-          <div class="label">Max battle stats (estimate)
-            <div class="slider-row"><input type="range" id="maxBs-r" min="0" max="1000"><input type="number" id="maxBs" inputmode="numeric" min="0" step="1" aria-label="Maximum battle stats"></div></div>
+          <div class="label">Targets stronger than
+            <div class="slider-row"><input type="range" id="minBs-r" min="0" max="1000"><input type="number" id="minBs" inputmode="numeric" min="0" step="1" aria-label="Targets stronger than"></div></div>
           <div class="label">Max fair fight
-            <div class="slider-row"><input type="range" id="maxFf-r" min="1" max="10" step="0.01"><input type="number" id="maxFf" inputmode="decimal" min="1" max="10" step="0.01" aria-label="Maximum fair fight"></div></div>
-          <div class="label">Listing price within % of market value
-            <span class="hint">Skips listings priced far from what the item sells for. 0 turns this check off.</span>
-            <div class="slider-row"><input type="range" id="priceTol-r" min="0" max="100" step="1"><input type="number" id="priceTol" inputmode="numeric" min="0" max="100" step="1" aria-label="Percent of market value"></div></div>
-          <label>Min trade activity <span class="hint">Listings that changed in the last hour. Busy items sell fast. 0 turns this off.</span>
-            <input type="number" id="minActivity" inputmode="numeric" min="0" max="100" step="1"></label>
-          <label class="check"><input type="checkbox" id="includeUnknown"> Include players with no stat estimate</label>
-          <label>Max sellers to check <span class="hint">Highest value first. Stats are checked on every seller before this limit is applied.</span>
+            <div class="slider-row"><input type="range" id="maxFf-r" min="1" max="10" step="0.01"><input type="number" id="maxFf" inputmode="decimal" min="1" max="10" step="0.01" aria-label="Max fair fight"></div></div>
+          <div class="label">Price within % of market
+            <div class="slider-row"><input type="range" id="priceTol-r" min="0" max="100" step="1"><input type="number" id="priceTol" inputmode="numeric" min="0" max="100" step="1" aria-label="Price within percent of market"></div>
+            <span class="hint">Skips overpriced listings. 0 = off.</span></div>
+          <label class="check"><input type="checkbox" id="includeUnknown"> Keep players with no stat estimate</label>
+          <label class="check"><input type="checkbox" id="autoScan"> Scan every item above the price</label>
+          <label>Items per scan <span class="hint">Highest value first.</span>
+            <input type="number" id="maxItems" inputmode="numeric" min="1" max="150" step="1"></label>
+          <label>Sellers to check <span class="hint">Highest value first.</span>
             <input type="number" id="maxSellers" inputmode="numeric" min="1" max="500" step="1"></label>
+          <label>Auto hunt repeats every (seconds)
+            <input type="number" id="autoEvery" inputmode="numeric" min="30" max="3600" step="1"></label>
+          <div class="label">Always scan these items
+            <form class="row" id="watch-form">
+              <input type="number" id="watch-id" inputmode="numeric" min="1" step="1" placeholder="Item ID" aria-label="Item ID">
+              <button class="btn small" type="submit">Add</button>
+            </form>
+            <div class="chips" id="chips"></div></div>
         </div>
-      </section>
-    </div>
+      </details>
 
-    <div class="progress" aria-hidden="true"><div id="bar"></div></div>
-    <div class="scanbar">
-      <button class="btn green" id="scan" type="button">Scan bazaars &clubs;</button>
-      <button class="btn ghost" id="auto" type="button">Start auto hunt</button>
-      <button class="btn ghost" id="cancel" type="button" hidden>Cancel scan</button>
-    </div>
-    <p class="msg info" id="scan-msg" role="status" aria-live="polite"></p>
+      <div class="progress" aria-hidden="true"><div id="bar"></div></div>
+      <div class="scanbar">
+        <button class="btn green" id="scan" type="button">Scan once &clubs;</button>
+        <button class="btn ghost" id="auto" type="button">Start auto hunt</button>
+        <button class="btn ghost" id="cancel" type="button" hidden>Cancel</button>
+      </div>
+      <p class="hint">Auto hunt keeps scanning and collects good mugs in the feed.</p>
+      <p class="msg info" id="scan-msg" role="status" aria-live="polite"></p>
+    </section>
 
     <div class="sortbar">
-      <label>Sort by
+      <label>Sort
         <select id="sort">
-          <option value="stats">Battle stats</option>
-          <option value="hospital">Hospital time</option>
-          <option value="age">Account age</option>
-          <option value="price">Price</option>
-          <option value="activity">Trade activity</option>
-        </select>
-      </label>
-      <label>Order
-        <select id="dir">
-          <option value="asc">Ascending</option>
-          <option value="desc">Descending</option>
+          <option value="stats:asc">Weakest first</option>
+          <option value="stats:desc">Strongest first</option>
+          <option value="hospital:asc">Out of hospital soonest</option>
+          <option value="price:asc">Cheapest first</option>
+          <option value="price:desc">Priciest first</option>
+          <option value="activity:desc">Busiest items first</option>
+          <option value="age:asc">Newest accounts</option>
+          <option value="age:desc">Oldest accounts</option>
         </select>
       </label>
     </div>

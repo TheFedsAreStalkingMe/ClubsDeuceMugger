@@ -1,4 +1,4 @@
-// Calls to outside services (Torn, Weav3r, FF Scouter, TornStats).
+// Calls to outside services (Torn, Weav3r, FF Scouter).
 
 import { USER_AGENT } from "../config.js";
 
