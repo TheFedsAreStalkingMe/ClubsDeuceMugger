@@ -32,7 +32,7 @@ export const section = (title) => console.log(`\n${title}`);
 const now = () => Math.floor(Date.now() / 1000);
 // Test control: statuses the fake Torn reports, by player id. Change them with setFakeStatus().
 const statusOverride = {};
-const flags = { attacklogFail: false, weav3rBusy: false, deep: false };
+const flags = { attacklogFail: false, weav3rBusy: false, deep: false, typesFail: false };
 export async function setFakeFlag(name, on) {
   await fetch(`http://localhost:${FAKE_PORT}/__flag?name=${name}&on=${on ? 1 : 0}`);
 }
@@ -149,6 +149,7 @@ function fakeServer() {
     // Torn companies (inactive earners): types 12 Mining Corporation and 5 Flower Shop
     //   501 Deep Co (10 stars): Pia 10 days idle, Quin 2 days idle, Rex 30 days idle and in hospital
     //   502 Shallow Co (4 stars): Sam 20 days idle        601 Petals (5 stars, Flower Shop): Tess 15 days idle
+    if (p === "/v2/torn/companies" && (flags.typesFail || u.searchParams.has("striptags"))) return send({ error: { code: flags.typesFail ? 2 : 23, error: flags.typesFail ? "Incorrect key" : "Unknown parameter" } });
     if (p === "/v2/torn/companies") return send({ companies: [{ id: 12, name: "Mining Corporation", cost: 1, employees: 10 }, { id: 5, name: "Flower Shop", cost: 1, employees: 10 }] });
     let m;
     if ((m = p.match(/^\/v2\/company\/(\d+)\/companies$/))) {

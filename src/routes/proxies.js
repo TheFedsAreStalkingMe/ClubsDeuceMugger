@@ -143,7 +143,8 @@ async function tornPublic(env, request, user, path, params = {}) {
   const blocked = await throttle(env, "torn", String(user.id), TORN_PER_MINUTE, 60);
   if (blocked) return { response: blocked };
   try {
-    return { data: await tornV2(upstream(env).tornV2, path, { striptags: "true", ...params }, key) };
+    const query = Object.fromEntries(Object.entries({ striptags: "true", ...params }).filter(([, v]) => v != null)); // a null param is left out
+    return { data: await tornV2(upstream(env).tornV2, path, query, key) };
   } catch (e) {
     if (e.code) return { response: json({ error: e.message, code: e.code }) };
     return { response: fail("Torn sent bad data.", 502) };
@@ -152,7 +153,7 @@ async function tornPublic(env, request, user, path, params = {}) {
 
 // Every company type: id and name (about 40 of them; they almost never change).
 export async function companyTypes({ request, env, user }) {
-  const { data, response } = await tornPublic(env, request, user, "/torn/companies");
+  const { data, response } = await tornPublic(env, request, user, "/torn/companies", { striptags: null }); // this endpoint takes no striptags
   if (response) return response;
   return json({ types: (data.companies || []).map((t) => ({ id: t.id, name: t.name })) });
 }

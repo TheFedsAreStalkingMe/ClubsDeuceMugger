@@ -251,3 +251,5 @@ details.more[open] > summary { margin-bottom: 10px; }
 .rarity-orange { color: #ff9a3c; }
 .rarity-red { color: #ff5470; }
 .bonus-line { font-weight: 700; margin: 4px 0 0; }
+
+.suggested { color: var(--club); font-weight: 700; }

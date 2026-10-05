@@ -280,6 +280,17 @@ async function runChecks() {
   await page.goto(BASE + "/app/earners.html");
   await page.waitForSelector("#types label");
   check("company types listed, Mining ticked the first time", (await page.$$("#types label")).length === 2 && (await page.isChecked("#types label:first-child input")));
+  check("the best earning types are marked [ Suggested ] and listed first", /Mining Corporation\s*\[ Suggested \]/.test(await text("#types label:first-child")) && !/Suggested/.test(await text("#types label:last-child")), await text("#types"));
+  // A failed load is explained inside the list, and Try again works.
+  await setFakeFlag("typesFail", true);
+  await page.evaluate(() => localStorage.removeItem("cdm.earn.cache"));
+  await page.reload();
+  await page.waitForSelector("#types .msg.err");
+  check("a failed list says why and offers Try again", /Could not load company types: Torn: ?Incorrect key|Incorrect key/.test(await text("#types")) && (await page.isVisible("#types button")), await text("#types"));
+  await setFakeFlag("typesFail", false);
+  await page.click("#types button");
+  await page.waitForSelector("#types label");
+  check("Try again loads the list", (await page.$$("#types label")).length === 2);
   await page.click("#scan");
   await scanDone();
   let efound = await earnCards();

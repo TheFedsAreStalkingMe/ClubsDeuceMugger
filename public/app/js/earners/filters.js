@@ -6,6 +6,11 @@ import { fromLog, slide, toLog } from "../features/sliders.js";
 import { render } from "./results.js";
 import { earn } from "./state.js";
 
+// The company types with the highest average income (Tornstats' average weekly income by type, Oct 2026), best first.
+// Matched by name against Torn's list.
+const SUGGESTED = ["Oil Rig", "Mining Corporation", "Logistics Management", "Television Network", "Private Security Firm"];
+const suggestedRank = (t) => SUGGESTED.findIndex((n) => n.toLowerCase() === String(t.name).toLowerCase());
+
 const persist = () => save(STORE.earnFilters, earn.filters);
 const bindSlider = (name, opts = {}) => slide(name, { target: earn.filters, save: persist, ...opts });
 
@@ -26,7 +31,12 @@ export function renderTypes() {
     const mining = earn.types.find((t) => /mining/i.test(t.name));
     if (mining) { f.types = [mining.id]; persist(); }
   }
-  $("types").replaceChildren(...earn.types.map((t) => {
+  const ordered = [...earn.types].sort((a, b) => {
+    const x = suggestedRank(a), y = suggestedRank(b);
+    if (x >= 0 || y >= 0) return (x < 0 ? 99 : x) - (y < 0 ? 99 : y); // suggested first, best income first
+    return a.name.localeCompare(b.name);
+  });
+  $("types").replaceChildren(...ordered.map((t) => {
     const box = el("input", { type: "checkbox" });
     box.checked = f.types.includes(t.id);
     box.addEventListener("change", () => {
@@ -34,7 +44,7 @@ export function renderTypes() {
       persist();
       $("types-count").textContent = `${f.types.length} selected`;
     });
-    return el("label", { class: "check" }, box, ` ${t.name}`);
+    return el("label", { class: "check" }, box, ` ${t.name}`, suggestedRank(t) >= 0 ? el("span", { class: "suggested", text: " [ Suggested ]" }) : null);
   }));
   $("types-count").textContent = `${f.types.length} selected`;
 }
@@ -59,4 +69,12 @@ export function initEarnFilters() {
   sort.value = `${f.sort}:${f.dir}`;
   if (!sort.value) sort.value = "cash:desc";
   sort.addEventListener("change", () => { [f.sort, f.dir] = sort.value.split(":"); persist(); render(); });
+}
+
+// The list could not be loaded: say why, inside the list, with a way to try again.
+export function showTypesError(message, retry) {
+  const again = el("button", { class: "btn small", type: "button", text: "Try again" });
+  again.addEventListener("click", retry);
+  $("types").replaceChildren(el("span", { class: "msg err", text: `Could not load company types: ${message}` }), again);
+  $("types-count").textContent = "";
 }
