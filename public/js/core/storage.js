@@ -10,7 +10,7 @@ export const STORE = {
   profiles: "cdm.profiles", // Torn status cache
   ff: "cdm.ff", // FF Scouter estimate cache
   tornCalls: "cdm.calls", // timestamps of recent Torn calls (rate limiter)
-  lastClick: "cdm.lastClick",
+  taps: "cdm.taps", // Attack taps not yet confirmed by a leaderboard check: [{ target, at }]
   lastSync: "cdm.lastSync",
 };
 

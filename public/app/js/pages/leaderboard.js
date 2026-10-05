@@ -5,6 +5,8 @@ import { api } from "/js/core/api.js";
 import { $, el, say } from "/js/core/dom.js";
 import { fmtMoney } from "/js/core/format.js";
 import { loadKeys } from "/js/core/storage.js";
+import { runLeaderboardCheck } from "../features/tracking.js";
+import { watchForUpdates } from "/js/core/update.js";
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
@@ -32,8 +34,8 @@ async function checkMyMugs(quiet) {
   if (!key) return quiet || say("sync-msg", "Add your Torn key in Settings first.", "err");
   if (!quiet) say("sync-msg", "Checking your attacks...", "info");
   try {
-    const d = await api("/api/leaderboard/sync", { method: "POST", headers: { "X-Torn-Key": key }, body: {} });
-    if (!quiet) say("sync-msg", `${d.note || "Checked."} (Linked to ${d.linked}.)`, d.counted ? "ok" : "info");
+    const d = await runLeaderboardCheck(key);
+    if (!quiet) say("sync-msg", `${d.note || "Checked."} (Linked to ${d.linked}. Taps ${d.taps}, attacks ${d.attacks}, mugs ${d.mugs}, matched ${d.matched}.)`, d.counted ? "ok" : "info");
     await loadBoard();
   } catch (e) {
     if (!quiet) say("sync-msg", e.message, "err");
@@ -43,3 +45,5 @@ async function checkMyMugs(quiet) {
 $("range").addEventListener("change", loadBoard);
 $("sync").addEventListener("click", () => checkMyMugs(false));
 loadBoard().then(() => checkMyMugs(true)).catch((e) => say("sync-msg", e.message, "err"));
+
+watchForUpdates();

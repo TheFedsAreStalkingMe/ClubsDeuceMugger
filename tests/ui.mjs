@@ -84,6 +84,18 @@ async function runChecks() {
   await scanDone();
   check("empty result says why", /are over your max stats/.test(await text("#scan-msg")), await text("#scan-msg"));
 
+  section("Attack taps");
+  await page.context().route("https://www.torn.com/**", (route) => route.abort());
+  page.context().on("page", (p) => p.close().catch(() => {})); // Torn opens in a new tab; not needed here
+  await setStore("cdm.filters", filters);
+  await page.reload();
+  await page.click("#scan");
+  await scanDone();
+  await page.evaluate(() => localStorage.removeItem("cdm.taps"));
+  await page.click("#results .target a:has-text('Attack')");
+  const taps = await page.evaluate(() => JSON.parse(localStorage.getItem("cdm.taps") || "[]"));
+  check("tapping Attack saves the tap on the phone", taps.length === 1 && Number.isInteger(taps[0].target) && taps[0].at > 1e9, JSON.stringify(taps));
+
   section("Stacks");
   const names = async () => (await cards("#results")).map((c) => c.name).sort().join();
   // Singles only, $20m minimum: Gold Bar's cheapest listing is $19.5m, so it is skipped. Silver Bar counts.
@@ -216,6 +228,20 @@ async function runChecks() {
   await page.click("#test-ff");
   await page.waitForFunction(() => document.getElementById("keys-msg").textContent.length > 12);
   check("FF Scouter key test answers", /FF Scouter/.test(await text("#keys-msg")), await text("#keys-msg"));
+
+  section("Update notice");
+  let fakeBuild = "build-A";
+  await page.route("**/api/me", async (route) => {
+    const res = await route.fetch();
+    await route.fulfill({ response: res, json: { ...(await res.json()), build: fakeBuild } });
+  });
+  await page.goto(BASE + "/app/settings.html");
+  await page.waitForTimeout(800);
+  check("no update bar when nothing changed", (await page.$("#update-bar")) === null);
+  fakeBuild = "build-B";
+  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+  check("update bar appears after a new deploy", await page.waitForSelector("#update-bar", { timeout: 5000 }).then(() => true, () => false));
+  await page.unroute("**/api/me");
 
   section("Leaderboard");
   await page.goto(BASE + "/app/leaderboard.html");

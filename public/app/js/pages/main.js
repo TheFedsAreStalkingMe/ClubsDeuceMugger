@@ -14,6 +14,7 @@ import { syncLeaderboard } from "../features/tracking.js";
 import { updateRunButtons } from "../features/ui.js";
 import { initWatch } from "../features/watchlist.js";
 import { state } from "../state.js";
+import { watchForUpdates } from "/js/core/update.js";
 
 // A key saved to the account follows you to a new browser.
 async function loadAccountKeys() {
@@ -61,3 +62,5 @@ async function boot() {
 }
 
 boot();
+
+watchForUpdates();

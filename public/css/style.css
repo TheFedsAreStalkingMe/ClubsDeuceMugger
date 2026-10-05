@@ -227,6 +227,9 @@ details.more[open] > summary { margin-bottom: 10px; }
 .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .btns .btn::after { content: "->"; } /* these open Torn */
 
+/* "A new version is ready" bar */
+.update-bar { display: flex; gap: 12px; align-items: center; justify-content: center; flex-wrap: wrap; padding: 8px 12px; border-bottom: 2px solid var(--club); background: #04180c; color: var(--club); }
+
 /* ---------- 7. Small screens ---------- */
 
 @media (max-width: 480px) { .slider-row { grid-template-columns: 1fr 100px; } }

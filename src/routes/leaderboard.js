@@ -9,13 +9,26 @@ import { tornV2 } from "../lib/upstream.js";
 const TORN_KEY_ERRORS = [2, 10, 13, 16];
 const MAX_LOGS_PER_SYNC = 8; // attack logs fetched per check, to keep each sync small
 
+const validTarget = (t) => Number.isInteger(t) && t >= 1 && t <= 9999999999;
+
+// A tap time from the phone is trusted only if it is plausible (in the last day, not in the future).
+const tapTime = (at) => (Number.isInteger(at) && at > nowSec() - 86400 && at <= nowSec() + 60 ? at : nowSec());
+
+// Records an Attack tap unless the same tap (same player, within 5 seconds) is already there.
+async function addTap(env, userId, target, at) {
+  await env.DB.prepare(
+    `INSERT INTO clicks (user_id, target_id, clicked_at)
+     SELECT ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM clicks WHERE user_id = ? AND target_id = ? AND clicked_at BETWEEN ? AND ?)`
+  ).bind(userId, target, at, userId, target, at - 5, at + 5).run();
+}
+
 // The member tapped Attack on a player.
 export async function recordClick({ request, env, user }) {
-  const { target } = await readJson(request);
-  if (!Number.isInteger(target) || target < 1 || target > 9999999999) return fail("Bad target.");
+  const { target, at } = await readJson(request);
+  if (!validTarget(target)) return fail("Bad target.");
   const blocked = await throttle(env, "click", String(user.id), 120, 3600);
   if (blocked) return blocked;
-  await env.DB.prepare("INSERT INTO clicks (user_id, target_id, clicked_at) VALUES (?, ?, ?)").bind(user.id, target, nowSec()).run();
+  await addTap(env, user.id, target, tapTime(at));
   return json({ ok: true });
 }
 
@@ -67,6 +80,13 @@ export async function syncMugs({ request, env, user }) {
       throw err;
     }
     const result = { ok: true, linked: basic.profile.name, counted: 0, checked: 0, taps: 0, attacks: 0, mugs: 0, matched: 0 };
+
+    // The phone keeps its own list of Attack taps and sends it with every check, so a tap whose request was
+    // lost (the app was suspended as Torn opened) still counts.
+    const sent = (await readJson(request)).taps;
+    for (const t of (Array.isArray(sent) ? sent : []).slice(0, 100)) {
+      if (t && validTarget(t.target) && Number.isInteger(t.at)) await addTap(env, user.id, t.target, tapTime(t.at));
+    }
 
     const now = nowSec();
     const { results: clicks } = await env.DB.prepare(

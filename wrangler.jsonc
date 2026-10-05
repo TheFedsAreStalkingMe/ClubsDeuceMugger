@@ -28,6 +28,9 @@
     }
   ],
 
+  // Lets open pages notice a new deploy (see /api/me and public/js/core/update.js).
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
+
   // Email sending: env.EMAIL.send()
   "send_email": [
     {

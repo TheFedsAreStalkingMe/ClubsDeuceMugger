@@ -9,7 +9,12 @@ import { sendMail } from "../lib/mail.js";
 import { throttle } from "../lib/ratelimit.js";
 
 export const me = ({ env, user }) =>
-  json({ username: user.username, email: user.email || "", isOwner: isOwner(env, user.username) });
+  json({
+    username: user.username,
+    email: user.email || "",
+    isOwner: isOwner(env, user.username),
+    build: (env.CF_VERSION_METADATA && env.CF_VERSION_METADATA.id) || "", // changes with every deploy
+  });
 
 export async function logout({ env, user }) {
   await env.DB.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(user.tokenHash).run();

@@ -236,6 +236,13 @@ async function runChecks() {
   check("board adds the second mug", r.data.rows[0].total === 5000000 && r.data.rows[0].mugs === 2, JSON.stringify(r.data));
   r = await bob.get("/api/leaderboard?range=day");
   check("24 hour board", r.data.rows.length === 1);
+  // the phone sends its own list of taps with the check, so a lost quick request does not matter
+  r = await bob.post("/api/leaderboard/sync", { taps: [{ target: 999, at: Math.floor(Date.now() / 1000) - 2 }, { target: "bad", at: 1 }] }, { headers: K });
+  check("taps sent with the check are used", r.data.counted === 1 && r.data.taps >= 1, JSON.stringify(r.data));
+  r = await bob.post("/api/leaderboard/sync", { taps: [{ target: 999, at: Math.floor(Date.now() / 1000) - 2 }] }, { headers: K });
+  check("the same tap sent twice is one tap", r.data.counted === 0, JSON.stringify(r.data));
+  r = await bob.get("/api/me");
+  check("me carries a build id for update notices", typeof r.data.build === "string");
   r = await anon.get("/api/leaderboard");
   check("board needs sign-in", r.status === 401);
   // a second member cannot claim the same Torn player
