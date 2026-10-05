@@ -173,6 +173,7 @@ function initFilters() {
   bindFilter("minBs", { log: true });
   bindFilter("maxBs", { log: true });
   bindFilter("maxFf", { log: false });
+  bindFilter("priceTol", { log: false });
   const auto = $("autoScan");
   auto.checked = !!state.filters.autoScan;
   auto.addEventListener("change", () => { state.filters.autoScan = auto.checked; save(LS.filters, state.filters); });
@@ -181,12 +182,6 @@ function initFilters() {
   mi.addEventListener("input", () => {
     const v = Math.min(150, Math.max(1, parseInt(mi.value, 10) || 40));
     state.filters.maxItems = v; save(LS.filters, state.filters);
-  });
-  const pt = $("priceTol");
-  pt.value = state.filters.priceTol;
-  pt.addEventListener("input", () => {
-    const v = Math.min(100, Math.max(0, parseInt(pt.value, 10) || 0));
-    state.filters.priceTol = v; save(LS.filters, state.filters);
   });
   const ms = $("maxSellers");
   ms.value = state.filters.maxSellers;

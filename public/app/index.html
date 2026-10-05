@@ -59,8 +59,9 @@
             <div class="slider-row"><input type="range" id="maxBs-r" min="0" max="1000"><input type="number" id="maxBs" inputmode="numeric" min="0" step="1" aria-label="Maximum battle stats"></div></div>
           <div class="label">Max fair fight
             <div class="slider-row"><input type="range" id="maxFf-r" min="1" max="3" step="0.01"><input type="number" id="maxFf" inputmode="decimal" min="1" max="3" step="0.01" aria-label="Maximum fair fight"></div></div>
-          <label>Listing price within % of market value <span class="hint">Skips listings priced far from what the item really sells for. 0 turns this check off.</span>
-            <input type="number" id="priceTol" inputmode="numeric" min="0" max="100" step="1"></label>
+          <div class="label">Listing price within % of market value
+            <span class="hint">Skips listings priced far from what the item sells for. 0 turns this check off.</span>
+            <div class="slider-row"><input type="range" id="priceTol-r" min="0" max="100" step="1"><input type="number" id="priceTol" inputmode="numeric" min="0" max="100" step="1" aria-label="Percent of market value"></div></div>
           <label>Max sellers to check <span class="hint">Highest value listings first</span>
             <input type="number" id="maxSellers" inputmode="numeric" min="1" max="500" step="1"></label>
         </div>
