@@ -57,7 +57,7 @@ async function runChecks() {
   await page.click("details.more > summary");
   check("More options opens", (await page.isVisible("#maxFf")) && (await page.isVisible("#watch-form")));
   await page.click("details.more > summary");
-  check("one sort menu", (await page.$$("#sort option")).length === 8 && (await page.$("#dir")) === null);
+  check("one sort menu", (await page.$$("#sort option")).length === 9 && (await page.$("#dir")) === null);
 
   section("Scan");
   const filters = { minPrice: 15000000, priceTol: 100, maxItems: 5, autoScan: true, maxSellers: 20 };
