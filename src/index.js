@@ -1,4 +1,4 @@
-// Clubs Deuce Mugger Worker: auth, account approval, and API proxies.
+// Clubs Deuce Mugger Worker: auth, invites, recovery, and API proxies.
 // Static files in /public are served through env.ASSETS (run_worker_first),
 // and everything under /app is only served to signed-in users.
 
@@ -62,10 +62,10 @@ async function route(request, env, ctx) {
 async function api(request, env, url, path, method) {
   // ---- public endpoints ----
   if (path === "/api/signup" && method === "POST") return signup(request, env);
-  if (path === "/api/signup/sponsor" && method === "POST") return signupSponsor(request, env);
+  if (path === "/api/signup/vouch" && method === "POST") return signupVouch(request, env);
+  if (path === "/api/recover" && method === "POST") return recover(request, env);
+  if (path === "/api/reset" && method === "POST") return resetPassword(request, env);
   if (path === "/api/login" && method === "POST") return login(request, env);
-  if (path === "/api/approval/preview" && method === "POST") return approvalPreview(request, env);
-  if (path === "/api/approval/confirm" && method === "POST") return approvalConfirm(request, env);
 
   // ---- signed-in endpoints ----
   const user = await getUser(request, env);
@@ -103,6 +103,7 @@ async function signup(request, env) {
   const password = typeof body.password === "string" ? body.password : "";
   const confirm = typeof body.confirm === "string" ? body.confirm : "";
   const invite = typeof body.invite === "string" ? body.invite : "";
+  const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
 
   if (!TOKEN_RE.test(invite)) return json({ error: "You need an invite link from a member to apply." }, 403);
   const inviteHash = await sha256(invite);
@@ -118,6 +119,7 @@ async function signup(request, env) {
     return json({ error: "Password must be 8-128 characters." }, 400);
   }
   if (password !== confirm) return json({ error: "Passwords do not match." }, 400);
+  if (!EMAIL_RE.test(email) || email.length > 254) return json({ error: "Enter a valid email address." }, 400);
 
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const hash = await pbkdf2(password, salt, PBKDF2_ITERATIONS);
@@ -126,14 +128,15 @@ async function signup(request, env) {
   let userId;
   try {
     const res = await env.DB.prepare(
-      "INSERT INTO users (username, password_hash, salt, iterations, status, created_at, invited_by) VALUES (?, ?, ?, ?, 'pending', ?, ?)"
+      "INSERT INTO users (username, email, password_hash, salt, iterations, status, created_at, invited_by) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)"
     )
-      .bind(username, b64(hash), b64(salt), PBKDF2_ITERATIONS, now, inviteRow.inviter_id)
+      .bind(username, email, b64(hash), b64(salt), PBKDF2_ITERATIONS, now, inviteRow.inviter_id)
       .run();
     userId = res.meta.last_row_id;
   } catch (err) {
     if (String(err && err.message).includes("UNIQUE")) {
-      return json({ error: "That username is taken or already has an application." }, 409);
+      const msg = String(err.message);
+      return json({ error: /email/i.test(msg) ? "That email is already used by another account." : "That username is taken." }, 409);
     }
     throw err;
   }
@@ -159,79 +162,128 @@ async function newApplySession(env, userId) {
   return token;
 }
 
-// Step 2: the applicant names the member who invited them. The approval links go to that member.
-async function signupSponsor(request, env) {
-  const rl = await rateLimit(env, "sponsor", clientIp(request), 10, 3600);
-  if (!rl.ok) return tooMany(rl);
-
+// Step 2: the applicant types the username of the member who invited them. A match grants access.
+async function signupVouch(request, env) {
   const body = await readJson(request);
   const applyToken = typeof body.applyToken === "string" ? body.applyToken : "";
-  const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
-  if (!EMAIL_RE.test(email) || email.length > 254) return json({ error: "Enter a valid email address." }, 400);
+  const typed = typeof body.inviter === "string" ? body.inviter.trim() : "";
   if (!TOKEN_RE.test(applyToken)) return json({ error: "Your application session expired. Sign in to continue." }, 400);
 
   const row = await env.DB.prepare(
-    `SELECT u.id, u.username, u.invited_by, u.approval_sent FROM apply_sessions s JOIN users u ON u.id = s.user_id
+    `SELECT u.id, u.username, u.email, u.invited_by FROM apply_sessions s JOIN users u ON u.id = s.user_id
      WHERE s.token_hash = ? AND s.expires_at > ? AND u.status = 'pending'`
   ).bind(await sha256(applyToken), nowSec()).first();
   if (!row) return json({ error: "Your application session expired. Sign in to continue." }, 404);
-  if (row.approval_sent) return json({ error: "Application sent, waiting for approval" }, 409);
+
+  // Limit guesses per application (and per IP).
+  const rl = await rateLimit(env, "vouch", String(row.id), 5, 3600);
+  const rlIp = await rateLimit(env, "vouch-ip", clientIp(request), 15, 3600);
+  if (!rl.ok || !rlIp.ok) return tooMany(rl.ok ? rlIp : rl);
 
   const inviter = row.invited_by
     ? await env.DB.prepare("SELECT id, username, email FROM users WHERE id = ? AND status = 'active'").bind(row.invited_by).first()
     : null;
-  if (!inviter) return json({ error: "The member who invited you is no longer active." }, 400);
-  const expected = (inviter.email || (isOwner(env, inviter.username) ? env.ADMIN_EMAIL : "") || "").toLowerCase();
-  if (!expected) return json({ error: "The member who invited you has not set an email yet. Ask them to add one in Settings." }, 400);
-  if (expected !== email) return json({ error: "That is not the email of the member who invited you." }, 400);
+  if (!inviter) return json({ error: "The member who invited you is no longer here." }, 400);
+  const match = await env.DB.prepare("SELECT id FROM users WHERE username = ? AND status = 'active'").bind(typed).first();
+  if (!match || match.id !== inviter.id) return json({ error: "That is not the member who invited you." }, 400);
 
-  const approveToken = randomToken();
-  const denyToken = randomToken();
-  const expires = nowSec() + APPROVAL_SECONDS;
+  const now = nowSec();
   await env.DB.batch([
-    env.DB.prepare("INSERT INTO approval_tokens (token_hash, user_id, action, expires_at) VALUES (?, ?, 'approve', ?)")
-      .bind(await sha256(approveToken), row.id, expires),
-    env.DB.prepare("INSERT INTO approval_tokens (token_hash, user_id, action, expires_at) VALUES (?, ?, 'deny', ?)")
-      .bind(await sha256(denyToken), row.id, expires),
-  ]);
-
-  const base = (env.APP_URL || new URL(request.url).origin).replace(/\/$/, "");
-  const approveUrl = `${base}/approve.html?t=${approveToken}`;
-  const denyUrl = `${base}/approve.html?t=${denyToken}`;
-  const message = (to) => ({
-    to,
-    from: env.FROM_EMAIL,
-    subject: `Clubs Deuce Mugger: application from ${row.username}`,
-    text:
-      `${row.username} applied using an invite from ${inviter.username}.\n\n` +
-      `Approve: ${approveUrl}\n` +
-      `Deny: ${denyUrl}\n\n` +
-      `Links work once and expire in 7 days.`,
-    html:
-      `<div style="font-family:Arial,sans-serif;background:#000;color:#eee;padding:24px">` +
-      `<h2 style="color:#b983e8;margin:0 0 12px">&#9827; Clubs Deuce Mugger</h2>` +
-      `<p>New application from <b>${escapeHtml(row.username)}</b>, invited by <b>${escapeHtml(inviter.username)}</b>.</p>` +
-      `<p><a href="${approveUrl}" style="background:#3ddc7a;color:#000;padding:12px 22px;text-decoration:none;font-weight:bold">Approve</a> &nbsp; ` +
-      `<a href="${denyUrl}" style="background:#a066d6;color:#000;padding:12px 22px;text-decoration:none;font-weight:bold">Deny</a></p>` +
-      `<p style="color:#999;font-size:12px">Links work once and expire in 7 days.</p></div>`,
-  });
-
-  try {
-    await env.EMAIL.send(message(expected));
-  } catch (err) {
-    console.error("email failed", err && err.message);
-    await env.DB.prepare("DELETE FROM approval_tokens WHERE user_id = ?").bind(row.id).run();
-    return json({ error: "Could not send the email. Please try again later." }, 502);
-  }
-  // The site owner gets a copy so they can always step in.
-  if (env.ADMIN_EMAIL && env.ADMIN_EMAIL.toLowerCase() !== expected) {
-    try { await env.EMAIL.send(message(env.ADMIN_EMAIL)); } catch (err) { console.error("owner copy failed", err && err.message); }
-  }
-  await env.DB.batch([
-    env.DB.prepare("UPDATE users SET approval_sent = 1 WHERE id = ?").bind(row.id),
+    env.DB.prepare("UPDATE users SET status = 'active', approved_at = ? WHERE id = ? AND status = 'pending'").bind(now, row.id),
     env.DB.prepare("DELETE FROM apply_sessions WHERE user_id = ?").bind(row.id),
   ]);
-  return json({ ok: true, message: "Application sent, waiting for approval" });
+
+  const token = randomToken();
+  await env.DB.prepare("INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)")
+    .bind(await sha256(token), row.id, now, now + SESSION_SECONDS)
+    .run();
+
+  // Welcome notice to the new member; a heads-up to whoever invited them.
+  const base = (env.APP_URL || new URL(request.url).origin).replace(/\/$/, "");
+  await sendMail(env, row.email, "Welcome to Clubs Deuce Mugger",
+    `Your account "${row.username}" is ready. Sign in at ${base}\n\nThis email address is used for account recovery and security notices.`);
+  if (inviter.email) {
+    await sendMail(env, inviter.email, `${row.username} joined with your invite`,
+      `${row.username} used your invite link to join Clubs Deuce Mugger. If this was not expected, ask the owner to remove the account.`);
+  }
+  return json({ ok: true }, 200, { "Set-Cookie": sessionCookie(token, SESSION_SECONDS) });
+}
+
+// ---- email helpers
+
+async function sendMail(env, to, subject, text, link) {
+  if (!to) return false;
+  const safe = escapeHtml(text).replace(/\n/g, "<br>");
+  const button = link
+    ? `<p><a href="${link}" style="background:#3ddc7a;color:#000;padding:12px 22px;text-decoration:none;font-weight:bold">Open link</a></p>`
+    : "";
+  try {
+    await env.EMAIL.send({
+      to,
+      from: env.FROM_EMAIL,
+      subject,
+      text: link ? `${text}\n\n${link}` : text,
+      html:
+        `<div style="font-family:Courier New,monospace;background:#000;color:#eee;padding:24px">` +
+        `<h2 style="color:#b983e8;margin:0 0 12px">&#9827; Clubs Deuce Mugger</h2><p>${safe}</p>${button}</div>`,
+    });
+    return true;
+  } catch (err) {
+    console.error("email failed", err && err.message);
+    return false;
+  }
+}
+
+// ---- password recovery
+
+async function recover(request, env) {
+  const rl = await rateLimit(env, "recover", clientIp(request), 5, 3600);
+  if (!rl.ok) return tooMany(rl);
+  const body = await readJson(request);
+  const who = typeof body.who === "string" ? body.who.trim().toLowerCase() : "";
+  const generic = json({ ok: true, message: "If that account has an email on file, a reset link is on its way." });
+  if (!who || who.length > 254) return generic;
+
+  const user = await env.DB.prepare(
+    "SELECT id, username, email FROM users WHERE status = 'active' AND email IS NOT NULL AND (lower(username) = ? OR lower(email) = ?)"
+  ).bind(who, who).first();
+  if (!user) return generic;
+
+  const token = randomToken();
+  await env.DB.prepare("INSERT INTO password_resets (token_hash, user_id, expires_at) VALUES (?, ?, ?)")
+    .bind(await sha256(token), user.id, nowSec() + 3600)
+    .run();
+  const base = (env.APP_URL || new URL(request.url).origin).replace(/\/$/, "");
+  await sendMail(env, user.email, "Reset your Clubs Deuce Mugger password",
+    `Someone asked to reset the password for "${user.username}". The link works once and lasts 1 hour. If this was not you, ignore this email.`,
+    `${base}/reset.html?t=${token}`);
+  return generic;
+}
+
+async function resetPassword(request, env) {
+  const rl = await rateLimit(env, "reset", clientIp(request), 10, 3600);
+  if (!rl.ok) return tooMany(rl);
+  const body = await readJson(request);
+  const token = typeof body.token === "string" ? body.token : "";
+  const password = typeof body.password === "string" ? body.password : "";
+  if (!TOKEN_RE.test(token)) return json({ error: "This reset link is invalid or expired." }, 400);
+  if (password.length < 8 || password.length > 128) return json({ error: "Password must be 8-128 characters." }, 400);
+  if (password !== body.confirm) return json({ error: "Passwords do not match." }, 400);
+
+  const row = await env.DB.prepare("DELETE FROM password_resets WHERE token_hash = ? AND expires_at > ? RETURNING user_id")
+    .bind(await sha256(token), nowSec()).first();
+  if (!row) return json({ error: "This reset link is invalid, expired, or already used." }, 404);
+
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const hash = await pbkdf2(password, salt, PBKDF2_ITERATIONS);
+  await env.DB.batch([
+    env.DB.prepare("UPDATE users SET password_hash = ?, salt = ?, iterations = ? WHERE id = ?").bind(b64(hash), b64(salt), PBKDF2_ITERATIONS, row.user_id),
+    env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(row.user_id),
+    env.DB.prepare("DELETE FROM password_resets WHERE user_id = ?").bind(row.user_id),
+  ]);
+  const u = await env.DB.prepare("SELECT username, email FROM users WHERE id = ?").bind(row.user_id).first();
+  if (u) await sendMail(env, u.email, "Your password was changed", `The password for "${u.username}" was just changed. If this was not you, contact the site owner.`);
+  return json({ ok: true });
 }
 
 async function login(request, env) {
@@ -259,8 +311,7 @@ async function login(request, env) {
   if (!timingSafeEqual(hash, unb64(row.password_hash))) return wrong();
   if (row.status !== "active") {
     // Applied but never finished naming the member who invited them: let them continue.
-    if (!row.approval_sent) return json({ error: "Account pending approval", applyToken: await newApplySession(env, row.id) }, 403);
-    return json({ error: "Account pending approval" }, 403);
+    return json({ error: "Account pending approval", applyToken: await newApplySession(env, row.id) }, 403);
   }
 
   const token = randomToken();
@@ -287,43 +338,6 @@ function sessionCookie(value, maxAge) {
   return `${SESSION_COOKIE}=${value}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Strict`;
 }
 
-// ---------------------------------------------------------------- approval
-
-async function approvalPreview(request, env) {
-  const rl = await rateLimit(env, "approval", clientIp(request), 30, 600);
-  if (!rl.ok) return tooMany(rl);
-  const { token } = await readJson(request);
-  if (typeof token !== "string" || !/^[A-Za-z0-9_-]{20,100}$/.test(token)) return json({ error: "Invalid link." }, 400);
-  const row = await env.DB.prepare(
-    `SELECT t.action, u.username, i.username AS invited_by FROM approval_tokens t
-     JOIN users u ON u.id = t.user_id LEFT JOIN users i ON i.id = u.invited_by
-     WHERE t.token_hash = ? AND t.expires_at > ? AND u.status = 'pending'`
-  ).bind(await sha256(token), nowSec()).first();
-  if (!row) return json({ error: "This link is invalid, expired, or already used." }, 404);
-  return json({ action: row.action, username: row.username, invitedBy: row.invited_by || null });
-}
-
-async function approvalConfirm(request, env) {
-  const rl = await rateLimit(env, "approval", clientIp(request), 30, 600);
-  if (!rl.ok) return tooMany(rl);
-  const { token } = await readJson(request);
-  if (typeof token !== "string" || !/^[A-Za-z0-9_-]{20,100}$/.test(token)) return json({ error: "Invalid link." }, 400);
-
-  // Atomic single-use: only one request can delete the row and get RETURNING data.
-  const row = await env.DB.prepare(
-    "DELETE FROM approval_tokens WHERE token_hash = ? AND expires_at > ? RETURNING user_id, action"
-  ).bind(await sha256(token), nowSec()).first();
-  if (!row) return json({ error: "This link is invalid, expired, or already used." }, 404);
-
-  await env.DB.batch([
-    row.action === "approve"
-      ? env.DB.prepare("UPDATE users SET status = 'active', approved_at = ? WHERE id = ? AND status = 'pending'").bind(nowSec(), row.user_id)
-      : env.DB.prepare("DELETE FROM users WHERE id = ? AND status = 'pending'").bind(row.user_id),
-    env.DB.prepare("DELETE FROM approval_tokens WHERE user_id = ?").bind(row.user_id),
-  ]);
-  return json({ ok: true, action: row.action });
-}
-
 // ---------------------------------------------------------------- members, invites, owner
 
 function isOwner(env, username) {
@@ -331,18 +345,33 @@ function isOwner(env, username) {
 }
 
 async function setEmail(request, env, user) {
-  const { email } = await readJson(request);
+  const rl = await rateLimit(env, "email", String(user.id), 5, 3600);
+  if (!rl.ok) return tooMany(rl);
+  const { email, password } = await readJson(request);
   const value = typeof email === "string" ? email.trim().toLowerCase() : "";
-  if (value && (!EMAIL_RE.test(value) || value.length > 254)) return json({ error: "Enter a valid email address." }, 400);
-  await env.DB.prepare("UPDATE users SET email = ? WHERE id = ?").bind(value || null, user.id).run();
+  if (!EMAIL_RE.test(value) || value.length > 254) return json({ error: "Enter a valid email address." }, 400);
+  if (typeof password !== "string" || !password || password.length > 128) return json({ error: "Enter your current password to change your email." }, 400);
+
+  const row = await env.DB.prepare("SELECT password_hash, salt, iterations, email FROM users WHERE id = ?").bind(user.id).first();
+  const hash = await pbkdf2(password, unb64(row.salt), row.iterations);
+  if (!timingSafeEqual(hash, unb64(row.password_hash))) return json({ error: "Wrong password." }, 403);
+  if (row.email && row.email.toLowerCase() === value) return json({ ok: true, email: value });
+
+  try {
+    await env.DB.prepare("UPDATE users SET email = ? WHERE id = ?").bind(value, user.id).run();
+  } catch (err) {
+    if (String(err && err.message).includes("UNIQUE")) return json({ error: "That email is already used by another account." }, 409);
+    throw err;
+  }
+  if (row.email) {
+    await sendMail(env, row.email, "Your email was changed", `The email on "${user.username}" was changed to ${value}. If this was not you, contact the site owner right away.`);
+  }
+  await sendMail(env, value, "Email added to your account", `This address is now the contact email for "${user.username}" on Clubs Deuce Mugger.`);
   return json({ ok: true, email: value });
 }
 
 async function createInvite(env, user, url) {
   const owner = isOwner(env, user.username);
-  if (!owner && !user.email) {
-    return json({ error: "Add your email in Settings first, so the person you invite can name you as their sponsor." }, 400);
-  }
   const rl = await rateLimit(env, "invite", String(user.id), 10, 3600);
   if (!rl.ok) return tooMany(rl);
   if (!owner) {
@@ -371,9 +400,9 @@ async function listInvites(env, user) {
 async function adminList(env, user) {
   if (!isOwner(env, user.username)) return json({ error: "Owner only." }, 403);
   const { results } = await env.DB.prepare(
-    `SELECT u.id, u.username, u.status, u.created_at, u.approved_at, u.approval_sent, i.username AS invited_by
+    `SELECT u.id, u.username, u.email, u.status, u.created_at, i.username AS invited_by
      FROM users u LEFT JOIN users i ON i.id = u.invited_by
-     ORDER BY (u.status = 'pending') DESC, u.created_at DESC LIMIT 300`
+     ORDER BY (u.status = 'pending') DESC, u.created_at DESC LIMIT 2000`
   ).all();
   return json({ users: results.map((r) => ({ ...r, owner: isOwner(env, r.username) })) });
 }
@@ -386,10 +415,7 @@ async function adminAction(request, env, user) {
   if (!target) return json({ error: "No such account." }, 404);
   if (isOwner(env, target.username)) return json({ error: "The owner account cannot be changed here." }, 400);
   if (action === "approve") {
-    await env.DB.batch([
-      env.DB.prepare("UPDATE users SET status = 'active', approved_at = ? WHERE id = ? AND status = 'pending'").bind(nowSec(), id),
-      env.DB.prepare("DELETE FROM approval_tokens WHERE user_id = ?").bind(id),
-    ]);
+    await env.DB.prepare("UPDATE users SET status = 'active', approved_at = ? WHERE id = ? AND status = 'pending'").bind(nowSec(), id).run();
   } else if (action === "deny") {
     await env.DB.prepare("DELETE FROM users WHERE id = ? AND status = 'pending'").bind(id).run();
   } else {
@@ -518,7 +544,7 @@ async function cleanup(env) {
   await env.DB.batch([
     env.DB.prepare("DELETE FROM rate_limits WHERE expires_at < ?").bind(now),
     env.DB.prepare("DELETE FROM sessions WHERE expires_at < ?").bind(now),
-    env.DB.prepare("DELETE FROM approval_tokens WHERE expires_at < ?").bind(now),
+    env.DB.prepare("DELETE FROM password_resets WHERE expires_at < ?").bind(now),
     env.DB.prepare("DELETE FROM apply_sessions WHERE expires_at < ?").bind(now),
     // Stale applications nobody acted on free their username again.
     env.DB.prepare("DELETE FROM users WHERE status = 'pending' AND created_at < ?").bind(now - APPROVAL_SECONDS),

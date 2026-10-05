@@ -95,10 +95,10 @@ input:focus, select:focus { border-color: var(--club); }
 .arrow-note { color: var(--muted); font-weight: 400; margin: 6px 0 12px; }
 
 /* app header */
-.topbar { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; margin-bottom: 16px; padding: 12px; border: 2px solid var(--line); text-align: center; }
-.topbar h1 { font-size: 1.7rem; display: flex; align-items: center; justify-content: center; gap: 8px; }
-.topbar .who { color: var(--club); }
-.topbar .actions { display: flex; gap: 12px; align-items: center; justify-content: center; flex-wrap: wrap; }
+.topbar { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; margin-bottom: 16px; padding: 14px 12px; border: 2px solid var(--line); text-align: center; }
+.topbar h1 { font-size: 1.7rem; display: block; width: 100%; text-align: center; }
+.topbar .who { color: var(--club); width: 100%; word-break: break-all; }
+.topbar .actions { display: flex; gap: 12px; align-items: center; justify-content: center; flex-wrap: wrap; width: 100%; }
 
 .panels { display: grid; gap: 16px; grid-template-columns: 1fr; margin-bottom: 8px; }
 @media (min-width: 820px) { .panels { grid-template-columns: 1fr 1fr; } .panels .wide { grid-column: 1 / -1; } }
@@ -165,4 +165,14 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 24px; background: #
 .tag.pending { color: var(--derse-l); border-color: var(--derse); } .tag.active { color: var(--club); border-color: var(--club); }
 .item .acts { display: flex; gap: 8px; }
 .check { display: flex; align-items: center; gap: 10px; justify-content: center; }
-.check input { width: 26px; height: 26px; accent-color: var(--club); }
+/* old-Windows style check box */
+.check input[type="checkbox"] {
+  -webkit-appearance: none; appearance: none; flex: none; width: 26px; height: 26px; margin: 0; cursor: pointer;
+  background: #fff; border: 2px solid; border-color: #808080 #fff #fff #808080; outline: 1px solid #000; outline-offset: -3px;
+  position: relative;
+}
+.check input[type="checkbox"]:checked::after {
+  content: ""; position: absolute; left: 7px; top: 1px; width: 6px; height: 13px;
+  border: solid #000; border-width: 0 3px 3px 0; transform: rotate(45deg);
+}
+.check input[type="checkbox"]:focus-visible { outline: 2px dotted var(--club); outline-offset: 2px; }

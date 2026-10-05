@@ -424,10 +424,16 @@ function tick() {
 // ---------------------------------------------------------------- owner panel
 
 async function initAdmin() {
-  $("admin").hidden = false;
+  // Built only for the owner; other accounts never get this markup.
+  const panel = el("section", { class: "card panel", id: "admin" },
+    el("h2", { text: "Owner panel" }),
+    el("p", { class: "hint", id: "admin-count", text: "Loading accounts..." }),
+    el("div", { class: "list", id: "admin-list" }));
+  $("alerts").after(panel);
   const box = $("admin-list");
   async function refresh() {
     const { users } = await api("/api/admin/users");
+    $("admin-count").textContent = `${users.length} account${users.length === 1 ? "" : "s"} registered`;
     box.replaceChildren();
     for (const u of users) {
       const acts = el("div", { class: "acts" });
@@ -447,7 +453,7 @@ async function initAdmin() {
       }
       box.append(el("div", { class: "item" },
         el("span", {}, el("span", { class: `tag ${u.status}`, text: u.owner ? "owner" : u.status }), ` ${u.username}`),
-        el("span", { class: "meta", text: u.invited_by ? `invited by ${u.invited_by}` : "" }),
+        el("span", { class: "meta", text: [u.email, u.invited_by ? `invited by ${u.invited_by}` : ""].filter(Boolean).join(" | ") }),
         acts));
     }
   }

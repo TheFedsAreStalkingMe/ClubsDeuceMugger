@@ -87,8 +87,9 @@ async function loadInvites() {
 })();
 $("save-email").addEventListener("click", async () => {
   try {
-    const d = await api("/api/account/email", { method: "POST", body: { email: $("acct-email").value } });
-    say("email-msg", d.email ? "Saved." : "Email removed.", "ok");
+    const d = await api("/api/account/email", { method: "POST", body: { email: $("acct-email").value, password: $("acct-pass").value } });
+    $("acct-pass").value = "";
+    say("email-msg", "Saved. We emailed a notice.", "ok");
   } catch (e) { say("email-msg", e.message, "err"); }
 });
 $("make-invite").addEventListener("click", async () => {

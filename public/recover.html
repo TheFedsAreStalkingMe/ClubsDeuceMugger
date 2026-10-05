@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#000000">
+  <meta name="robots" content="noindex">
+  <title>Clubs Deuce Mugger | Recover account</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <main class="wrap narrow">
+    <header class="brand"><h1>Recover account</h1></header>
+    <section class="card dashed">
+      <form id="recover-form" class="stack" autocomplete="off">
+        <p class="arrow-note">Enter your username or the email on your account. We email a reset link if it matches.</p>
+        <label>Username or email <input type="text" name="who" autocapitalize="none" required maxlength="254"></label>
+        <button class="btn green" type="submit">Send reset link</button>
+        <p class="msg" id="recover-msg" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+    <p class="foot"><a href="/">Back to sign in</a></p>
+    <p class="foot">Font: Fontstuck by KevinHilt, <a href="/fonts/LICENSE-fontstuck.txt">CC BY-SA 3.0</a></p>
+  </main>
+  <script src="/js/recover.js"></script>
+</body>
+</html>

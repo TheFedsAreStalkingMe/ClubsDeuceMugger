@@ -23,6 +23,7 @@
         <label>Password <input type="password" name="password" autocomplete="current-password" required maxlength="128"></label>
         <button class="btn green" type="submit">Submit</button>
         <p class="msg" id="login-msg" role="status" aria-live="polite"></p>
+        <a href="/recover.html">Forgot your password?</a>
       </form>
     </section>
 
@@ -37,6 +38,8 @@
         <p class="arrow-note">You have an invite. Pick a username and password.</p>
         <label>Username <span class="hint">3-24 characters: letters, numbers, _ . -</span>
           <input type="text" name="username" autocomplete="off" autocapitalize="none" required minlength="3" maxlength="24" pattern="[A-Za-z0-9_.\-]{3,24}"></label>
+        <label>Email <span class="hint">For account recovery and security notices</span>
+          <input type="text" name="email" inputmode="email" autocomplete="email" autocapitalize="none" required maxlength="254"></label>
         <label>Password <span class="hint">At least 8 characters</span>
           <input type="password" name="password" autocomplete="new-password" required minlength="8" maxlength="128"></label>
         <label>Confirm password
@@ -46,10 +49,10 @@
       </form>
 
       <form id="sponsor-form" class="stack" autocomplete="off" hidden>
-        <p class="arrow-note">Last step. Enter the email of the member who gave you the invite. We send them the Approve or Deny links.</p>
-        <label>Their email
-          <input type="text" name="email" inputmode="email" autocomplete="off" autocapitalize="none" required maxlength="254"></label>
-        <button class="btn" type="submit">Send to them</button>
+        <p class="arrow-note">Last step. Type the username of the member who gave you the invite link.</p>
+        <label>Their username
+          <input type="text" name="inviter" autocomplete="off" autocapitalize="none" required maxlength="24"></label>
+        <button class="btn green" type="submit">Let me in</button>
         <p class="msg" id="sponsor-msg" role="status" aria-live="polite"></p>
       </form>
     </section>

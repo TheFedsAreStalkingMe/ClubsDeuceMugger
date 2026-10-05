@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#000000">
+  <meta name="robots" content="noindex">
+  <title>Clubs Deuce Mugger | New password</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <main class="wrap narrow">
+    <header class="brand"><h1>New password</h1></header>
+    <section class="card dashed">
+      <form id="reset-form" class="stack" autocomplete="off">
+        <label>New password <span class="hint">At least 8 characters</span>
+          <input type="password" name="password" autocomplete="new-password" required minlength="8" maxlength="128"></label>
+        <label>Confirm password
+          <input type="password" name="confirm" autocomplete="new-password" required minlength="8" maxlength="128"></label>
+        <button class="btn green" type="submit">Change password</button>
+        <p class="msg" id="reset-msg" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+    <p class="foot"><a href="/">Back to sign in</a></p>
+    <p class="foot">Font: Fontstuck by KevinHilt, <a href="/fonts/LICENSE-fontstuck.txt">CC BY-SA 3.0</a></p>
+  </main>
+  <script src="/js/reset.js"></script>
+</body>
+</html>

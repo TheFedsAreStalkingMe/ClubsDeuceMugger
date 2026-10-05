@@ -30,7 +30,7 @@ Worker > **Settings** > **Bindings** should show `DB` (D1: deucemugger), `EMAIL`
 
 ## 5. Try it
 1. Open `https://clubsdeuce.com` and fill in **Apply for an account**.
-2. Open the email, tap **Approve**, then tap the confirm button on the page that opens. (The extra tap stops email scanners from approving or denying by accident.)
+2. Follow the invite steps below instead. Applications no longer send approval emails.
 3. Sign in, open **Settings**, paste your Torn API key and FF Scouter key (stored only in that browser), add item IDs, and scan.
 
 ## Notes
@@ -39,9 +39,10 @@ Worker > **Settings** > **Bindings** should show `DB` (D1: deucemugger), `EMAIL`
 - Limits: 10 login tries per 10 minutes and 5 applications per hour per IP.
 - Torn calls are capped at 80 per minute in the browser, with a server backstop at 84.
 
-## Invites and the owner account
-- Signup is invite only. Members make a link in **Settings > Invite someone** and send it to the person.
-- Before making invites, each member saves their email in **Settings > Your email**. The applicant types that email as their sponsor, and the Approve/Deny links go there. You get a copy at `lobsterlover7170@gmail.com`.
-- `TheFedsAreStalkingMe` is the owner. It has an **Owner panel** on the Mug Finder to approve, deny or remove accounts, and its invites only need your email on file (it falls back to `lobsterlover7170@gmail.com`).
-- The new database migration (`0002_invites.sql`) runs by itself through the deploy command.
-
+## Invites, emails and the owner account
+- Signup is invite only. A member makes a link in **Settings > Invite someone** and sends it to the person.
+- The new person picks a username, email and password, then types the username of the member who invited them. If it matches, they are let in right away. There are no approval emails any more.
+- Emails go out for: a welcome message, a heads-up to the inviter, password recovery (**Forgot your password?** on the sign-in page), and a notice whenever an email address changes. All of these need Email Sending set up for `clubsdeuce.com` (step 3).
+- `TheFedsAreStalkingMe` is the owner and is the only account that sees the **Owner panel** on the Mug Finder. It lists every account with its email and who invited it, and can remove accounts.
+- Save your own email in **Settings > Your email** so you can recover your password.
+- The new migrations (`0002` and `0003`) run by themselves through the deploy command.

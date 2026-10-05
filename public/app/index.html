@@ -14,8 +14,8 @@
   <main class="wrap">
     <header class="topbar">
       <h1><svg class="icon club-c"><use href="/img/sprite.svg#club"/></svg> Mug Finder</h1>
+      <div class="who" id="who"></div>
       <div class="actions">
-        <span class="who" id="who"></span>
         <a class="btn ghost small" href="/app/settings.html">Settings</a>
         <button class="btn ghost small" id="logout" type="button">Log out</button>
       </div>
@@ -23,12 +23,6 @@
 
     <div class="alerts" id="alerts" aria-live="polite"></div>
     <p class="msg info" id="setup-note" hidden>Add your API keys in <a href="/app/settings.html">Settings</a> to start scanning.</p>
-
-    <section class="card panel" id="admin" hidden>
-      <h2>Owner panel</h2>
-      <p class="hint">Approve, deny or remove accounts.</p>
-      <div class="list" id="admin-list"></div>
-    </section>
 
     <div class="panels">
       <section class="card panel">

@@ -73,7 +73,7 @@ wire(
   "/api/signup",
   (f) => {
     if (f.get("password") !== f.get("confirm")) return "Passwords do not match.";
-    return { username: f.get("username"), password: f.get("password"), confirm: f.get("confirm"), invite };
+    return { username: f.get("username"), email: f.get("email"), password: f.get("password"), confirm: f.get("confirm"), invite };
   },
   (data, form) => {
     form.reset();
@@ -84,11 +84,7 @@ wire(
 wire(
   "sponsor-form",
   "sponsor-msg",
-  "/api/signup/sponsor",
-  (f) => ({ applyToken, email: f.get("email") }),
-  (data, form, msg) => {
-    form.reset();
-    msg.className = "msg ok";
-    msg.textContent = data.message || "Application sent, waiting for approval";
-  }
+  "/api/signup/vouch",
+  (f) => ({ applyToken, inviter: f.get("inviter") }),
+  () => { location.href = "/app/"; }
 );

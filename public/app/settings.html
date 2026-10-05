@@ -49,9 +49,10 @@
 
       <section class="card panel">
         <h2>Your email</h2>
-        <p class="hint">People you invite enter this email to name you as their sponsor, and the approval links for them are sent here.</p>
+        <p class="hint">Used for account recovery and security notices, including when your email changes. Changing it needs your current password.</p>
         <div class="stack">
           <label>Email <input type="text" id="acct-email" inputmode="email" autocapitalize="none" autocomplete="email" maxlength="254"></label>
+          <label>Current password <input type="password" id="acct-pass" autocomplete="current-password" maxlength="128"></label>
           <button class="btn green small" id="save-email" type="button">Save email</button>
           <p class="msg" id="email-msg" role="status" aria-live="polite"></p>
         </div>
@@ -59,7 +60,7 @@
 
       <section class="card panel">
         <h2>Invite someone</h2>
-        <p class="hint">Make a single-use link that lasts 7 days. Send it to the person. They apply with it, then enter your email.</p>
+        <p class="hint">Make a single-use link that lasts 7 days. Send it to the person. They apply with it, then type your username to get in.</p>
         <div class="stack">
           <button class="btn small" id="make-invite" type="button">Make invite link</button>
           <div class="invite-link" id="invite-link" hidden></div>
