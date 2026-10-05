@@ -14,6 +14,9 @@ export function remaining(r) {
   return Math.max(0, r.until - Date.now() / 1000);
 }
 
+// The rows to show. With "only Okay", players who are out are hidden (players not checked yet stay until they are).
+export const visibleRows = () => (state.filters.onlyOkay ? state.rows.filter((r) => r.state == null || remaining(r) === 0) : state.rows);
+
 export function sortValue(r, key) {
   switch (key) {
     case "stats": return r.bs;
@@ -32,6 +35,7 @@ export function isMug(r, now, jackpot) {
   if (pf.myBs && r.bs >= pf.myBs) return false;
   const rem = remaining(r);
   if (rem == null || rem > pf.outMinutes * 60) return false;
+  if (state.filters.onlyOkay && rem !== 0) return false;
   if (!r.last || (now - r.last) / 60 < pf.offlineMinutes) return false;
   if (jackpot && r.topPrice < pf.minJackpot) return false;
   return true;

@@ -65,10 +65,10 @@ function bindChoice(name) {
   select.addEventListener("change", () => { state.filters[name] = Number(select.value); persist(); });
 }
 
-function bindCheckbox(name) {
+function bindCheckbox(name, onChange) {
   const box = $(name);
   box.checked = !!state.filters[name];
-  box.addEventListener("change", () => { state.filters[name] = box.checked; persist(); });
+  box.addEventListener("change", () => { state.filters[name] = box.checked; persist(); if (onChange) onChange(); });
 }
 
 export function initFilters() {
@@ -84,6 +84,7 @@ export function initFilters() {
   bindSlider("priceTol");
 
   bindCheckbox("autoScan");
+  bindCheckbox("onlyOkay", render); // shows or hides players straight away
   bindCheckbox("includeUnknown");
   bindChoice("minActivity");
   bindAmount("minStack");

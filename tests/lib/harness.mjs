@@ -32,6 +32,10 @@ export const section = (title) => console.log(`\n${title}`);
 const now = () => Math.floor(Date.now() / 1000);
 // Test control: statuses the fake Torn reports, by player id. Change them with setFakeStatus().
 const statusOverride = {};
+const flags = { attacklogFail: false };
+export async function setFakeFlag(name, on) {
+  await fetch(`http://localhost:${FAKE_PORT}/__flag?name=${name}&on=${on ? 1 : 0}`);
+}
 export async function setFakeStatus(id, state, mins = 30) {
   await fetch(`http://localhost:${FAKE_PORT}/__status?id=${id}&state=${state}&mins=${mins}`);
 }
@@ -72,6 +76,8 @@ function fakeServer() {
         { player_id: 12, player_name: "Foxtrot", quantity: 2, price: 8000000, content_updated: old() },
       ] });
 
+    // Test control: /__flag?name=attacklogFail&on=1 makes Torn's attack log fail
+    if (p === "/__flag") { flags[u.searchParams.get("name")] = u.searchParams.get("on") === "1"; return send({ ok: true }); }
     // Test control: /__status?id=7&state=Hospital&mins=30 (state=Okay clears it)
     if (p === "/__status") {
       const id = u.searchParams.get("id"), st = u.searchParams.get("state");
@@ -98,8 +104,10 @@ function fakeServer() {
         { id: 1, code: "AAA", started: t, result: "Mugged", attacker: { id: 555 }, defender: { id: 111 } },
         { id: 2, code: "BBB", started: t, result: "Mugged", attacker: { id: 555 }, defender: { id: 999 } }, // never clicked
         { id: 3, code: "CCC", started: t, result: "Hospitalized", attacker: { id: 555 }, defender: { id: 111 } }, // not a mug
+        { id: 4, code: "DDD", started: t, result: "Mugged", attacker: null, defender: { id: 112 } }, // stealthed: no attacker listed
       ] });
     }
+    if (p === "/v2/torn/attacklog" && flags.attacklogFail) return send({ error: { code: 17, error: "Backend error" } });
     if (p === "/v2/torn/attacklog") return send({ attacklog: { log: [
       { action: "hit", text: "Mugsy hit Rich for 100" },
       { action: "mug", text: "Mugsy mugged Rich and stole $2,500,000" },

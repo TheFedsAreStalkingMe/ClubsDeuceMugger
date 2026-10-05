@@ -33,7 +33,7 @@ async function checkMyMugs(quiet) {
   if (!quiet) say("sync-msg", "Checking your attacks...", "info");
   try {
     const d = await api("/api/leaderboard/sync", { method: "POST", headers: { "X-Torn-Key": key }, body: {} });
-    if (!quiet) say("sync-msg", d.counted ? `Found ${plural(d.counted, "new mug")}. Linked to ${d.linked}.` : `No new mugs. Linked to ${d.linked}.`, "ok");
+    if (!quiet) say("sync-msg", `${d.note || "Checked."} (Linked to ${d.linked}.)`, d.counted ? "ok" : "info");
     await loadBoard();
   } catch (e) {
     if (!quiet) say("sync-msg", e.message, "err");

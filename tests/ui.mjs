@@ -139,6 +139,26 @@ async function runChecks() {
   await setFakeStatus(7, "Okay");
   await setFakeStatus(8, "Okay");
 
+  section("Only players who are Okay");
+  await setStore("cdm.filters", filters);
+  await page.reload();
+  await page.click("#scan");
+  await scanDone();
+  check("all three are shown at first", (await cards("#results")).length === 3);
+  await setFakeStatus(7, "Hospital", 30);
+  await page.waitForFunction(() => [...document.querySelectorAll("#results .target")].some((c) => c.querySelector(".name").textContent === "Alpha" && /^Out in/.test(c.querySelector(".status").textContent)), null, { timeout: 45000 });
+  await page.click("details.more > summary");
+  await page.check("#onlyOkay");
+  check("ticking it hides a player who is in hospital", (await names()) === "Bravo,Charlie", await names());
+  await setFakeStatus(7, "Okay");
+  await setFakeStatus(8, "Abroad");
+  await page.waitForFunction(() => document.querySelectorAll("#results .target").length === 1, null, { timeout: 45000 }).catch(() => {});
+  check("a player who flies away disappears on their own", !(await names()).includes("Bravo"), await names());
+  await page.uncheck("#onlyOkay");
+  check("unticking brings them back", (await cards("#results")).length === 3);
+  await page.click("details.more > summary");
+  await setFakeStatus(8, "Okay");
+
   section("Auto hunt, feed and cancel");
   await setStore("cdm.filters", { ...filters, autoEvery: 30 });
   await page.reload();

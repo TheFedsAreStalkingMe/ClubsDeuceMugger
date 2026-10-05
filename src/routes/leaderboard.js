@@ -31,13 +31,27 @@ function mugAmount(attacklog) {
   return best;
 }
 
+const BEFORE_TAP = 300; // seconds an attack may start before the tap was logged (clock differences)
+const AFTER_TAP = 3 * 3600; // an attack counts if it starts within 3 hours after the tap
+
+// Says what happened, in plain words, so a check that finds nothing is never a mystery.
+function explain({ taps, attacks, mugs, matched, counted }) {
+  if (counted) return `Found ${counted} new mug${counted === 1 ? "" : "s"}.`;
+  if (!taps) return "No Attack taps in the last 24 hours. Tap Attack on a card here first, then mug them.";
+  if (!attacks) return `Torn shows no attacks by you since your last Attack tap here (${taps} tap${taps === 1 ? "" : "s"} waiting).`;
+  if (!mugs) return `Torn shows ${attacks} attack${attacks === 1 ? "" : "s"} by you but none were mugs.`;
+  if (!matched) return `Torn shows ${mugs} mug${mugs === 1 ? "" : "s"} by you, but none on a player you opened with Attack here in the last 3 hours.`;
+  return "Those mugs were already counted.";
+}
+
 // Finds the member's recent outgoing mugs on players they opened through the site and records them.
-// Amounts come from Torn's own attack log, never from the browser.
+// Amounts come from Torn's own attack log, never from the browser. An Attack tap is only used up once its mug
+// is safely recorded, so a Torn hiccup just means the next check tries again.
 export async function syncMugs({ request, env, user }) {
   const key = request.headers.get("X-Torn-Key") || "";
   if (!RE.tornKey.test(key)) return fail("Add your Torn key in Settings first.");
   const blocked =
-    (await throttle(env, "sync", String(user.id), 12, 3600)) || (await throttle(env, "torn", String(user.id), 70, 60));
+    (await throttle(env, "sync", String(user.id), 40, 3600)) || (await throttle(env, "torn", String(user.id), 70, 60));
   if (blocked) return blocked;
 
   const base = upstream(env).tornV2;
@@ -52,38 +66,41 @@ export async function syncMugs({ request, env, user }) {
       if (isUniqueError(err)) return fail("That Torn player is already linked to another member.", 409);
       throw err;
     }
+    const result = { ok: true, linked: basic.profile.name, counted: 0, checked: 0, taps: 0, attacks: 0, mugs: 0, matched: 0 };
 
     const now = nowSec();
     const { results: clicks } = await env.DB.prepare(
       "SELECT id, target_id, clicked_at FROM clicks WHERE user_id = ? AND matched = 0 AND clicked_at > ? ORDER BY clicked_at ASC LIMIT 300"
     ).bind(user.id, now - 86400).all();
-    if (!clicks.length) return json({ ok: true, linked: basic.profile.name, counted: 0, checked: 0 });
+    result.taps = clicks.length;
+    if (!clicks.length) return json({ ...result, note: explain(result) });
 
-    const from = Math.max(0, clicks[0].clicked_at - 120);
+    const from = Math.max(0, clicks[0].clicked_at - BEFORE_TAP);
     const att = await tornV2(base, "/user/attacks", { filters: "outgoing", limit: "100", sort: "DESC", from: String(from) }, key);
-    const mugs = (att.attacks || [])
-      .filter((a) => a.result === "Mugged" && a.defender && a.attacker && a.attacker.id === tornId)
-      .sort((a, b) => a.started - b.started);
+    // A stealthed attack has no attacker listed; it is still yours because we asked for outgoing attacks.
+    const outgoing = (att.attacks || []).filter((a) => !a.attacker || a.attacker.id === tornId);
+    const mugs = outgoing.filter((a) => a.result === "Mugged" && a.defender).sort((a, b) => a.started - b.started);
+    Object.assign(result, { attacks: outgoing.length, mugs: mugs.length });
 
-    let counted = 0;
-    let checked = 0;
     const used = new Set();
     for (const a of mugs) {
-      if (checked >= MAX_LOGS_PER_SYNC) break;
-      // Must follow a tap on Attack for that same player, within an hour.
-      const click = clicks.find((c) => !used.has(c.id) && c.target_id === a.defender.id && a.started >= c.clicked_at - 120 && a.started <= c.clicked_at + 3600);
+      // Must follow a tap on Attack for that same player.
+      const click = clicks.find((c) => !used.has(c.id) && c.target_id === a.defender.id && a.started >= c.clicked_at - BEFORE_TAP && a.started <= c.clicked_at + AFTER_TAP);
       if (!click) continue;
-      used.add(click.id);
+      result.matched++;
       const known = await env.DB.prepare("SELECT 1 AS x FROM mugs WHERE attack_code = ?").bind(a.code).first();
-      await env.DB.prepare("UPDATE clicks SET matched = 1 WHERE id = ?").bind(click.id).run();
-      if (known) continue;
-      checked++;
-      const log = await tornV2(base, "/torn/attacklog", { log: a.code, striptags: "true" }, key);
-      await env.DB.prepare("INSERT OR IGNORE INTO mugs (attack_code, user_id, target_id, amount, mugged_at) VALUES (?, ?, ?, ?, ?)")
-        .bind(a.code, user.id, a.defender.id, mugAmount(log.attacklog), a.started).run();
-      counted++;
+      if (!known) {
+        if (result.checked >= MAX_LOGS_PER_SYNC) break; // keep each check small; the rest wait for the next one
+        result.checked++;
+        const log = await tornV2(base, "/torn/attacklog", { log: a.code, striptags: "true" }, key);
+        await env.DB.prepare("INSERT OR IGNORE INTO mugs (attack_code, user_id, target_id, amount, mugged_at) VALUES (?, ?, ?, ?, ?)")
+          .bind(a.code, user.id, a.defender.id, mugAmount(log.attacklog), a.started).run();
+        result.counted++;
+      }
+      used.add(click.id);
+      await env.DB.prepare("UPDATE clicks SET matched = 1 WHERE id = ?").bind(click.id).run(); // only now is the tap used up
     }
-    return json({ ok: true, linked: basic.profile.name, counted, checked });
+    return json({ ...result, note: explain(result) });
   } catch (err) {
     if (TORN_KEY_ERRORS.includes(err.code)) return fail(`Torn key problem: ${err.message}. The key needs the "attacks" permission.`);
     if (err.code === 5) return fail("Torn says slow down. Try again in a minute.", 429);

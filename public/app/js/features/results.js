@@ -5,17 +5,19 @@ import { state } from "../state.js";
 import { updateAlerts } from "./alerts.js";
 import { card, refreshStatuses } from "./cards.js";
 import { collectMugs } from "./feed.js";
-import { sortValue } from "./rules.js";
+import { sortValue, visibleRows } from "./rules.js";
 
 export function render() {
   const box = $("results");
-  if (!state.rows.length) {
-    box.replaceChildren(el("p", { class: "empty", text: "Nothing on the table yet. Hit Scan." }));
+  const shown = visibleRows();
+  if (!shown.length) {
+    const hidden = state.rows.length - shown.length;
+    box.replaceChildren(el("p", { class: "empty", text: hidden ? `${hidden} player${hidden === 1 ? " is" : "s are"} hidden because they are not Okay.` : "Nothing on the table yet. Hit Scan." }));
     return;
   }
   const { sort, dir } = state.filters;
   const mul = dir === "asc" ? 1 : -1;
-  const rows = [...state.rows].sort((a, b) => {
+  const rows = [...shown].sort((a, b) => {
     const x = sortValue(a, sort), y = sortValue(b, sort);
     if (x == null && y == null) return 0;
     if (x == null) return 1; // unknowns always last

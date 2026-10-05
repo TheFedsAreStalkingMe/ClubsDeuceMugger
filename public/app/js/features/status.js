@@ -3,6 +3,8 @@
 import { Cache, STORE } from "/js/core/storage.js";
 import { state } from "../state.js";
 import { refreshStatuses } from "./cards.js";
+import { remaining } from "./rules.js";
+import { scheduleRender } from "./results.js";
 
 // One cache for the page, shared by scans and the live refresher: player id -> record.
 export const profiles = new Cache(STORE.profiles, 3000);
@@ -43,4 +45,6 @@ export function applyProfile(id, p) {
     a.dataset.ts = a.dataset.kind === "checked" ? fields.checkedAt / 1000 : fields.last || "";
   }
   refreshStatuses(Date.now() / 1000);
+  // With "only Okay" on, someone who just flew or was hospitalized must leave the list.
+  if (state.filters.onlyOkay && state.rows.some((r) => r.id === id && remaining(r) !== 0)) scheduleRender();
 }

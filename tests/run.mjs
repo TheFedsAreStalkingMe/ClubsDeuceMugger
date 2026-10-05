@@ -5,7 +5,7 @@
 //
 // Nothing here touches your real Cloudflare account, database or email.
 
-import { BASE, Client, OWNER, check, fail, finish, section, startEnvironment, waitForMail } from "./lib/harness.mjs";
+import { BASE, Client, OWNER, check, fail, finish, section, setFakeFlag, startEnvironment, waitForMail } from "./lib/harness.mjs";
 
 async function runChecks() {
   const anon = new Client("10.0.0.1");
@@ -204,20 +204,36 @@ async function runChecks() {
   section("Leaderboard");
   r = await bob.post("/api/clicks", { target: "x" });
   check("bad click refused", r.status === 400);
-  r = await bob.post("/api/leaderboard/sync", {}, { headers: K });
-  check("link before any click", r.data.linked === "Mugsy" && r.data.counted === 0);
-  await bob.post("/api/clicks", { target: 111 });
-  await new Promise((s) => setTimeout(s, 1100));
-  r = await bob.post("/api/leaderboard/sync", {}, { headers: K });
-  check("only the clicked mug counts", r.data.counted === 1 && r.data.checked === 1, JSON.stringify(r.data));
-  r = await bob.post("/api/leaderboard/sync", {}, { headers: K });
+  const sync = () => bob.post("/api/leaderboard/sync", {}, { headers: K });
+  const tap = async (id) => { await bob.post("/api/clicks", { target: id }); await new Promise((s) => setTimeout(s, 1100)); };
+  r = await sync();
+  check("link before any tap", r.data.linked === "Mugsy" && r.data.counted === 0 && r.data.taps === 0);
+  check("explains when there are no taps", /No Attack taps/.test(r.data.note), r.data.note);
+
+  await tap(111);
+  await setFakeFlag("attacklogFail", true);
+  r = await sync();
+  check("a Torn hiccup is reported", r.status >= 400, JSON.stringify(r.data));
+  await setFakeFlag("attacklogFail", false);
+  r = await sync();
+  check("the mug is still counted next time (the tap was not used up)", r.data.counted === 1 && r.data.checked === 1, JSON.stringify(r.data));
+  check("only the tapped player's mug counts", r.data.mugs >= 2 && r.data.matched === 1, JSON.stringify(r.data));
+  r = await sync();
   check("nothing counts twice", r.data.counted === 0);
-  await bob.post("/api/clicks", { target: 111 });
-  await new Promise((s) => setTimeout(s, 1100));
-  r = await bob.post("/api/leaderboard/sync", {}, { headers: K });
+  await tap(111);
+  r = await sync();
   check("same attack is never re-counted", r.data.counted === 0);
   r = await bob.get("/api/leaderboard?range=all");
   check("board shows the total", r.data.rows.length === 1 && r.data.rows[0].username === "bob" && r.data.rows[0].total === 2500000 && r.data.rows[0].mugs === 1, JSON.stringify(r.data));
+
+  await tap(112);
+  r = await sync();
+  check("a stealthed attack still counts", r.data.counted === 1, JSON.stringify(r.data));
+  await tap(888);
+  r = await sync();
+  check("explains when mugs were not on tapped players", r.data.counted === 0 && r.data.taps >= 1 && /none on a player you opened/.test(r.data.note), r.data.note);
+  r = await bob.get("/api/leaderboard?range=all");
+  check("board adds the second mug", r.data.rows[0].total === 5000000 && r.data.rows[0].mugs === 2, JSON.stringify(r.data));
   r = await bob.get("/api/leaderboard?range=day");
   check("24 hour board", r.data.rows.length === 1);
   r = await anon.get("/api/leaderboard");

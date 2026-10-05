@@ -10,7 +10,7 @@ import { fmtMoney } from "/js/core/format.js";
 import { Cache, STORE, save } from "/js/core/storage.js";
 import { MIN_PRICE, state } from "../state.js";
 import { acquireTorn } from "./limits.js";
-import { explainDrops, statVerdict } from "./rules.js";
+import { explainDrops, statVerdict, visibleRows } from "./rules.js";
 import { render, scheduleRender, tick } from "./results.js";
 import { STAGES, countdown, setProgress, setScanMsg, updateRunButtons } from "./ui.js";
 import { applyProfile, profileFresh, profiles, recordFrom } from "./status.js";
@@ -242,7 +242,7 @@ export async function scan() {
     const { sellers: checked, keyProblem } = await fetchStatuses(call, rows, runId);
     if (runId === state.runId && !keyProblem) {
       state.outcome = "ok";
-      setScanMsg(`Done. ${checked} seller(s) found.`, "ok");
+      setScanMsg(`Done. ${visibleRows().length} seller(s) shown.`, "ok");
       setProgress(1);
     }
     render();

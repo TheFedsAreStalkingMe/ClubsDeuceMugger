@@ -17,6 +17,7 @@ export const DEFAULT_FILTERS = {
   maxItems: 40, // items read per scan
   autoScan: true, // read every item whose cheapest listing is above the minimum
   includeUnknown: false, // keep players that have no stat estimate
+  onlyOkay: false, // hide players who are in hospital, traveling, abroad or in jail
   autoEvery: 120, // seconds between auto hunt scans
   sort: "stats",
   dir: "desc",
