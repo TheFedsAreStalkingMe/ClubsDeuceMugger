@@ -7,7 +7,7 @@ import { trackAttack } from "./tracking.js";
 
 export function attackLink(id) {
   const a = el("a", {
-    class: "btn small", href: `https://www.torn.com/loader.php?sid=attack&user2ID=${id}`,
+    class: "btn small", href: `https://www.torn.com/page.php?sid=attack&user2ID=${id}`,
     target: "_blank", rel: "noopener noreferrer", text: "Attack",
   });
   a.addEventListener("click", () => trackAttack(id));

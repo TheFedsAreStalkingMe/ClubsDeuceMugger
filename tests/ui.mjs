@@ -91,6 +91,7 @@ async function runChecks() {
   await page.reload();
   await page.click("#scan");
   await scanDone();
+  check("the Attack button opens Torn's current attack page (page.php, not the retired loader.php)", /^https:\/\/www\.torn\.com\/page\.php\?sid=attack&user2ID=\d+$/.test(await page.getAttribute("#results .target a:has-text('Attack')", "href")));
   await page.evaluate(() => localStorage.removeItem("cdm.taps"));
   await page.click("#results .target a:has-text('Attack')");
   const taps = await page.evaluate(() => JSON.parse(localStorage.getItem("cdm.taps") || "[]"));
