@@ -90,6 +90,16 @@ company, last action, status). Torn does not show wages, so **estimated cash is 
 employees (capped at Torn's $25m a day pay limit). Company lists and employees are cached in the browser for 3 hours
 (`data.js`); every Torn call goes through the shared 80 a minute limiter (`features/limits.js`).
 
+**Mug rating and predicted mug.** Each player gets a 0 to 100 score from: estimated cash (30), net worth (25, Torn's
+public personal stats: a high net worth means they have held money for a long time), account age (15), weak stats (15,
+against your own stats from Settings when set), days inactive (10) and company stars (5); hover the rating for the
+breakdown. Parts that are not known yet are left out and the rest scaled up. Labels: 75+ Excellent, 55+ Good, 35+ Fair.
+The predicted mug is the estimated cash times your mug rate (5%, plus merits and Plunder from More options).
+
+**Your Torn key.** Everything the site calls with a member's key is listed in `public/js/core/keyneeds.js`; the "Make
+my Torn key" link in Settings is built from it and "Check my key" (Torn's `/key/info`) compares a key against it.
+Add a new selection there when a feature starts using one.
+
 ## How it fits together
 
 - **Every request goes through the Worker** (`run_worker_first`). `/api/*` goes to a route handler; anything

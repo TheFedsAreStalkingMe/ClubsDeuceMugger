@@ -212,6 +212,12 @@ async function runChecks() {
   check("ranked weapons: odd filter values refused", r.status === 400);
   r = await anon.get("/api/weav3r/ranked?tab=weapons");
   check("ranked weapons need sign-in", r.status === 401);
+  r = await bob.get("/api/torn/key", { headers: K });
+  check("key check lists what the key can use", r.data.type === "Limited Access" && r.data.selections.user.includes("attacks") && r.data.selections.company.includes("employees") && r.data.selections.torn.includes("attacklog"), JSON.stringify(r.data));
+  r = await bob.get("/api/torn/networth?id=21", { headers: K });
+  check("net worth of a player", r.data.networth === 2100000000, JSON.stringify(r.data));
+  r = await bob.get("/api/torn/networth?id=abc", { headers: K });
+  check("bad player id refused for net worth", r.status === 400);
   r = await bob.get("/api/torn/user?id=7", { headers: K });
   check("Torn profile trimmed", r.data.name === "A" && r.data.secret === undefined && r.data.last_action.timestamp === 5 && r.data.status.state === "Okay");
   r = await bob.get("/api/torn/user?id=7", { headers: { "X-Torn-Key": "BADKEY1234567890" } });

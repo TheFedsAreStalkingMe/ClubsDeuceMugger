@@ -253,3 +253,7 @@ details.more[open] > summary { margin-bottom: 10px; }
 .bonus-line { font-weight: 700; margin: 4px 0 0; }
 
 .suggested { color: var(--club); font-weight: 700; }
+
+.keycheck { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; text-align: left; }
+.keycheck .yes { color: var(--club); }
+.keycheck .no { color: var(--derse-l); }

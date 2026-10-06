@@ -26,9 +26,8 @@
       <section class="card panel">
         <h2>API key</h2>
         <div class="stack">
-          <a class="btn green small" id="make-key" target="_blank" rel="noopener noreferrer"
-             href="https://www.torn.com/preferences.php#tab=api?step=addNewKey&amp;title=ClubsDeuceMugger&amp;user=basic,profile,battlestats,attacks&amp;company=profile,employees,companies&amp;torn=companies">1. Make my Torn key</a>
-          <p class="hint">Opens Torn with the right permissions (your stats and attacks, and company data for the Inactive earners tab). Tap Create, copy the key. Made your key earlier? Make a new one, or edit it in Torn's API settings and tick Company and Torn.</p>
+          <a class="btn green small" id="make-key" target="_blank" rel="noopener noreferrer" href="https://www.torn.com/preferences.php#tab=api">1. Make my Torn key</a>
+          <p class="hint">Opens Torn with every permission the site uses (stats, attacks, companies, net worth). Then tap Check my key below to see that all of it works. Tap Create, copy the key. Made your key earlier? Make a new one, or edit it in Torn's API settings and tick Company and Torn.</p>
           <label>2. Paste it here <input type="password" id="key-torn" autocomplete="off" spellcheck="false" maxlength="64"></label>
           <label class="check"><input type="checkbox" id="save-account"> Keep it on my account for other devices</label>
           <label id="pass-row" hidden>Your password <span class="hint">Locks the saved key. Only you can unlock it.</span>
@@ -38,6 +37,9 @@
             <button class="btn ghost small" id="clear-keys" type="button">Clear</button>
           </div>
           <p class="msg" id="keys-msg" role="status" aria-live="polite"></p>
+          <div class="row"><button class="btn ghost small" id="check-key" type="button">Check my key</button></div>
+          <p class="msg" id="keycheck-msg" role="status" aria-live="polite"></p>
+          <ul class="keycheck" id="keycheck-list"></ul>
 
           <details class="more">
             <summary>FF Scouter (stat estimates)</summary>

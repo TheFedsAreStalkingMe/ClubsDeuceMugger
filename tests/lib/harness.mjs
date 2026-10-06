@@ -32,7 +32,7 @@ export const section = (title) => console.log(`\n${title}`);
 const now = () => Math.floor(Date.now() / 1000);
 // Test control: statuses the fake Torn reports, by player id. Change them with setFakeStatus().
 const statusOverride = {};
-const flags = { attacklogFail: false, weav3rBusy: false, deep: false, typesFail: false, manyCompanies: false };
+const flags = { attacklogFail: false, weav3rBusy: false, deep: false, typesFail: false, manyCompanies: false, keyLimited: false };
 export async function setFakeFlag(name, on) {
   await fetch(`http://localhost:${FAKE_PORT}/__flag?name=${name}&on=${on ? 1 : 0}`);
 }
@@ -145,6 +145,15 @@ function fakeServer() {
       { action: "hit", text: "Mugsy hit Rich for 100" },
       { action: "mug", text: "Mugsy mugged Rich and stole $2,500,000" },
     ], summary: [] } });
+
+    // Torn key info and net worth
+    if (p === "/v2/key/info") {
+      const all = { user: ["basic", "profile", "battlestats", "attacks", "personalstats"], company: ["companies", "employees", "profile"], torn: ["attacklog", "companies"], market: [], faction: [], property: [], racing: [], forum: [], key: ["info"] };
+      if (flags.keyLimited) all.user = ["basic", "profile"], all.torn = [];
+      return send({ info: { selections: all, user: { id: 555, faction_id: null, company_id: null }, access: { level: 3, type: flags.keyLimited ? "Custom" : "Limited Access", faction: false, company: false } } });
+    }
+    const nw = p.match(/^\/v2\/user\/(\d+)\/personalstats$/);
+    if (nw) return send({ personalstats: { networth: { total: Number(nw[1]) * 100000000 } } });
 
     // Torn companies (inactive earners): types 12 Mining Corporation and 5 Flower Shop
     //   501 Deep Co (10 stars): Pia 10 days idle, Quin 2 days idle, Rex 30 days idle and in hospital

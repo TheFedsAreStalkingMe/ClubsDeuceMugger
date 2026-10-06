@@ -45,6 +45,8 @@ const ROUTES = [
   ["GET", "/api/weav3r/ranked", proxies.weav3rRanked],
   ["GET", "/api/torn/user", proxies.tornProfile],
   ["GET", "/api/torn/me", proxies.tornMe],
+  ["GET", "/api/torn/key", proxies.keyInfo],
+  ["GET", "/api/torn/networth", proxies.playerNetworth],
   ["GET", "/api/torn/company-types", proxies.companyTypes],
   ["GET", "/api/torn/companies", proxies.companyList],
   ["GET", "/api/torn/employees", proxies.companyEmployees],

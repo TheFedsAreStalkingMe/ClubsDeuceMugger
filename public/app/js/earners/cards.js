@@ -3,7 +3,7 @@
 import { el } from "/js/core/dom.js";
 import { fmtShortMoney, fmtStats } from "/js/core/format.js";
 import { attackLink } from "../features/cards.js";
-import { daysInactive, estimateCash } from "./rules.js";
+import { daysInactive, estimateCash, mugScore, predictedMug } from "./rules.js";
 
 const profileLink = (id) =>
   el("a", { class: "btn small ghost", href: `https://www.torn.com/profiles.php?XID=${id}`, target: "_blank", rel: "noopener noreferrer", text: "Profile" });
@@ -21,7 +21,14 @@ export function earnCard(r, index) {
   const idle = daysInactive(r);
   const cash = estimateCash(r);
   const c = r.company;
+  const ms = mugScore(r);
+  const tone = ms.score >= 55 ? "good" : ms.score >= 35 ? "mediocre" : "bad";
+  const why = ms.parts.map((p) => `${p.label}: ${p.points == null ? "?" : `${p.points}/${p.max}`} (${p.note})`).join("\n");
+  const mug = predictedMug(r);
   const dl = el("dl", {},
+    ...row("Mug rating", el("span", { class: `rating ${tone}`, title: `${why}\nUnknown parts are left out and the rest scaled up.`, text: `${ms.label} (${ms.score}/100)` })),
+    ...row("Predicted mug", el("span", { class: "rating good", title: "Estimated cash x your mug rate (5%, plus merits and Plunder from More options). A rough guess.", text: mug != null ? `~${fmtShortMoney(mug)} (rough)` : "?" })),
+    ...row("Net worth", r.networth != null ? fmtShortMoney(r.networth) : "?"),
     ...row("Est. cash", el("span", { class: "rating good", title: "A rough guess: assumed daily wage (see Settings) x days inactive. Torn does not show wages.", text: cash != null ? `~${fmtShortMoney(cash)} (rough)` : "?" })),
     ...row("Days inactive", idle != null ? idle.toFixed(1) : "?"),
     ...row("Est. stats", fmtStats(r.bs)),

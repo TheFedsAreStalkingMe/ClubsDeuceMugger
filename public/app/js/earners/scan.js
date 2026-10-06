@@ -95,6 +95,31 @@ async function readEmployees(companies, f, runId) {
   return rows;
 }
 
+// ---------------------------------------------------------------- net worth
+
+// Public net worth of the new matches (Torn personal stats), kept for a day. null when Torn does not show it.
+let networthDenied = false;
+async function readNetworth(rows, runId) {
+  const ids = [...new Set(rows.map((r) => r.id))];
+  await pool(ids, 3, async (id) => {
+    if (runId !== state.runId) return;
+    let hit = cached(`n:${id}`, 24 * 3600e3);
+    if (!hit) {
+      try {
+        const r = await tornCall(`/api/torn/networth?id=${id}`, runId);
+        hit = { w: r.networth };
+        keep(`n:${id}`, hit);
+      } catch (e) {
+        if (isCancel(e)) throw e;
+        if (/access level|permission/i.test(e.message)) networthDenied = true;
+        hit = { w: null };
+      }
+    }
+    for (const r of rows) if (r.id === id) r.networth = hit.w;
+  });
+  flushCache();
+}
+
 // ---------------------------------------------------------------- the scan
 
 export async function scanEarners() {
@@ -116,6 +141,7 @@ export async function scanEarners() {
     const companies = await readCompanies(f, runId);
     const why = { noEst: 0, tooStrong: 0, tooWeak: 0, ffHigh: 0 };
     const known = new Set(); // players already looked at
+    networthDenied = false;
     let checked = 0, inactive = 0, keyProblem = false;
 
     for (let i = 0; i < companies.length && earn.rows.length < f.maxPlayers && !keyProblem; i += BATCH) {
@@ -140,6 +166,7 @@ export async function scanEarners() {
           earn.rows = [...earn.rows, ...good];
           render(); // matches show up as they are found
           keyProblem = await checkStatuses(good.map((r) => r.id), runId, { apply: applyRecord, progress: () => {}, render });
+          if (!keyProblem) { await readNetworth(good, runId); render(); } // net worth feeds the mug rating
         }
       }
       setProgress(0.1 + 0.9 * (checked / companies.length));
@@ -155,7 +182,7 @@ export async function scanEarners() {
     if (!earn.rows.length) {
       throw new Stop(inactive ? explainDrops(why, inactive).replace("sellers", "inactive players") : `No one at ${checked} companies has been inactive for ${f.minDays}+ days.`, "info", 1);
     }
-    setScanMsg(`Done. ${earn.rows.length} inactive player(s) found${full ? " (stopped at your limit)" : ""} after checking ${checked} of ${companies.length} companies.`, "ok");
+    setScanMsg(`Done. ${earn.rows.length} inactive player(s) found${full ? " (stopped at your limit)" : ""} after checking ${checked} of ${companies.length} companies.${networthDenied ? " Net worth could not be read: your key may need the personalstats permission (Settings, Check my key)." : ""}`, networthDenied ? "info" : "ok");
     setProgress(1);
   } catch (e) {
     if (isCancel(e) || runId !== state.runId) return;

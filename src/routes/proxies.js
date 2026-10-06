@@ -134,6 +134,37 @@ export async function tornMe({ request, env, user }) {
   return json({ total });
 }
 
+// ---------------------------------------------------------------- Torn key check and net worth
+
+// What the member's key can do: its access type and the selections it may use (Torn's /key/info works with any key).
+export async function keyInfo({ request, env, user }) {
+  const { data, response } = await tornPublic(env, request, user, "/key/info", { striptags: null });
+  if (response) return response;
+  const info = data.info || {};
+  const flat = (v) => (Array.isArray(v) ? v.flat(Infinity).filter((x) => typeof x === "string") : []);
+  const selections = {};
+  for (const [section, list] of Object.entries(info.selections || {})) selections[section] = flat(list);
+  return json({ type: info.access?.type || "", level: info.access?.level ?? null, selections });
+}
+
+// Public net worth of a player (Torn's personal stats, "networth" category), or null when it is not shown.
+const findNetworth = (o) => {
+  if (Array.isArray(o)) { for (const x of o) { const n = findNetworth(x); if (n != null) return n; } return null; }
+  if (o && typeof o === "object") {
+    if (o.networth && typeof o.networth.total === "number") return o.networth.total;
+    for (const v of Object.values(o)) { const n = findNetworth(v); if (n != null) return n; }
+  }
+  return null;
+};
+
+export async function playerNetworth({ request, env, url, user }) {
+  const id = url.searchParams.get("id") || "";
+  if (!/^\d{1,10}$/.test(id)) return fail("Bad player ID.");
+  const { data, response } = await tornPublic(env, request, user, `/user/${id}/personalstats`, { cat: "networth", striptags: null });
+  if (response) return response;
+  return json({ networth: findNetworth(data.personalstats) });
+}
+
 // ---------------------------------------------------------------- Torn companies (inactive earners)
 
 // A Torn API v2 call with the member's key. Key and Torn errors are passed on in the body, like the v1 calls.

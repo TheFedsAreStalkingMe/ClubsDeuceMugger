@@ -15,7 +15,9 @@ export const DEFAULT_EARN = {
   maxCompanies: 300, // the most companies whose employees are read in one scan (best stars first)
   maxPlayers: 80, // stop once this many matches are found
   includeUnknown: false, // keep players with no stat estimate
-  sort: "cash",
+  merits: false, // you have the mugging merits (+10% mug money), used for the predicted mug
+  plunder: 0, // percent of Plunder on your weapon, used for the predicted mug
+  sort: "score",
   dir: "desc",
 };
 
@@ -37,3 +39,4 @@ export const earn = {
 // Older saved settings had smaller limits (60 companies, 200 per type): the scan now keeps going, so use the new ones.
 if (earn.filters.maxCompanies === 60) earn.filters.maxCompanies = DEFAULT_EARN.maxCompanies;
 if (earn.filters.perType === 200) earn.filters.perType = DEFAULT_EARN.perType;
+if (earn.filters.sort === "cash" && earn.filters.dir === "desc") earn.filters.sort = "score"; // the old default; best mug first now

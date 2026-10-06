@@ -294,7 +294,15 @@ async function runChecks() {
   check("Try again loads the list", (await page.$$("#types label")).length === 2);
   await page.goto(BASE + "/app/settings.html");
   const keyLink = await page.getAttribute("#make-key", "href");
-  check("the key made from Settings includes company and Torn access", /company=[^&]*employees/.test(keyLink) && /torn=companies/.test(keyLink) && /user=basic,profile,battlestats,attacks/.test(keyLink), keyLink);
+  check("the key made from Settings asks for everything the site uses", /company=[^&]*employees/.test(keyLink) && /torn=[^&]*companies/.test(keyLink) && /torn=[^&]*attacklog/.test(keyLink) && /user=[^&]*personalstats/.test(keyLink) && /user=basic,profile,battlestats,attacks/.test(keyLink), keyLink);
+  await page.click("#check-key");
+  await page.waitForSelector("#keycheck-list li");
+  check("Check my key says a full key covers everything", /covers everything the site needs/.test(await text("#keycheck-msg")) && !/Missing/.test(await text("#keycheck-list")), await text("#keycheck-msg"));
+  await setFakeFlag("keyLimited", true);
+  await page.click("#check-key");
+  await page.waitForFunction(() => /missing access/.test(document.getElementById("keycheck-msg").textContent));
+  check("Check my key names the features a limited key cannot do", /Missing: Leaderboard[^\n]*attacks/.test(await text("#keycheck-list")) && /Missing: Inactive earners/.test(await text("#keycheck-list")), await text("#keycheck-list"));
+  await setFakeFlag("keyLimited", false);
   await page.goto(BASE + "/app/earners.html");
   await page.waitForSelector("#types label");
   await page.click("#scan");
@@ -304,6 +312,15 @@ async function runChecks() {
   check("estimated cash: 60% of $1m daily income / 3 employees = $200k a day x days inactive, labelled rough", /~\$6m \(rough\)/.test(efound[0].text) && /~\$2m \(rough\)/.test(efound[1].text), efound.map((c) => c.text.slice(0, 120)).join(" | "));
   check("cards show company, type, stars, position, profile and attack buttons", /Deep Co · Mining Corporation · 10★/.test(efound[0].text) && /Miner/.test(efound[0].text) && efound[0].link === "Profile,Attack", efound[0].link);
   check("cards show stats, fair fight, age and status", /Est\. stats2b/.test(efound[0].text) && /Fair fight1\.50/.test(efound[0].text) && /Account age\d+ days/.test(efound[0].text) && /Status(Okay|Out|Hospital)/.test(efound[0].text), efound[0].text);
+  check("mug rating and predicted mug shown", /Mug rating(Excellent|Good|Fair|Poor) \(\d+\/100\)/.test(efound[0].text) && /Predicted mug~\$300k \(rough\)/.test(efound[0].text), efound[0].text.slice(0, 220));
+  check("net worth shown and counted in the rating", /Net worth\$2\.3b/.test(efound[0].text), efound[0].text.slice(0, 220));
+  check("the best mug is listed first (Rex: more cash, idle longer, richer)", efound[0].name === "Rex", efound.map((c) => c.name).join());
+  await page.click("details.more > summary");
+  await page.check("#merits");
+  await page.fill("#plunder", "20");
+  check("merits and Plunder raise the predicted mug", /Predicted mug~\$390k/.test((await earnCards())[0].text), (await earnCards())[0].text.slice(0, 200));
+  await page.uncheck("#merits");
+  await page.fill("#plunder", "0");
   await page.selectOption("#sort", "days:asc");
   check("sorting by days inactive", (await earnCards()).map((c) => c.name).join() === "Pia,Rex");
   // the second scan is served from the browser cache: no new company or employee calls

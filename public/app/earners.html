@@ -59,6 +59,9 @@
         <summary>More options</summary>
         <div class="stack">
           <label class="check"><input type="checkbox" id="includeUnknown"> Keep players with no stat estimate</label>
+          <label class="check"><input type="checkbox" id="merits"> I have the mugging merits (+10% mug money)</label>
+          <label>Plunder on my weapon (%) <span class="hint">Used for the predicted mug.</span>
+            <input type="number" id="plunder" inputmode="decimal" min="0" max="100" step="0.1"></label>
           <label>Companies read per type <span class="hint">100 per Torn call.</span>
             <input type="number" id="perType" inputmode="numeric" min="100" max="2000" step="100"></label>
           <label>Check at most this many companies <span class="hint">Most stars first. The scan keeps going through them, ten at a time, until it has enough matches.</span>
@@ -80,6 +83,9 @@
     <div class="sortbar">
       <label>Sort
         <select id="sort">
+          <option value="score:desc">Best mug first</option>
+          <option value="score:asc">Worst mug first</option>
+          <option value="mug:desc">Biggest predicted mug</option>
           <option value="cash:desc">Most estimated cash</option>
           <option value="cash:asc">Least estimated cash</option>
           <option value="days:desc">Longest inactive</option>
