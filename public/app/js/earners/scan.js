@@ -1,7 +1,8 @@
-// One Inactive Earners scan, in stages:
-//   1 company lists (by type, stars)  ->  2 employees of each company (last action, status)
-//   3 FF Scouter estimates            ->  4 stat filter + keep the biggest estimated cash
-//   5 Torn status and account age
+// One Inactive Earners scan. It keeps searching until it has found enough matches or run out of companies:
+//   1 company lists (by type, stars), best stars first
+//   then, ten companies at a time:
+//   2 employees of those companies (last action)  ->  3 FF Scouter estimates  ->  4 stat filter
+//   5 Torn status and account age for the new matches (they show up as soon as they are found)
 //
 // Every Torn call waits for a free slot under the per-minute limit. Company lists and employees are cached
 // for a few hours (data.js), so a repeat scan only pays for what changed.
@@ -20,7 +21,8 @@ import { daysInactive, estimateCash } from "./rules.js";
 import { earn } from "./state.js";
 
 const isCancel = (e) => e && e.message === "cancelled";
-const STAGES = { companies: phase(0, 0.15), employees: phase(0.15, 0.55), estimates: phase(0.55, 0.7), status: phase(0.7, 1) };
+const BATCH = 10; // companies read before their employees are filtered and shown
+const STAGES = { companies: phase(0, 0.1) };
 
 class Stop extends Error {
   constructor(message, kind = "info", progress = null) { super(message); Object.assign(this, { kind, progress }); }
@@ -67,7 +69,6 @@ async function readEmployees(companies, f, runId) {
   const rows = [];
   const minIdle = f.minDays * 86400;
   const nowSec = Date.now() / 1000;
-  let done = 0;
   await pool(companies, 3, async (c) => {
     if (runId !== state.runId) return;
     const key = `e:${c.id}`;
@@ -89,8 +90,6 @@ async function readEmployees(companies, f, runId) {
         company: { id: c.id, name: c.name, typeId: c.type, typeName: c.typeName, stars: c.stars, income: c.income, hired: c.hired },
       });
     }
-    STAGES.employees(++done / companies.length);
-    setScanMsg(`Reading employees ${done}/${companies.length}...`);
   });
   flushCache();
   return rows;
@@ -115,34 +114,49 @@ export async function scanEarners() {
 
   try {
     const companies = await readCompanies(f, runId);
-    let rows = await readEmployees(companies, f, runId);
-    if (runId !== state.runId) return;
-    if (!rows.length) throw new Stop(`No one at ${companies.length} companies has been inactive for ${f.minDays}+ days.`, "info", 1);
-
-    // best guesses first, then stats for all of them (cheap: 200 per call), then the stat filter
-    rows.sort((a, b) => estimateCash(b) - estimateCash(a));
-    const estimates = await estimateStats(call, rows.map((r) => r.id), runId, STAGES.estimates);
-    if (runId !== state.runId) return;
     const why = { noEst: 0, tooStrong: 0, tooWeak: 0, ffHigh: 0 };
-    const seen = rows.length;
-    rows = rows.filter((r) => {
-      const e = estimates.get(r.id) || {};
-      Object.assign(r, { ff: e.ff, bs: e.bs });
-      const verdict = statVerdict(r.bs, r.ff, f);
-      if (verdict) why[verdict]++;
-      return !verdict;
-    }).slice(0, f.maxPlayers);
+    const known = new Set(); // players already looked at
+    let checked = 0, inactive = 0, keyProblem = false;
 
-    earn.rows = rows;
-    render();
-    if (!rows.length) throw new Stop(explainDrops(why, seen).replace("sellers", "inactive players"), "info", 1);
-
-    const keyProblem = await checkStatuses(rows.map((r) => r.id), runId, { apply: applyRecord, progress: STAGES.status, render });
-    if (runId === state.runId && !keyProblem) {
-      setScanMsg(`Done. ${rows.length} inactive player(s) from ${companies.length} companies.`, "ok");
-      setProgress(1);
+    for (let i = 0; i < companies.length && earn.rows.length < f.maxPlayers && !keyProblem; i += BATCH) {
+      if (runId !== state.runId) return;
+      const batch = companies.slice(i, i + BATCH);
+      const rows = (await readEmployees(batch, f, runId)).filter((r) => !known.has(r.id));
+      checked += batch.length;
+      if (runId !== state.runId) return;
+      if (rows.length) {
+        for (const r of rows) known.add(r.id);
+        inactive += rows.length;
+        const estimates = await estimateStats(call, rows.map((r) => r.id), runId, () => {});
+        if (runId !== state.runId) return;
+        const good = rows.filter((r) => {
+          const e = estimates.get(r.id) || {};
+          Object.assign(r, { ff: e.ff, bs: e.bs });
+          const verdict = statVerdict(r.bs, r.ff, f);
+          if (verdict) why[verdict]++;
+          return !verdict;
+        });
+        if (good.length) {
+          earn.rows = [...earn.rows, ...good];
+          render(); // matches show up as they are found
+          keyProblem = await checkStatuses(good.map((r) => r.id), runId, { apply: applyRecord, progress: () => {}, render });
+        }
+      }
+      setProgress(0.1 + 0.9 * (checked / companies.length));
+      setScanMsg(`Checked ${checked}/${companies.length} companies, ${earn.rows.length} match(es) so far. Cancel to stop.`);
     }
+    if (runId !== state.runId) return;
+
+    earn.rows.sort((a, b) => (estimateCash(b) ?? 0) - (estimateCash(a) ?? 0));
+    const full = earn.rows.length >= f.maxPlayers;
+    earn.rows = earn.rows.slice(0, f.maxPlayers);
     render();
+    if (keyProblem) return;
+    if (!earn.rows.length) {
+      throw new Stop(inactive ? explainDrops(why, inactive).replace("sellers", "inactive players") : `No one at ${checked} companies has been inactive for ${f.minDays}+ days.`, "info", 1);
+    }
+    setScanMsg(`Done. ${earn.rows.length} inactive player(s) found${full ? " (stopped at your limit)" : ""} after checking ${checked} of ${companies.length} companies.`, "ok");
+    setProgress(1);
   } catch (e) {
     if (isCancel(e) || runId !== state.runId) return;
     if (e instanceof Stop) {

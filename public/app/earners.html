@@ -60,10 +60,10 @@
         <div class="stack">
           <label class="check"><input type="checkbox" id="includeUnknown"> Keep players with no stat estimate</label>
           <label>Companies read per type <span class="hint">100 per Torn call.</span>
-            <input type="number" id="perType" inputmode="numeric" min="100" max="1000" step="100"></label>
-          <label>Companies to check employees of <span class="hint">Most stars first.</span>
-            <input type="number" id="maxCompanies" inputmode="numeric" min="1" max="300" step="1"></label>
-          <label>Players to show <span class="hint">Biggest estimated cash first.</span>
+            <input type="number" id="perType" inputmode="numeric" min="100" max="2000" step="100"></label>
+          <label>Check at most this many companies <span class="hint">Most stars first. The scan keeps going through them, ten at a time, until it has enough matches.</span>
+            <input type="number" id="maxCompanies" inputmode="numeric" min="1" max="1000" step="1"></label>
+          <label>Stop after finding this many players <span class="hint">Biggest estimated cash first.</span>
             <input type="number" id="maxPlayers" inputmode="numeric" min="1" max="500" step="1"></label>
         </div>
       </details>
@@ -73,7 +73,7 @@
         <button class="btn green" id="scan" type="button">Scan once &clubs;</button>
         <button class="btn ghost" id="cancel" type="button" hidden>Cancel</button>
       </div>
-      <p class="hint">Company lists and employees are kept for 3 hours, so repeat scans are quick.</p>
+      <p class="hint">The scan keeps searching company after company until it finds enough matches or runs out. Matches appear as they are found; Cancel stops it. Company lists and employees are kept for 3 hours, so repeat scans are quick.</p>
       <p class="msg info" id="scan-msg" role="status" aria-live="polite"></p>
     </section>
 

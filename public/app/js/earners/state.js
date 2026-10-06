@@ -11,9 +11,9 @@ export const DEFAULT_EARN = {
   minBs: 0,
   maxBs: NUM_MAX,
   maxFf: 10,
-  perType: 200, // companies read per type (100 per call)
-  maxCompanies: 60, // companies whose employees are read per scan
-  maxPlayers: 80, // players who get the slower status checks
+  perType: 500, // companies read per type (100 per call)
+  maxCompanies: 300, // the most companies whose employees are read in one scan (best stars first)
+  maxPlayers: 80, // stop once this many matches are found
   includeUnknown: false, // keep players with no stat estimate
   sort: "cash",
   dir: "desc",
@@ -33,3 +33,7 @@ export const earn = {
   types: [], // [{ id, name }] every company type
   rows: [], // players from the last scan
 };
+
+// Older saved settings had smaller limits (60 companies, 200 per type): the scan now keeps going, so use the new ones.
+if (earn.filters.maxCompanies === 60) earn.filters.maxCompanies = DEFAULT_EARN.maxCompanies;
+if (earn.filters.perType === 200) earn.filters.perType = DEFAULT_EARN.perType;

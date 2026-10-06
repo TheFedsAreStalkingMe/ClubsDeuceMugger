@@ -32,7 +32,7 @@ export const section = (title) => console.log(`\n${title}`);
 const now = () => Math.floor(Date.now() / 1000);
 // Test control: statuses the fake Torn reports, by player id. Change them with setFakeStatus().
 const statusOverride = {};
-const flags = { attacklogFail: false, weav3rBusy: false, deep: false, typesFail: false };
+const flags = { attacklogFail: false, weav3rBusy: false, deep: false, typesFail: false, manyCompanies: false };
 export async function setFakeFlag(name, on) {
   await fetch(`http://localhost:${FAKE_PORT}/__flag?name=${name}&on=${on ? 1 : 0}`);
 }
@@ -154,12 +154,14 @@ function fakeServer() {
     let m;
     if ((m = p.match(/^\/v2\/company\/(\d+)\/companies$/))) {
       const co = (id, name, type, typeName, rating, hired) => ({ id, name, type: { id: type, name: typeName }, rating, employees: { hired, capacity: 10 }, income: { daily: 1000000 } });
-      const list = m[1] === "12" ? [co(501, "Deep Co", 12, "Mining Corporation", 10, 3), co(502, "Shallow Co", 12, "Mining Corporation", 4, 1)] : [co(601, "Petals", 5, "Flower Shop", 5, 1)];
+      const many = flags.manyCompanies && m[1] === "12" ? Array.from({ length: 25 }, (_, i) => co(700 + i, `Mass ${i}`, 12, "Mining Corporation", 10, 1)) : [];
+      const list = m[1] === "12" ? [...many, co(501, "Deep Co", 12, "Mining Corporation", 10, 3), co(502, "Shallow Co", 12, "Mining Corporation", 4, 1)] : [co(601, "Petals", 5, "Flower Shop", 5, 1)];
       return send({ companies: list, _metadata: { total: list.length, links: { next: null, prev: null } } });
     }
     if ((m = p.match(/^\/v2\/company\/(\d+)\/employees$/))) {
       const day = 86400;
       const emp = (id, name, days, idle, state = "Okay", until = null) => ({ id, name, position: { id: 1, name: "Miner" }, days_in_company: days, status: { description: state, details: null, state, color: "green", until }, last_action: { status: "Offline", timestamp: now() - idle * day, relative: "x" } });
+      if (Number(m[1]) >= 700) return send({ employees: [emp(900 + Number(m[1]) - 700, `Mass Emp ${Number(m[1]) - 700}`, 100, 10 + (Number(m[1]) % 5))] });
       const by = { 501: [emp(21, "Pia", 100, 10), emp(22, "Quin", 100, 2), emp(23, "Rex", 100, 30, "Hospital", now() + 3600)], 502: [emp(24, "Sam", 100, 20)], 601: [emp(25, "Tess", 8, 15)] };
       return send({ employees: by[m[1]] || [] });
     }

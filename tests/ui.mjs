@@ -337,6 +337,33 @@ async function runChecks() {
   await setStore("cdm.earn.filters", { types: [12], minStars: 5, minDays: 7 });
   await setStore("cdm.earn.wages", { base: 500000, types: {} });
 
+  section("Inactive earners keep searching");
+  // 27 companies at 10 stars: the scan goes on batch after batch until it has them all, or has enough.
+  await setFakeFlag("manyCompanies", true);
+  await page.goto(BASE + "/app/earners.html");
+  await page.waitForFunction(() => document.getElementById("maxBs").value !== "");
+  await page.evaluate(() => { localStorage.removeItem("cdm.earn.cache"); localStorage.removeItem("cdm.calls"); localStorage.removeItem("cdm.profiles"); });
+  await setStore("cdm.earn.filters", { types: [12], minStars: 5, minDays: 7, maxPlayers: 80 });
+  await page.reload();
+  await page.waitForSelector("#types label");
+  await page.evaluate(() => localStorage.removeItem("cdm.calls")); // a fresh minute of Torn calls
+  await page.click("#scan");
+  await page.waitForSelector("#scan:not([disabled])", { timeout: 150000 });
+  efound = await earnCards();
+  check("it keeps going through every company (more than one batch of ten)", efound.length === 27, `${efound.length} | ${await text("#scan-msg")}`);
+  check("the message says how many companies were checked", /after checking 26 of 26 companies|after checking \d+ of \d+ companies/.test(await text("#scan-msg")), await text("#scan-msg"));
+  await setStore("cdm.earn.filters", { types: [12], minStars: 5, minDays: 7, maxPlayers: 5 });
+  await page.reload();
+  await page.waitForSelector("#types label");
+  await page.evaluate(() => localStorage.removeItem("cdm.calls")); // a fresh minute of Torn calls
+  await page.click("#scan");
+  await page.waitForSelector("#scan:not([disabled])", { timeout: 150000 });
+  efound = await earnCards();
+  check("it stops once it has found enough players", efound.length === 5 && /stopped at your limit/.test(await text("#scan-msg")), `${efound.length} | ${await text("#scan-msg")}`);
+  await setFakeFlag("manyCompanies", false);
+  await page.evaluate(() => { localStorage.removeItem("cdm.earn.cache"); localStorage.removeItem("cdm.calls"); localStorage.removeItem("cdm.profiles"); });
+  await setStore("cdm.earn.filters", { types: [12], minStars: 5, minDays: 7 });
+
   section("Bonus weapon sellers");
   const bonusCards = () => page.$$eval("#results .target", (els) => els.map((e) => ({
     name: e.querySelector(".name").textContent,

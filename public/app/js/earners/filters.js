@@ -56,8 +56,8 @@ export function initEarnFilters() {
   bindSlider("minBs", { to: toLog, from: fromLog });
   bindSlider("maxBs", { to: toLog, from: fromLog });
   bindSlider("maxFf");
-  bindNumber("perType", 100, 1000, 200);
-  bindNumber("maxCompanies", 1, 300, 60);
+  bindNumber("perType", 100, 2000, 500);
+  bindNumber("maxCompanies", 1, 1000, 300);
   bindNumber("maxPlayers", 1, 500, 80);
   const unknown = $("includeUnknown");
   unknown.checked = !!f.includeUnknown;
