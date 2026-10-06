@@ -28,7 +28,7 @@ export function render() {
 
 // A fresh Torn record for a player: write it on their row and their card (in place, so button taps are not lost).
 export function applyRecord(id, p) {
-  const fields = { state: p.state, until: p.until, desc: p.desc, age: p.age, checkedAt: p.t || Date.now() };
+  const fields = { state: p.state, until: p.until, desc: p.desc, details: p.details || "", age: p.age, checkedAt: p.t || Date.now() };
   for (const r of earn.rows) {
     if (r.id !== id) continue;
     Object.assign(r, fields);

@@ -123,7 +123,7 @@ export async function tornProfile({ request, env, url, user }) {
     name: data.name,
     age: data.age,
     last_action: data.last_action && { timestamp: data.last_action.timestamp, status: data.last_action.status },
-    status: data.status && { state: data.status.state, description: data.status.description, until: data.status.until },
+    status: data.status && { state: data.status.state, description: data.status.description, details: data.status.details || "", until: data.status.until },
   });
 }
 
@@ -176,7 +176,7 @@ export async function playerData({ request, env, url, user }) {
   return json({
     player_id: p.id, name: p.name, age: p.age,
     last_action: p.last_action && { timestamp: p.last_action.timestamp, status: p.last_action.status },
-    status: p.status && { state: p.status.state, description: p.status.description, until: p.status.until },
+    status: p.status && { state: p.status.state, description: p.status.description, details: p.status.details || "", until: p.status.until },
     networth: findNetworth(data.personalstats),
   });
 }

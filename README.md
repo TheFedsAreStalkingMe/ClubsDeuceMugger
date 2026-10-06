@@ -96,6 +96,16 @@ against your own stats from Settings when set), days inactive (10) and company s
 breakdown. Parts that are not known yet are left out and the rest scaled up. Labels: 75+ Excellent, 55+ Good, 35+ Fair.
 The predicted mug is the estimated cash times your mug rate (5%, plus merits and Plunder from More options).
 
+**Mug tracking (why a mug took what it did).** Tapping Attack on a card saves a prediction with the tap (predicted mug,
+estimated cash, net worth, rating, recent mugs; `pred` in `features/tracking.js`, stored on `clicks`, migration 0007).
+While a finder page is open, `startMugWatch` checks your Torn attack log once a minute for 20 minutes after a tap
+(`/api/leaderboard/sync`). A matching mug fills in `result` and `actual`; a tap with no mug is closed after 3 hours with
+what the fight ended as. The Leaderboard page lists predicted against actual with a likely reason
+(`features/outcomes.js`): other members' mugs in the 24 hours before, a mug the site already knew about, "Mugged by" in
+the hospital status, or no known cause. **Recently mugged** lowers the rating on the Inactive earners tab: every mug a
+member made is remembered (`seen_mugs`), each one in the last 24 hours takes about 18% off, older ones this week a
+little, a mug in the last hour and a "Mugged by" hospital status extra (`recentDrain` in `earners/rules.js`).
+
 **Your Torn key.** Everything the site calls with a member's key is listed in `public/js/core/keyneeds.js`; the "Make
 my Torn key" link in Settings is built from it and "Check my key" (Torn's `/key/info`) compares a key against it.
 Add a new selection there when a feature starts using one.

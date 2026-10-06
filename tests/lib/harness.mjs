@@ -32,7 +32,7 @@ export const section = (title) => console.log(`\n${title}`);
 const now = () => Math.floor(Date.now() / 1000);
 // Test control: statuses the fake Torn reports, by player id. Change them with setFakeStatus().
 const statusOverride = {};
-const flags = { attacklogFail: false, weav3rBusy: false, deep: false, typesFail: false, manyCompanies: false, keyLimited: false, combinedFail: false };
+const flags = { attacklogFail: false, weav3rBusy: false, deep: false, typesFail: false, manyCompanies: false, keyLimited: false, combinedFail: false, attacksDenied: false };
 export async function setFakeFlag(name, on) {
   await fetch(`http://localhost:${FAKE_PORT}/__flag?name=${name}&on=${on ? 1 : 0}`);
 }
@@ -140,9 +140,11 @@ function fakeServer() {
 
     // Torn v2 (leaderboard)
     if (p === "/v2/user/basic") return send({ profile: { id: TORN_IDS[key] || 999, name: key.startsWith("DANA") ? "Dana" : "Mugsy" } });
+    if (p === "/v2/user/attacks" && flags.attacksDenied) return send({ error: { code: 16, error: "Access level of this key is not high enough" } });
     if (p === "/v2/user/attacks") {
       const t = now() + 5; // after the test's click
       return send({ attacks: [
+        { id: 5, code: "EEE", started: t, result: "Mugged", attacker: { id: 555 }, defender: { id: 23 } }, // Rex, never tapped by the test: counts as a recent mug of him
         { id: 1, code: "AAA", started: t, result: "Mugged", attacker: { id: 555 }, defender: { id: 111 } },
         { id: 2, code: "BBB", started: t, result: "Mugged", attacker: { id: 555 }, defender: { id: 999 } }, // never clicked
         { id: 3, code: "CCC", started: t, result: "Hospitalized", attacker: { id: 555 }, defender: { id: 111 } }, // not a mug

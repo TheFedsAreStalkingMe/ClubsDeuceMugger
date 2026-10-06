@@ -268,6 +268,34 @@ async function runChecks() {
   await page.waitForFunction(() => document.getElementById("keys-msg").textContent.length > 12);
   check("FF Scouter key test answers", /FF Scouter/.test(await text("#keys-msg")), await text("#keys-msg"));
 
+  section("Mug tracking");
+  // A tap carries a prediction; the page checks your attack log by itself (every minute, shortened here) and matches it.
+  await page.goto(BASE + "/app/");
+  await page.waitForFunction(() => document.getElementById("maxBs").value !== "");
+  await setStore("cdm.keys", { torn: "abcdefgh12345678", ff: "" });
+  await page.evaluate(() => {
+    localStorage.setItem("cdm.watchMs", "1000");
+    localStorage.setItem("cdm.taps", JSON.stringify([{ target: 111, at: Math.floor(Date.now() / 1000), pred: { src: "earners", mug: 5000000, cash: 90000000, networth: 2500000000, score: 70, recent: 2, hosp: false } }]));
+  });
+  await page.reload();
+  const matchedByWatch = await page.waitForFunction(async () => (await (await fetch("/api/mug/outcomes")).json()).rows.some((o) => o.target_id === 111 && o.result === "Mugged"), null, { timeout: 40000, polling: 1000 }).then(() => true, () => false);
+  check("the watch matched the mug by itself, with no button pressed", matchedByWatch);
+  await page.evaluate(() => localStorage.removeItem("cdm.watchMs"));
+  await page.goto(BASE + "/app/leaderboard.html");
+  await page.waitForSelector("#outcomes .item");
+  const outcomeText = await text("#outcomes");
+  check("the outcome compares what was predicted with what was mugged, and says why it was lower", /Below prediction/.test(outcomeText) && /\$2,500,000 of \$5,000,000/.test(outcomeText) && /2 recent mugs/.test(outcomeText), outcomeText.slice(0, 300));
+  check("the summary says how close predictions are", /took 50% of its prediction/.test(await text("#outcome-summary")), await text("#outcome-summary"));
+  // A key without the attacks permission: the check says what is missing and links to a new key.
+  await page.evaluate(() => fetch("/api/clicks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ target: 5000 }) }));
+  await setFakeFlag("attacksDenied", true);
+  await setFakeFlag("keyLimited", true);
+  await page.click("#sync");
+  await page.waitForSelector("#sync-diag li");
+  check("a key without the attacks permission is explained on the leaderboard page", /Torn key problem/.test(await text("#sync-msg")) && /Missing: Leaderboard[^\n]*attacks/.test(await text("#sync-diag")) && (await page.$("#sync-diag a")) !== null, `${await text("#sync-msg")} | ${await text("#sync-diag")}`);
+  await setFakeFlag("attacksDenied", false);
+  await setFakeFlag("keyLimited", false);
+
   section("Inactive earners");
   const earnCards = () => page.$$eval("#results .target", (els) => els.map((e) => ({
     name: e.querySelector(".name").textContent,
@@ -308,17 +336,22 @@ async function runChecks() {
   await page.click("#scan");
   await scanDone();
   let efound = await earnCards();
-  check("only inactive players at companies with enough stars", efound.map((c) => c.name).join() === "Rex,Pia", efound.map((c) => c.name).join());
-  check("estimated cash: 60% of $1m daily income / 3 employees = $200k a day x days inactive, labelled rough", /~\$6m \(rough\)/.test(efound[0].text) && /~\$2m \(rough\)/.test(efound[1].text), efound.map((c) => c.text.slice(0, 120)).join(" | "));
-  check("cards show company, type, stars, position, profile and attack buttons", /Deep Co · Mining Corporation · 10★/.test(efound[0].text) && /Miner/.test(efound[0].text) && efound[0].link === "Profile,Attack", efound[0].link);
-  check("cards show stats, fair fight, age and status", /Est\. stats2b/.test(efound[0].text) && /Fair fight1\.50/.test(efound[0].text) && /Account age\d+ days/.test(efound[0].text) && /Status(Okay|Out|Hospital)/.test(efound[0].text), efound[0].text);
-  check("mug rating and predicted mug shown", /Mug rating(Excellent|Good|Fair|Poor) \(\d+\/100\)/.test(efound[0].text) && /Predicted mug~\$300k \(rough\)/.test(efound[0].text), efound[0].text.slice(0, 220));
-  check("net worth shown and counted in the rating", /Net worth\$2\.3b/.test(efound[0].text), efound[0].text.slice(0, 220));
-  check("the best mug is listed first (Rex: more cash, idle longer, richer)", efound[0].name === "Rex", efound.map((c) => c.name).join());
+  const rex = efound.find((c) => c.name === "Rex"), pia = efound.find((c) => c.name === "Pia");
+  check("only inactive players at companies with enough stars", efound.map((c) => c.name).sort().join() === "Pia,Rex", efound.map((c) => c.name).join());
+  check("estimated cash: 60% of $1m daily income / 3 employees = $200k a day x days inactive, labelled rough", /~\$6m \(rough\)/.test(rex.text) && /~\$2m \(rough\)/.test(pia.text), efound.map((c) => c.text.slice(0, 120)).join(" | "));
+  check("cards show company, type, stars, position, profile and attack buttons", /Deep Co · Mining Corporation · 10★/.test(rex.text) && /Miner/.test(rex.text) && rex.link === "Profile,Attack", efound[0].link);
+  check("cards show stats, fair fight, age and status", /Est\. stats2b/.test(rex.text) && /Fair fight1\.50/.test(rex.text) && /Account age\d+ days/.test(rex.text) && /Status(Okay|Out|Hospital)/.test(rex.text), rex.text);
+  check("mug rating and predicted mug shown", /Mug rating(Excellent|Good|Fair|Poor) \(\d+\/100\)/.test(rex.text) && /Predicted mug~\$201k \(rough\)/.test(rex.text), rex.text.slice(0, 220));
+  check("net worth shown and counted in the rating", /Net worth\$2\.3b/.test(rex.text), rex.text.slice(0, 220));
+  check("a player mugged recently is marked and rated lower (Rex was mugged an hour ago)", /Recently mugged1 mug in 24h \(-33%\)/.test(rex.text), rex.text.slice(0, 320));
+  await page.click("#results .target:has-text('Rex') a:has-text('Attack')");
+  const lastTap = await page.evaluate(() => JSON.parse(localStorage.getItem("cdm.taps") || "[]").pop());
+  check("the Attack tap saves the prediction (mug, cash, net worth, score, recent mugs)", lastTap && lastTap.pred && lastTap.pred.src === "earners" && lastTap.pred.mug > 0 && lastTap.pred.networth === 2300000000 && lastTap.pred.score > 0 && lastTap.pred.recent === 1, JSON.stringify(lastTap));
+  check("a player mugged recently is ranked below one who was not (Pia above Rex)", efound[0].name === "Pia", efound.map((c) => c.name).join());
   await page.click("details.more > summary");
   await page.check("#merits");
   await page.fill("#plunder", "20");
-  check("merits and Plunder raise the predicted mug", /Predicted mug~\$390k/.test((await earnCards())[0].text), (await earnCards())[0].text.slice(0, 200));
+  check("merits and Plunder raise the predicted mug", /Predicted mug~\$261k/.test((await earnCards()).find((c) => c.name === "Rex").text), (await earnCards()).find((c) => c.name === "Rex").text.slice(0, 200));
   await page.uncheck("#merits");
   await page.fill("#plunder", "0");
   await page.selectOption("#sort", "days:asc");

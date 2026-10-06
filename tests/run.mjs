@@ -276,11 +276,28 @@ async function runChecks() {
   check("board adds the second mug", r.data.rows[0].total === 5000000 && r.data.rows[0].mugs === 2, JSON.stringify(r.data));
   r = await bob.get("/api/leaderboard?range=day");
   check("24 hour board", r.data.rows.length === 1);
+  // a tap carries what the page predicted; the check keeps it next to what was really mugged
+  const nowSec = Math.floor(Date.now() / 1000);
+  r = await bob.post("/api/clicks", { target: 999, at: nowSec - 2, pred: { src: "earners", mug: 2000000, cash: 40000000, networth: 2500000000, score: 80, recent: 1, hosp: true } });
+  check("a tap with a prediction is accepted", r.status === 200);
   // the phone sends its own list of taps with the check, so a lost quick request does not matter
   r = await bob.post("/api/leaderboard/sync", { taps: [{ target: 999, at: Math.floor(Date.now() / 1000) - 2 }, { target: "bad", at: 1 }] }, { headers: K });
   check("taps sent with the check are used", r.data.counted === 1 && r.data.taps >= 1, JSON.stringify(r.data));
   r = await bob.post("/api/leaderboard/sync", { taps: [{ target: 999, at: Math.floor(Date.now() / 1000) - 2 }] }, { headers: K });
   check("the same tap sent twice is one tap", r.data.counted === 0, JSON.stringify(r.data));
+  r = await bob.post("/api/leaderboard/sync", { taps: [{ target: 777, at: nowSec - 4 * 3600 }] }, { headers: K });
+  check("an old tap with no attack seen is closed", r.status === 200, JSON.stringify(r.data));
+  r = await bob.get("/api/mug/outcomes");
+  const o999 = r.data.rows.find((x) => x.target_id === 999), o777 = r.data.rows.find((x) => x.target_id === 777);
+  check("outcome keeps the prediction next to what was mugged", o999 && o999.matched === 1 && o999.result === "Mugged" && o999.predicted === 2000000 && o999.actual === 2500000 && o999.src === "earners" && o999.score === 80 && o999.hosp === 1 && o999.recent_mugs === 1, JSON.stringify(o999));
+  check("a tap that never became an attack is closed with that result", o777 && o777.matched === 2 && o777.result === "No attack seen" && o777.actual === 0, JSON.stringify(o777));
+  check("outcomes say how close predictions are", r.data.summary.compared >= 1 && Math.abs(r.data.summary.median - 1.25) < 0.01, JSON.stringify(r.data.summary));
+  r = await bob.get("/api/targets/recent?ids=999,111,5");
+  check("recent mugs of players: counts and money in 24h", r.data.recent[999] && r.data.recent[999].n24 >= 1 && r.data.recent[999].n7 >= 1 && r.data.recent[999].sum24 === 2500000 && r.data.recent[5] === undefined, JSON.stringify(r.data));
+  r = await bob.get("/api/targets/recent?ids=abc");
+  check("bad ids refused for recent mugs", r.status === 400);
+  r = await anon.get("/api/mug/outcomes");
+  check("outcomes need sign-in", r.status === 401);
   r = await bob.get("/api/me");
   check("me carries a build id for update notices", typeof r.data.build === "string");
   r = await anon.get("/api/leaderboard");

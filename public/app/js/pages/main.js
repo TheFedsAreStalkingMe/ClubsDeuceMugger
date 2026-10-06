@@ -10,7 +10,7 @@ import { render, tick } from "../features/results.js";
 import { cancelScan, toggleAutoHunt } from "../features/runner.js";
 import { startLiveRefresh } from "../features/refresh.js";
 import { scan } from "../features/scan.js";
-import { syncLeaderboard } from "../features/tracking.js";
+import { startMugWatch } from "../features/tracking.js";
 import { updateRunButtons } from "../features/ui.js";
 import { initWatch } from "../features/watchlist.js";
 import { state } from "../state.js";
@@ -45,8 +45,7 @@ async function boot() {
 
   setInterval(tick, 1000);
   startLiveRefresh();
-  syncLeaderboard();
-  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") syncLeaderboard(); });
+  startMugWatch();
 }
 
 boot();

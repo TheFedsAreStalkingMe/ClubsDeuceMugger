@@ -14,21 +14,41 @@ const validTarget = (t) => Number.isInteger(t) && t >= 1 && t <= 9999999999;
 // A tap time from the phone is trusted only if it is plausible (in the last day, not in the future).
 const tapTime = (at) => (Number.isInteger(at) && at > nowSec() - 86400 && at <= nowSec() + 60 ? at : nowSec());
 
-// Records an Attack tap unless the same tap (same player, within 5 seconds) is already there.
-async function addTap(env, userId, target, at) {
-  await env.DB.prepare(
-    `INSERT INTO clicks (user_id, target_id, clicked_at)
-     SELECT ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM clicks WHERE user_id = ? AND target_id = ? AND clicked_at BETWEEN ? AND ?)`
-  ).bind(userId, target, at, userId, target, at - 5, at + 5).run();
+// What the page predicted for the player when Attack was tapped. Only plain numbers are kept.
+const SOURCES = ["bazaar", "earners", "bonus"];
+function cleanPrediction(p) {
+  const n = (v, max) => (Number.isFinite(v) && v >= 0 && v <= max ? Math.round(v) : null);
+  p = p && typeof p === "object" ? p : {};
+  return {
+    src: SOURCES.includes(p.src) ? p.src : null, predicted: n(p.mug, 1e12), est_cash: n(p.cash, 1e13), networth: n(p.networth, 1e14),
+    score: n(p.score, 100), recent: n(p.recent, 1000), hosp: p.hosp ? 1 : 0,
+  };
+}
+
+// Records an Attack tap unless the same tap (same player, within 5 seconds) is already there. A repeat of the same
+// tap fills in the prediction if the first copy had none.
+async function addTap(env, userId, target, at, pred) {
+  const q = cleanPrediction(pred);
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO clicks (user_id, target_id, clicked_at)
+       SELECT ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM clicks WHERE user_id = ? AND target_id = ? AND clicked_at BETWEEN ? AND ?)`
+    ).bind(userId, target, at, userId, target, at - 5, at + 5),
+    env.DB.prepare(
+      `UPDATE clicks SET src = COALESCE(src, ?), predicted = COALESCE(predicted, ?), est_cash = COALESCE(est_cash, ?), networth = COALESCE(networth, ?),
+         score = COALESCE(score, ?), recent_mugs = COALESCE(recent_mugs, ?), hosp = COALESCE(hosp, ?)
+       WHERE user_id = ? AND target_id = ? AND clicked_at BETWEEN ? AND ?`
+    ).bind(q.src, q.predicted, q.est_cash, q.networth, q.score, q.recent, q.hosp, userId, target, at - 5, at + 5),
+  ]);
 }
 
 // The member tapped Attack on a player.
 export async function recordClick({ request, env, user }) {
-  const { target, at } = await readJson(request);
+  const { target, at, pred } = await readJson(request);
   if (!validTarget(target)) return fail("Bad target.");
   const blocked = await throttle(env, "click", String(user.id), 120, 3600);
   if (blocked) return blocked;
-  await addTap(env, user.id, target, tapTime(at));
+  await addTap(env, user.id, target, tapTime(at), pred);
   return json({ ok: true });
 }
 
@@ -64,7 +84,7 @@ export async function syncMugs({ request, env, user }) {
   const key = request.headers.get("X-Torn-Key") || "";
   if (!RE.tornKey.test(key)) return fail("Add your Torn key in Settings first.");
   const blocked =
-    (await throttle(env, "sync", String(user.id), 40, 3600)) || (await throttle(env, "torn", String(user.id), 70, 60));
+    (await throttle(env, "sync", String(user.id), 100, 3600)) || (await throttle(env, "torn", String(user.id), 70, 60));
   if (blocked) return blocked;
 
   const base = upstream(env).tornV2;
@@ -85,7 +105,7 @@ export async function syncMugs({ request, env, user }) {
     // lost (the app was suspended as Torn opened) still counts.
     const sent = (await readJson(request)).taps;
     for (const t of (Array.isArray(sent) ? sent : []).slice(0, 100)) {
-      if (t && validTarget(t.target) && Number.isInteger(t.at)) await addTap(env, user.id, t.target, tapTime(t.at));
+      if (t && validTarget(t.target) && Number.isInteger(t.at)) await addTap(env, user.id, t.target, tapTime(t.at), t.pred);
     }
 
     const now = nowSec();
@@ -102,23 +122,39 @@ export async function syncMugs({ request, env, user }) {
     const mugs = outgoing.filter((a) => a.result === "Mugged" && a.defender).sort((a, b) => a.started - b.started);
     Object.assign(result, { attacks: outgoing.length, mugs: mugs.length });
 
+    // Remember every mug this member made (any player), so the site knows how often a player was mugged lately.
+    for (const a of mugs) {
+      await env.DB.prepare("INSERT OR IGNORE INTO seen_mugs (attack_code, target_id, user_id, mugged_at) VALUES (?, ?, ?, ?)").bind(a.code, a.defender.id, user.id, a.started).run();
+    }
+
     const used = new Set();
     for (const a of mugs) {
       // Must follow a tap on Attack for that same player.
       const click = clicks.find((c) => !used.has(c.id) && c.target_id === a.defender.id && a.started >= c.clicked_at - BEFORE_TAP && a.started <= c.clicked_at + AFTER_TAP);
       if (!click) continue;
       result.matched++;
-      const known = await env.DB.prepare("SELECT 1 AS x FROM mugs WHERE attack_code = ?").bind(a.code).first();
+      const known = await env.DB.prepare("SELECT amount FROM mugs WHERE attack_code = ?").bind(a.code).first();
+      let amount = known ? known.amount : 0;
       if (!known) {
         if (result.checked >= MAX_LOGS_PER_SYNC) break; // keep each check small; the rest wait for the next one
         result.checked++;
         const log = await tornV2(base, "/torn/attacklog", { log: a.code, striptags: "true" }, key);
+        amount = mugAmount(log.attacklog);
         await env.DB.prepare("INSERT OR IGNORE INTO mugs (attack_code, user_id, target_id, amount, mugged_at) VALUES (?, ?, ?, ?, ?)")
-          .bind(a.code, user.id, a.defender.id, mugAmount(log.attacklog), a.started).run();
+          .bind(a.code, user.id, a.defender.id, amount, a.started).run();
+        await env.DB.prepare("UPDATE seen_mugs SET amount = ? WHERE attack_code = ?").bind(amount, a.code).run();
         result.counted++;
       }
       used.add(click.id);
-      await env.DB.prepare("UPDATE clicks SET matched = 1 WHERE id = ?").bind(click.id).run(); // only now is the tap used up
+      // only now is the tap used up; it keeps what was predicted next to what was really taken
+      await env.DB.prepare("UPDATE clicks SET matched = 1, result = 'Mugged', actual = ?, resolved_at = ? WHERE id = ?").bind(amount, now, click.id).run();
+    }
+
+    // Taps older than the window that never turned into a mug are closed with what the attack ended as (or that none was seen).
+    for (const c of clicks.filter((x) => !used.has(x.id) && x.clicked_at + AFTER_TAP < now)) {
+      const tries = outgoing.filter((a) => a.defender && a.defender.id === c.target_id && a.started >= c.clicked_at - BEFORE_TAP && a.started <= c.clicked_at + AFTER_TAP);
+      const last = tries.length ? tries[tries.length - 1].result : "No attack seen";
+      await env.DB.prepare("UPDATE clicks SET matched = 2, result = ?, actual = 0, resolved_at = ? WHERE id = ?").bind(String(last).slice(0, 40), now, c.id).run();
     }
     return json({ ...result, note: explain(result) });
   } catch (err) {
@@ -142,4 +178,36 @@ export async function leaderboard({ env, url, user }) {
   ]);
   const linked = me.results[0] && me.results[0].torn_name;
   return json({ range, me: user.username, linked: linked || null, rows: board.results });
+}
+
+// The member's latest taps with what was predicted and what happened, plus how close the predictions are.
+export async function outcomes({ env, user }) {
+  const since = nowSec() - 7 * 86400;
+  const { results } = await env.DB.prepare(
+    `SELECT c.id, c.target_id, c.clicked_at, c.src, c.predicted, c.est_cash, c.networth, c.score, c.recent_mugs, c.hosp, c.matched, c.result, c.actual,
+            (SELECT COUNT(*) FROM seen_mugs s WHERE s.target_id = c.target_id AND s.user_id != c.user_id AND s.mugged_at BETWEEN c.clicked_at - 86400 AND c.clicked_at) AS others_24h
+     FROM clicks c WHERE c.user_id = ? AND c.clicked_at > ? ORDER BY c.clicked_at DESC LIMIT 40`
+  ).bind(user.id, since).all();
+  const ratios = results.filter((r) => r.matched === 1 && r.predicted > 0 && r.actual > 0).map((r) => r.actual / r.predicted).sort((a, b) => a - b);
+  const median = ratios.length ? ratios[Math.floor(ratios.length / 2)] : null;
+  const mean = ratios.length ? ratios.reduce((n, x) => n + x, 0) / ratios.length : null;
+  return json({ rows: results, summary: { compared: ratios.length, median, mean } });
+}
+
+// How often the given players were mugged by members lately: { id: { n24, n7, last, sum24 } }.
+export async function recentMugs({ env, url, user }) {
+  const ids = (url.searchParams.get("ids") || "").split(",").filter(Boolean).map(Number);
+  if (!ids.length || ids.length > 100 || !ids.every(validTarget)) return fail("Bad player list (1 to 100 ids).");
+  const blocked = await throttle(env, "recent", String(user.id), 60, 60);
+  if (blocked) return blocked;
+  const now = nowSec();
+  const marks = ids.map(() => "?").join(",");
+  const { results } = await env.DB.prepare(
+    `SELECT target_id, COUNT(*) AS n7, SUM(CASE WHEN mugged_at > ? THEN 1 ELSE 0 END) AS n24, MAX(mugged_at) AS last,
+            SUM(CASE WHEN mugged_at > ? THEN COALESCE(amount, 0) ELSE 0 END) AS sum24
+     FROM seen_mugs WHERE target_id IN (${marks}) AND mugged_at > ? GROUP BY target_id`
+  ).bind(now - 86400, now - 86400, ...ids, now - 7 * 86400).all();
+  const out = {};
+  for (const r of results) out[r.target_id] = { n24: r.n24, n7: r.n7, last: r.last, sum24: r.sum24 };
+  return json({ recent: out });
 }

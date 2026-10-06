@@ -5,12 +5,13 @@ import { fmtAgo, fmtCountdown, fmtMoney, fmtShortAgo, fmtShortMoney, fmtStats } 
 import { mugOutlook } from "./rules.js";
 import { trackAttack } from "./tracking.js";
 
-export function attackLink(id) {
+// `pred` is a function returning what the page predicted for this player (read when Attack is tapped).
+export function attackLink(id, pred) {
   const a = el("a", {
     class: "btn small", href: `https://www.torn.com/page.php?sid=attack&user2ID=${id}`,
     target: "_blank", rel: "noopener noreferrer", text: "Attack",
   });
-  a.addEventListener("click", () => trackAttack(id));
+  a.addEventListener("click", () => trackAttack(id, pred ? pred() : undefined));
   return a;
 }
 
@@ -63,7 +64,7 @@ export function card(r, index, opts = {}) {
     el("p", { class: "sub", text: `ID ${r.id} · ${r.items.length} item${r.items.length === 1 ? "" : "s"}` }),
     itemList(r),
     dl,
-    el("div", { class: "btns" }, bazaarLink(r.id), attackLink(r.id))
+    el("div", { class: "btns" }, bazaarLink(r.id), attackLink(r.id, () => ({ src: "bazaar", mug: mugOutlook(r).mug, cash: r.total })))
   );
   if (opts.dismiss) {
     const x = el("button", { class: "x", type: "button", "aria-label": "Dismiss", text: "X" });

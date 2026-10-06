@@ -58,6 +58,8 @@ const ROUTES = [
   // leaderboard
   ["POST", "/api/clicks", leaderboard.recordClick],
   ["GET", "/api/leaderboard", leaderboard.leaderboard],
+  ["GET", "/api/mug/outcomes", leaderboard.outcomes],
+  ["GET", "/api/targets/recent", leaderboard.recentMugs],
   ["POST", "/api/leaderboard/sync", leaderboard.syncMugs],
 ];
 

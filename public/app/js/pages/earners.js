@@ -4,6 +4,7 @@ import { api } from "/js/core/api.js";
 import { $, el } from "/js/core/dom.js";
 import { watchForUpdates } from "/js/core/update.js";
 import { refreshStatuses } from "../features/cards.js";
+import { startMugWatch } from "../features/tracking.js";
 import { loadAccountKeys } from "../features/account-keys.js";
 import { setScanMsg } from "../features/ui.js";
 import { state } from "../state.js";
@@ -30,6 +31,7 @@ async function boot() {
     location.href = "/";
   });
   setInterval(() => refreshStatuses(Date.now() / 1000), 1000);
+  startMugWatch();
 
   loadTypeList();
 }

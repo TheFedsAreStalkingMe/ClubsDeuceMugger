@@ -29,9 +29,29 @@ export function estimateCash(r, wages = earn.wages, now = Date.now() / 1000) {
 export function mugRate(f = earn.filters) {
   return BASE_MUG * (1 + (f.merits ? MERIT_BONUS : 0) + (Number(f.plunder) || 0) / 100);
 }
+// How much of their cash recent mugs have probably taken, 0 to 0.9. Each member mug in the last 24h took roughly a
+// fifth of what was left, older mugs this week count a little, a mug in the last hour counts extra, and a player in
+// hospital right after a mug (Torn says "Mugged by ...") was just mugged, maybe by someone outside the site.
+export function recentDrain(r, now = Date.now() / 1000) {
+  const rec = r.recent || {};
+  let d = Math.min(0.6, 0.18 * (rec.n24 || 0));
+  d += Math.min(0.15, 0.03 * Math.max(0, (rec.n7 || 0) - (rec.n24 || 0)));
+  if (rec.last && now - rec.last < 3600) d += 0.15;
+  if (/mugged/i.test(r.details || "")) d += 0.25;
+  return Math.min(0.9, d);
+}
+export const recentNote = (r) => {
+  const rec = r.recent || {};
+  const bits = [];
+  if (rec.n24) bits.push(`${rec.n24} mug${rec.n24 === 1 ? "" : "s"} in 24h`);
+  if ((rec.n7 || 0) > (rec.n24 || 0)) bits.push(`${rec.n7 - (rec.n24 || 0)} earlier this week`);
+  if (/mugged/i.test(r.details || "")) bits.push("in hospital after a mug");
+  return bits.length ? bits.join(", ") : r.recent ? "none known" : "not checked";
+};
+
 export function predictedMug(r, wages = earn.wages) {
   const cash = estimateCash(r, wages);
-  return cash == null ? null : cash * mugRate();
+  return cash == null ? null : cash * mugRate() * (1 - recentDrain(r));
 }
 
 // How good a mug target they look, 0 to 100, from what the site can see. Each part says why:
@@ -61,9 +81,10 @@ export function mugScore(r, now = Date.now() / 1000) {
   const known = parts.filter((p) => p.v != null);
   const maxKnown = known.reduce((n, p) => n + p.max, 0);
   const got = known.reduce((n, p) => n + p.v * p.max, 0);
-  const score = maxKnown ? Math.round((got / maxKnown) * 100) : 0;
+  const drain = recentDrain(r, now);
+  const score = maxKnown ? Math.round((got / maxKnown) * 100 * (1 - drain)) : 0; // mugged recently: rated lower
   const label = score >= 75 ? "Excellent" : score >= 55 ? "Good" : score >= 35 ? "Fair" : "Poor";
-  return { score, label, parts: parts.map((p) => ({ ...p, points: p.v == null ? null : Math.round(p.v * p.max) })) };
+  return { score, label, drain, drainNote: recentNote(r), parts: parts.map((p) => ({ ...p, points: p.v == null ? null : Math.round(p.v * p.max) })) };
 }
 
 // Rows to show: at least the minimum days inactive (a fresh status check can show they came back).

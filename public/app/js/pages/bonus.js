@@ -5,6 +5,7 @@ import { $ } from "/js/core/dom.js";
 import { watchForUpdates } from "/js/core/update.js";
 import { loadAccountKeys } from "../features/account-keys.js";
 import { refreshStatuses } from "../features/cards.js";
+import { startMugWatch } from "../features/tracking.js";
 import { state } from "../state.js";
 import { initBonusFilters } from "../bonus/filters.js";
 import { render } from "../bonus/results.js";
@@ -28,6 +29,7 @@ async function boot() {
     location.href = "/";
   });
   setInterval(() => refreshStatuses(Date.now() / 1000), 1000);
+  startMugWatch();
 }
 
 boot();

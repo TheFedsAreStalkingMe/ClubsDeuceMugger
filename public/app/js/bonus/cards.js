@@ -34,7 +34,7 @@ export function bonusCard(r, index) {
     el("p", { class: `sub rarity-${r.rarity}`, text: `${r.rarity} ${r.kind}` }),
     el("p", { class: "bonus-line", text: bonuses }),
     dl,
-    el("div", { class: "btns" }, link(`https://www.torn.com/bazaar.php?userId=${r.id}`, "Listing"), link(`https://www.torn.com/profiles.php?XID=${r.id}`, "Profile"), attackLink(r.id))
+    el("div", { class: "btns" }, link(`https://www.torn.com/bazaar.php?userId=${r.id}`, "Listing"), link(`https://www.torn.com/profiles.php?XID=${r.id}`, "Profile"), attackLink(r.id, () => ({ src: "bonus", mug: r.price * 0.05, cash: r.price })))
   );
   art.style.animationDelay = `${Math.min(index, 12) * 40}ms`;
   return art;
