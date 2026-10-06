@@ -21,7 +21,7 @@ export async function checkStatuses(ids, runId, { apply, progress, render }) {
   progress(done / Math.max(1, unique.length));
   render();
   let keyProblem = false;
-  await pool(todo, 3, async (id) => {
+  await pool(todo, 5, async (id) => {
     if (runId !== state.runId || keyProblem) return;
     try {
       const p = await tornCall(`/api/torn/user?id=${id}`, runId);

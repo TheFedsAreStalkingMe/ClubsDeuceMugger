@@ -32,7 +32,7 @@ export const section = (title) => console.log(`\n${title}`);
 const now = () => Math.floor(Date.now() / 1000);
 // Test control: statuses the fake Torn reports, by player id. Change them with setFakeStatus().
 const statusOverride = {};
-const flags = { attacklogFail: false, weav3rBusy: false, deep: false, typesFail: false, manyCompanies: false, keyLimited: false };
+const flags = { attacklogFail: false, weav3rBusy: false, deep: false, typesFail: false, manyCompanies: false, keyLimited: false, combinedFail: false };
 export async function setFakeFlag(name, on) {
   await fetch(`http://localhost:${FAKE_PORT}/__flag?name=${name}&on=${on ? 1 : 0}`);
 }
@@ -127,6 +127,15 @@ function fakeServer() {
       const o = statusOverride[id];
       const status = o ? { state: o.state, until: o.state === "Abroad" ? 0 : o.until, description: o.state } : { state: "Okay", until: 0, description: "Okay" };
       return send({ player_id: Number(id) || 7, name: "A", age: 100, secret: "dropped", last_action: { timestamp: 5, status: "Offline", relative: "x" }, status });
+    }
+
+    // Torn v2: profile and personal stats combined in one call
+    if (p === "/v2/user" && u.searchParams.get("selections") === "profile,personalstats") {
+      if (flags.combinedFail) return send({ error: { code: 16, error: "Access level of this key is not high enough" } });
+      const id = u.searchParams.get("id");
+      const o = statusOverride[id];
+      const status = o ? { state: o.state, until: o.state === "Abroad" ? 0 : o.until, description: o.state } : { state: "Okay", until: 0, description: "Okay" };
+      return send({ profile: { id: Number(id), name: "A", age: 100, last_action: { timestamp: 5, status: "Offline", relative: "x" }, status }, personalstats: { networth: { total: Number(id) * 100000000 } } });
     }
 
     // Torn v2 (leaderboard)

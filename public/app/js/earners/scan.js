@@ -10,7 +10,7 @@
 import { api } from "/js/core/api.js";
 import { pool } from "/js/core/async.js";
 import { estimateStats } from "../features/estimates.js";
-import { checkStatuses } from "../features/status-stage.js";
+import { profileFresh, profiles, recordFrom } from "../features/records.js";
 import { statVerdict, explainDrops } from "../features/rules.js";
 import { phase, setProgress, setScanMsg } from "../features/ui.js";
 import { tornCall } from "../features/torncall.js";
@@ -65,12 +65,12 @@ async function readCompanies(f, runId) {
 // ---------------------------------------------------------------- 2. employees
 
 // Employees stored compactly: [id, name, position, daysInCompany, lastAction, state, until, description]
-async function readEmployees(companies, f, runId) {
+async function readEmployees(companies, f, runId, stop = { v: false }) {
   const rows = [];
   const minIdle = f.minDays * 86400;
   const nowSec = Date.now() / 1000;
-  await pool(companies, 3, async (c) => {
-    if (runId !== state.runId) return;
+  await pool(companies, 5, async (c) => {
+    if (runId !== state.runId || stop.v) return;
     const key = `e:${c.id}`;
     let hit = cached(key);
     if (!hit) {
@@ -95,29 +95,49 @@ async function readEmployees(companies, f, runId) {
   return rows;
 }
 
-// ---------------------------------------------------------------- net worth
+// ---------------------------------------------------------------- status, age and net worth (one call each)
 
-// Public net worth of the new matches (Torn personal stats), kept for a day. null when Torn does not show it.
+// Torn lets selections be combined, so ONE call per new match gives status, age, last action and net worth
+// (half the calls of asking for each). If the key may not read personal stats, it falls back to the profile alone.
 let networthDenied = false;
-async function readNetworth(rows, runId) {
+let combinedOk = true;
+const DAY_MS = 24 * 3600e3;
+
+async function checkPlayers(rows, runId) {
   const ids = [...new Set(rows.map((r) => r.id))];
-  await pool(ids, 3, async (id) => {
-    if (runId !== state.runId) return;
-    let hit = cached(`n:${id}`, 24 * 3600e3);
-    if (!hit) {
-      try {
-        const r = await tornCall(`/api/torn/networth?id=${id}`, runId);
-        hit = { w: r.networth };
-        keep(`n:${id}`, hit);
-      } catch (e) {
-        if (isCancel(e)) throw e;
-        if (/access level|permission/i.test(e.message)) networthDenied = true;
-        hit = { w: null };
+  const setWorth = (id, w) => { for (const r of earn.rows) if (r.id === id) r.networth = w; };
+  const todo = [];
+  for (const id of ids) {
+    const p = profiles.get(id), n = cached(`n:${id}`, DAY_MS);
+    if (profileFresh(p) && p.age != null && n) { applyRecord(id, p); setWorth(id, n.w); } else todo.push(id);
+  }
+  let done = ids.length - todo.length, keyProblem = false;
+  await pool(todo, 5, async (id) => {
+    if (runId !== state.runId || keyProblem) return;
+    try {
+      let p = null;
+      if (combinedOk) {
+        try {
+          p = await tornCall(`/api/torn/player?id=${id}`, runId);
+        } catch (e) {
+          if (isCancel(e)) throw e;
+          if (e.fatal && /access level/i.test(e.message)) { combinedOk = false; networthDenied = true; } else throw e; // no personal stats on this key: profile only
+        }
       }
+      if (!p) p = await tornCall(`/api/torn/user?id=${id}`, runId);
+      const rec = recordFrom(p);
+      profiles.put(id, rec);
+      applyRecord(id, rec);
+      if (p.networth !== undefined) { keep(`n:${id}`, { w: p.networth }); setWorth(id, p.networth); }
+    } catch (e) {
+      if (isCancel(e)) return;
+      if (e.fatal) { keyProblem = true; setScanMsg(e.message, "err"); return; }
     }
-    for (const r of rows) if (r.id === id) r.networth = hit.w;
+    setScanMsg(`Checking players ${++done}/${ids.length}...`);
   });
+  profiles.flush();
   flushCache();
+  return keyProblem;
 }
 
 // ---------------------------------------------------------------- the scan
@@ -142,14 +162,20 @@ export async function scanEarners() {
     const why = { noEst: 0, tooStrong: 0, tooWeak: 0, ffHigh: 0 };
     const known = new Set(); // players already looked at
     networthDenied = false;
+    combinedOk = true;
+    const stop = { v: false };
     let checked = 0, inactive = 0, keyProblem = false;
 
-    for (let i = 0; i < companies.length && earn.rows.length < f.maxPlayers && !keyProblem; i += BATCH) {
+    const batches = [];
+    for (let i = 0; i < companies.length; i += BATCH) batches.push(companies.slice(i, i + BATCH));
+    const read = (n) => { const pr = n < batches.length ? readEmployees(batches[n], f, runId, stop) : null; if (pr) pr.catch(() => {}); return pr; };
+    let upcoming = read(0);
+    for (let b = 0; b < batches.length && earn.rows.length < f.maxPlayers && !keyProblem; b++) {
+      const raw = await upcoming;
+      upcoming = read(b + 1); // the next ten companies are read while this batch is filtered and checked
       if (runId !== state.runId) return;
-      const batch = companies.slice(i, i + BATCH);
-      const rows = (await readEmployees(batch, f, runId)).filter((r) => !known.has(r.id));
-      checked += batch.length;
-      if (runId !== state.runId) return;
+      const rows = raw.filter((r) => !known.has(r.id));
+      checked += batches[b].length;
       if (rows.length) {
         for (const r of rows) known.add(r.id);
         inactive += rows.length;
@@ -165,13 +191,14 @@ export async function scanEarners() {
         if (good.length) {
           earn.rows = [...earn.rows, ...good];
           render(); // matches show up as they are found
-          keyProblem = await checkStatuses(good.map((r) => r.id), runId, { apply: applyRecord, progress: () => {}, render });
-          if (!keyProblem) { await readNetworth(good, runId); render(); } // net worth feeds the mug rating
+          keyProblem = await checkPlayers(good, runId);
+          render();
         }
       }
       setProgress(0.1 + 0.9 * (checked / companies.length));
       setScanMsg(`Checked ${checked}/${companies.length} companies, ${earn.rows.length} match(es) so far. Cancel to stop.`);
     }
+    stop.v = true; // no more companies are started once the scan is over
     if (runId !== state.runId) return;
 
     earn.rows.sort((a, b) => (estimateCash(b) ?? 0) - (estimateCash(a) ?? 0));

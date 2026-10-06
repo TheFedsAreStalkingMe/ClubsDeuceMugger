@@ -157,7 +157,7 @@ export async function fetchStatuses(call, rows, runId) {
   let checked = ids.length - todo.length;
   let keyProblem = false;
   STAGES.status(checked / ids.length);
-  await pool(todo, 3, async (id) => {
+  await pool(todo, 5, async (id) => {
     for (;;) {
       if (runId !== state.runId || keyProblem) return;
       try {

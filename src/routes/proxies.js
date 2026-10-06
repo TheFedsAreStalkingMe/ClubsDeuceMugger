@@ -165,6 +165,22 @@ export async function playerNetworth({ request, env, url, user }) {
   return json({ networth: findNetworth(data.personalstats) });
 }
 
+// Status, age, last action AND net worth of a player in ONE Torn call (Torn lets selections be combined). The profile
+// part has the same shape as /api/torn/user, plus `networth`.
+export async function playerData({ request, env, url, user }) {
+  const id = url.searchParams.get("id") || "";
+  if (!/^\d{1,10}$/.test(id)) return fail("Bad player ID.");
+  const { data, response } = await tornPublic(env, request, user, "/user", { selections: "profile,personalstats", id, cat: "networth" });
+  if (response) return response;
+  const p = data.profile || {};
+  return json({
+    player_id: p.id, name: p.name, age: p.age,
+    last_action: p.last_action && { timestamp: p.last_action.timestamp, status: p.last_action.status },
+    status: p.status && { state: p.status.state, description: p.status.description, until: p.status.until },
+    networth: findNetworth(data.personalstats),
+  });
+}
+
 // ---------------------------------------------------------------- Torn companies (inactive earners)
 
 // A Torn API v2 call with the member's key. Key and Torn errors are passed on in the body, like the v1 calls.

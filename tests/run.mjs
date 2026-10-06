@@ -216,6 +216,10 @@ async function runChecks() {
   check("key check lists what the key can use", r.data.type === "Limited Access" && r.data.selections.user.includes("attacks") && r.data.selections.company.includes("employees") && r.data.selections.torn.includes("attacklog"), JSON.stringify(r.data));
   r = await bob.get("/api/torn/networth?id=21", { headers: K });
   check("net worth of a player", r.data.networth === 2100000000, JSON.stringify(r.data));
+  r = await bob.get("/api/torn/player?id=21", { headers: K });
+  check("one call gives status, age, last action and net worth", r.data.age === 100 && r.data.status.state === "Okay" && r.data.last_action.timestamp === 5 && r.data.networth === 2100000000 && r.data.secret === undefined, JSON.stringify(r.data));
+  r = await bob.get("/api/torn/player?id=abc", { headers: K });
+  check("bad player id refused for the combined call", r.status === 400);
   r = await bob.get("/api/torn/networth?id=abc", { headers: K });
   check("bad player id refused for net worth", r.status === 400);
   r = await bob.get("/api/torn/user?id=7", { headers: K });

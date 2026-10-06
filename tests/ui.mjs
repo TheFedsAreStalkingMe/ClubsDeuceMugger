@@ -369,6 +369,8 @@ async function runChecks() {
   await page.waitForSelector("#scan:not([disabled])", { timeout: 150000 });
   efound = await earnCards();
   check("it keeps going through every company (more than one batch of ten)", efound.length === 27, `${efound.length} | ${await text("#scan-msg")}`);
+  const callsUsed = await page.evaluate(() => JSON.parse(localStorage.getItem("cdm.calls") || "[]").length);
+  check("one combined call per match: 26 employee lists + 27 players is about 55 Torn calls, not 80+", callsUsed > 0 && callsUsed <= 62, `${callsUsed} Torn calls`);
   check("the message says how many companies were checked", /after checking 26 of 26 companies|after checking \d+ of \d+ companies/.test(await text("#scan-msg")), await text("#scan-msg"));
   await setStore("cdm.earn.filters", { types: [12], minStars: 5, minDays: 7, maxPlayers: 5 });
   await page.reload();
@@ -379,7 +381,18 @@ async function runChecks() {
   efound = await earnCards();
   check("it stops once it has found enough players", efound.length === 5 && /stopped at your limit/.test(await text("#scan-msg")), `${efound.length} | ${await text("#scan-msg")}`);
   await setFakeFlag("manyCompanies", false);
+  // A key without personal stats access: the scan falls back to the profile alone and says net worth is missing.
+  await setFakeFlag("combinedFail", true);
   await page.evaluate(() => { localStorage.removeItem("cdm.earn.cache"); localStorage.removeItem("cdm.calls"); localStorage.removeItem("cdm.profiles"); });
+  await setStore("cdm.earn.filters", { types: [12], minStars: 5, minDays: 7 });
+  await page.reload();
+  await page.waitForSelector("#types label");
+  await page.click("#scan");
+  await page.waitForSelector("#scan:not([disabled])", { timeout: 120000 });
+  efound = await earnCards();
+  check("without personal stats access it still finds players with status and age, net worth unknown", efound.length === 2 && /Account age100 days/.test(efound[0].text) && /Net worth\?/.test(efound[0].text) && /Net worth could not be read/.test(await text("#scan-msg")), `${efound.length} | ${await text("#scan-msg")}`);
+  await setFakeFlag("combinedFail", false);
+  await page.evaluate(() => { localStorage.removeItem("cdm.earn.cache"); localStorage.removeItem("cdm.profiles"); });
   await setStore("cdm.earn.filters", { types: [12], minStars: 5, minDays: 7 });
 
   section("Bonus weapon sellers");

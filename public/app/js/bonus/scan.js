@@ -20,7 +20,7 @@ import { matchBonus, passes, planSearches } from "./rules.js";
 import { bonus } from "./state.js";
 
 const TTL = 5 * 60e3;
-const READS_AT_ONCE = 2;
+const READS_AT_ONCE = 4;
 const STAGES = { listings: phase(0, 0.4), estimates: phase(0.4, 0.55), status: phase(0.55, 1) };
 const isCancel = (e) => e && e.message === "cancelled";
 const cache = new Cache(STORE.bonusCache, 24);

@@ -6,7 +6,7 @@ import { state } from "../state.js";
 import { setScanMsg } from "./ui.js";
 
 const WINDOW_MS = 60000;
-const TORN_PER_MIN = 80; // Torn's ceiling is 85
+const TORN_PER_MIN = 82; // Torn's ceiling is 85 (the server backstop allows 84)
 
 // Waits until a call is allowed, then records it. Throws "cancelled" if the scan was cancelled.
 async function acquire(storeKey, limit, label, runId) {
