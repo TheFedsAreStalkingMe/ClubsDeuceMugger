@@ -170,3 +170,11 @@ node tests/ui.mjs                  # browser checks (needs Playwright, see the t
 ```
 
 Run `tests/run.mjs` after changing anything in `src/`, and `tests/ui.mjs` after changing `public/app/`.
+
+## Automatic re-checking of the results
+
+After a scan, each finder keeps checking the players it found while the page is open and visible (`features/watch.js`).
+Every minute it asks our server which of them members mugged lately (no Torn calls) and re-reads the attack history
+(Torn's public stat snapshots, 3 calls each) of up to 3 players: never-checked ones first, then the oldest, each at most
+every 15 minutes. A player who turns out to be mugged drops in rating or is hidden. Torn offers no way to read another
+player's attack log, so mugs by non-members can only be inferred from those snapshots (fights lost, net worth drop).

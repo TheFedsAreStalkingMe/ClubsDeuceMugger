@@ -5,6 +5,8 @@ import { $, el } from "/js/core/dom.js";
 import { watchForUpdates } from "/js/core/update.js";
 import { refreshStatuses } from "../features/cards.js";
 import { startMugWatch } from "../features/tracking.js";
+import { startRowWatch } from "../features/watch.js";
+import { mugScore } from "../earners/rules.js";
 import { loadAccountKeys } from "../features/account-keys.js";
 import { setScanMsg } from "../features/ui.js";
 import { state } from "../state.js";
@@ -40,6 +42,7 @@ async function boot() {
   });
   setInterval(() => refreshStatuses(Date.now() / 1000), 1000);
   startMugWatch();
+  startRowWatch({ rows: () => earn.rows, render, score: (r) => mugScore(r).score });
 
   loadTypeList();
 }

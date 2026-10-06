@@ -9,8 +9,8 @@ import { tornCall } from "./torncall.js";
 const HOUR = 3600e3;
 
 // -> { lost24, lost7, drop24 } or null when Torn would not say.
-export async function readHistory(id, runId) {
-  const hit = cached(`h:${id}`, HOUR);
+export async function readHistory(id, runId, ttl = HOUR) {
+  const hit = cached(`h:${id}`, ttl);
   if (hit) return hit.h;
   try {
     const now = await tornCall(`/api/torn/stats?id=${id}&ago=0`, runId);

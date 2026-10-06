@@ -11,6 +11,7 @@ import { cancelScan, toggleAutoHunt } from "../features/runner.js";
 import { startLiveRefresh } from "../features/refresh.js";
 import { scan } from "../features/scan.js";
 import { startMugWatch } from "../features/tracking.js";
+import { startRowWatch } from "../features/watch.js";
 import { updateRunButtons } from "../features/ui.js";
 import { initWatch } from "../features/watchlist.js";
 import { state } from "../state.js";
@@ -46,6 +47,7 @@ async function boot() {
   setInterval(tick, 1000);
   startLiveRefresh();
   startMugWatch();
+  startRowWatch({ rows: () => state.rows, render });
 }
 
 boot();

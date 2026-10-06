@@ -6,8 +6,10 @@ import { watchForUpdates } from "/js/core/update.js";
 import { loadAccountKeys } from "../features/account-keys.js";
 import { refreshStatuses } from "../features/cards.js";
 import { startMugWatch } from "../features/tracking.js";
+import { startRowWatch } from "../features/watch.js";
 import { state } from "../state.js";
 import { initBonusFilters } from "../bonus/filters.js";
+import { bonus } from "../bonus/state.js";
 import { render } from "../bonus/results.js";
 import { cancelBonus, scanBonus } from "../bonus/scan.js";
 
@@ -30,6 +32,7 @@ async function boot() {
   });
   setInterval(() => refreshStatuses(Date.now() / 1000), 1000);
   startMugWatch();
+  startRowWatch({ rows: () => bonus.rows, render });
 }
 
 boot();
