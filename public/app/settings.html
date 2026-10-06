@@ -92,14 +92,16 @@
 
       <section class="card panel">
         <h2>Mugging bonuses</h2>
-        <p class="hint">Used for every predicted mug and expected profit on the finders. A mug takes about 5% of their cash; merits and Plunder raise that.</p>
+        <p class="hint">Used for every predicted mug and expected profit on the finders. A mug takes about 5% of the target's cash. Masterful Looting levels and the Plunder bonus on your weapon raise that. Example: level 10 (+50%) with 20% Plunder takes 5% x (1 + 0.5 + 0.2) = 8.5%.</p>
         <div class="stack">
-          <label>Masterful Looting merits you have (0 to 10)
+          <label>Masterful Looting level (0 to 10) <span class="hint">The "Masterful Looting" upgrade on Torn's <a href="https://www.torn.com/page.php?sid=awards&amp;tab=merits" target="_blank" rel="noopener noreferrer">Awards, Merits</a> page shows your level as X / 10. Enter that X. Torn describes it as "Increases money gained from mugging by 5%" for each level, so 10 / 10 is +50% on top of a normal mug.</span>
             <input type="number" id="m-merits" inputmode="numeric" min="0" max="10" step="1"></label>
-          <label>Extra mug money per merit (%) <span class="hint">5 means each merit adds 5% on top of the 5% base (10 merits: 7.5% instead of 5%).</span>
+          <label>Extra mug money per level (%) <span class="hint">Leave at 5, the number Torn shows for Masterful Looting. Change it only if Torn changes it.</span>
             <input type="number" id="m-boost" inputmode="decimal" min="0" max="20" step="0.1"></label>
-          <label>Plunder on my weapon (%) <span class="hint">Leave 0 if your weapon has none.</span>
+          <label>Plunder on my weapon (%) <span class="hint">The Plunder bonus shown on your weapon (for example 25 for "Plunder 25%"). Leave 0 if it has none.</span>
             <input type="number" id="m-plunder" inputmode="decimal" min="0" max="100" step="0.1"></label>
+          <label>Hide players mugged in the last (hours) <span class="hint">On every finder. A mug takes less from someone mugged recently (about 15 hours to recover), so they are hidden. 0 shows everyone.</span>
+            <input type="number" id="m-hide" inputmode="decimal" min="0" max="48" step="1"></label>
           <p class="hint" id="m-preview"></p>
           <button class="btn green small" id="save-mugbonus" type="button">Save mugging bonuses</button>
           <p class="msg" id="mugbonus-msg" role="status" aria-live="polite"></p>

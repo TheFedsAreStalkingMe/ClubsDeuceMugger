@@ -113,9 +113,10 @@ export async function syncMugs({ request, env, user }) {
       "SELECT id, target_id, clicked_at FROM clicks WHERE user_id = ? AND matched = 0 AND clicked_at > ? ORDER BY clicked_at ASC LIMIT 300"
     ).bind(user.id, now - 86400).all();
     result.taps = clicks.length;
-    if (!clicks.length) return json({ ...result, note: explain(result) });
 
-    const from = Math.max(0, clicks[0].clicked_at - BEFORE_TAP);
+    // With no waiting taps the last 6 hours are still read, so every member's mugs end up in the record that tells
+    // all members which players were mugged lately.
+    const from = clicks.length ? Math.max(0, clicks[0].clicked_at - BEFORE_TAP) : Math.max(0, now - 6 * 3600);
     const att = await tornV2(base, "/user/attacks", { filters: "outgoing", limit: "100", sort: "DESC", from: String(from) }, key);
     // A stealthed attack has no attacker listed; it is still yours because we asked for outgoing attacks.
     const outgoing = (att.attacks || []).filter((a) => !a.attacker || a.attacker.id === tornId);
@@ -126,6 +127,7 @@ export async function syncMugs({ request, env, user }) {
     for (const a of mugs) {
       await env.DB.prepare("INSERT OR IGNORE INTO seen_mugs (attack_code, target_id, user_id, mugged_at) VALUES (?, ?, ?, ?)").bind(a.code, a.defender.id, user.id, a.started).run();
     }
+    if (!clicks.length) return json({ ...result, note: explain(result) });
 
     const used = new Set();
     for (const a of mugs) {

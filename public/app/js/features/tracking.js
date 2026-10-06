@@ -39,6 +39,7 @@ export async function runLeaderboardCheck(tornKey) {
 // ---- the watch: while a page is open, your attack log is checked every minute after you tap Attack ----
 const WATCH_MS = Math.max(1000, Number(load("cdm.watchMs", 60000)) || 60000); // (the tests shorten it)
 const WATCH_FOR = 20 * 60e3; // keep checking for 20 minutes after the last tap
+const LOG_MS = Math.max(1000, Number(load("cdm.logMs", 300000)) || 300000); // with nothing waiting: read your attack log every 5 minutes
 let pending = 0; // taps the server was still waiting on at the last check
 let watchUntil = 0;
 let lastCheck = 0;
@@ -48,7 +49,9 @@ export async function syncLeaderboard() {
   try {
     if (!state.keys.torn || Date.now() < blockedUntil) return;
     const waiting = recentTaps().length || (pending > 0 && Date.now() < watchUntil);
-    if (!waiting || Date.now() - lastCheck < Math.min(WATCH_MS, 55000)) return;
+    // Waiting for a mug: every minute. Otherwise every 5 minutes, only to record your mugs (so every member's finder
+    // knows which players were mugged lately).
+    if (Date.now() - lastCheck < (waiting ? Math.min(WATCH_MS, 55000) : LOG_MS)) return;
     lastCheck = Date.now();
     const r = await runLeaderboardCheck(state.keys.torn);
     pending = Math.max(0, (r.taps || 0) - (r.matched || 0));

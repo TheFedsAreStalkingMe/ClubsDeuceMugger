@@ -3,7 +3,7 @@
 import { el } from "/js/core/dom.js";
 import { fmtAgo, fmtCountdown, fmtMoney, fmtShortAgo, fmtShortMoney, fmtStats } from "/js/core/format.js";
 import { mugOutlook } from "./rules.js";
-import { recentDrain, recentNote } from "./recent.js";
+import { markMugged, recentDrain, recentNote, recentlyMuggedClass } from "./recent.js";
 import { trackAttack } from "./tracking.js";
 
 // `pred` is a function returning what the page predicted for this player (read when Attack is tapped).
@@ -18,6 +18,14 @@ export function attackLink(id, pred) {
 
 const bazaarLink = (id) =>
   el("a", { class: "btn small ghost", href: `https://www.torn.com/bazaar.php?userId=${id}`, target: "_blank", rel: "noopener noreferrer", text: "Bazaar" });
+
+// For a mug the site cannot see: hides the player (for the hours set in Settings) and lowers their rating, like any mug.
+export function muggedButton(id) {
+  const b = el("button", { class: "btn small ghost", type: "button", text: "Mark mugged", title: "You (or someone) mugged them and the site did not see it" });
+  b.addEventListener("click", () => { markMugged(id); document.dispatchEvent(new CustomEvent("cdm:mugged")); });
+  return b;
+}
+export const mugEdge = (art, r) => { const c = recentlyMuggedClass(r); if (c) art.classList.add(c); };
 
 // Everything this seller has that qualifies: single items and stacks.
 function itemList(r) {
@@ -66,8 +74,9 @@ export function card(r, index, opts = {}) {
     el("p", { class: "sub", text: `ID ${r.id} · ${r.items.length} item${r.items.length === 1 ? "" : "s"}` }),
     itemList(r),
     dl,
-    el("div", { class: "btns" }, bazaarLink(r.id), attackLink(r.id, () => ({ src: "bazaar", mug: mugOutlook(r).mug, cash: r.total, recent: (r.recent && r.recent.n24) || 0 })))
+    el("div", { class: "btns" }, bazaarLink(r.id), muggedButton(r.id), attackLink(r.id, () => ({ src: "bazaar", mug: mugOutlook(r).mug, cash: r.total, recent: (r.recent && r.recent.n24) || 0 })))
   );
+  mugEdge(art, r);
   if (opts.dismiss) {
     const x = el("button", { class: "x", type: "button", "aria-label": "Dismiss", text: "X" });
     x.addEventListener("click", opts.dismiss);

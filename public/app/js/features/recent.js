@@ -6,13 +6,46 @@
 // Rows carry `recent` ({ n24, n7, last }) from our own record of member mugs (/api/targets/recent) and `details` (the
 // status text, "Mugged by ..." while in hospital).
 
+import { STORE, load, save } from "/js/core/storage.js";
+
 const RECOVERY_HOURS = 15;
+const LOCAL_MUGS = "cdm.muggedLocal"; // players you marked as mugged by hand: { id: seconds }
 export const recovery = (hours) => (hours >= RECOVERY_HOURS ? 1 : 0.1 + 0.9 * Math.pow(Math.max(0, hours) / RECOVERY_HOURS, 0.8));
 
-// Hours since the latest mug we know of (a member's, or "Mugged by ..." in the hospital status), or null.
+// You can mark a player as mugged by hand (for a mug the site cannot see); it counts like any other mug for a day.
+export function markMugged(id) {
+  const now = Math.floor(Date.now() / 1000);
+  const marks = Object.fromEntries(Object.entries(load(LOCAL_MUGS, {})).filter(([, t]) => now - t < 86400));
+  marks[id] = now;
+  save(LOCAL_MUGS, marks);
+}
+const localMugAt = (id) => Number((load(LOCAL_MUGS, {}) || {})[id]) || 0;
+
+// Players mugged within this many hours are hidden (Settings, "Hide players mugged in the last"). 0 = show everyone.
+export function hideHours() {
+  const v = (load(STORE.prefs, {}) || {}).hideMuggedHours;
+  return v === undefined || v === null || v === "" || !Number.isFinite(Number(v)) ? 12 : Math.max(0, Number(v));
+}
+export function isRecentlyMugged(r, now = Date.now() / 1000) {
+  const hide = hideHours();
+  const hours = hoursSinceMug(r, now);
+  return hide > 0 && hours != null && hours < hide;
+}
+export const hiddenNote = (rows) => {
+  const n = rows.filter((r) => isRecentlyMugged(r)).length;
+  return n ? `${n} hidden: mugged in the last ${hideHours()} hours (change this in Settings).` : "";
+};
+// Has a mug in the last 15 hours (when the yield is still reduced): shown with a red edge on the card.
+export function recentlyMuggedClass(r) {
+  const hours = hoursSinceMug(r);
+  return hours != null && hours < RECOVERY_HOURS ? "recent-mug" : "";
+}
+
+// Hours since the latest mug we know of (a member's, one you marked, or "Mugged by ..." in the hospital status), or null.
 export function hoursSinceMug(r, now = Date.now() / 1000) {
   const rec = r.recent || {};
-  let hours = rec.last ? Math.max(0, (now - rec.last) / 3600) : null;
+  const last = Math.max(rec.last || 0, localMugAt(r.id));
+  let hours = last ? Math.max(0, (now - last) / 3600) : null;
   if (/mugged/i.test(r.details || "")) hours = hours == null ? 0.5 : Math.min(hours, 0.5);
   return hours;
 }

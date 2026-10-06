@@ -257,3 +257,5 @@ details.more[open] > summary { margin-bottom: 10px; }
 .keycheck { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; text-align: left; }
 .keycheck .yes { color: var(--club); }
 .keycheck .no { color: var(--derse-l); }
+
+.card.recent-mug { border-color: var(--derse-l); }

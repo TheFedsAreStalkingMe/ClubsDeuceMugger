@@ -53,6 +53,7 @@ export function initBonusFilters() {
   bindSlider("maxFf");
   bindNumber("pages", 1, 5, 2);
   bindNumber("maxListings", 1, 300, 100);
+  bindNumber("historyTop", 0, 50, 8);
   const unknown = $("includeUnknown");
   unknown.checked = !!f.includeUnknown;
   unknown.addEventListener("change", () => { f.includeUnknown = unknown.checked; persist(); });

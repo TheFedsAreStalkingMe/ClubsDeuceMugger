@@ -1,9 +1,10 @@
+// (shared by all three finders)
 // How often a player was attacked lately by ANYONE, not just site members: Torn keeps daily snapshots of public stats,
 // so the number of defends they lost (and their net worth) now, a day ago and a week ago show it. Three Torn calls per
 // player, so it is only done for the best few matches and kept for an hour.
 
-import { tornCall } from "../features/torncall.js";
-import { cached, flushCache, keep } from "./data.js";
+import { cached, flushCache, keep } from "../earners/data.js";
+import { tornCall } from "./torncall.js";
 
 const HOUR = 3600e3;
 

@@ -3,6 +3,7 @@
 import { $, el } from "/js/core/dom.js";
 import { refreshStatuses } from "../features/cards.js";
 import { bonusCard } from "./cards.js";
+import { hiddenNote } from "../features/recent.js";
 import { sortValue, visibleRows } from "./rules.js";
 import { bonus } from "./state.js";
 
@@ -10,9 +11,11 @@ export function render() {
   const box = $("results");
   const shown = visibleRows();
   if (!shown.length) {
-    box.replaceChildren(el("p", { class: "empty", text: "Nothing on the table yet. Hit Scan." }));
+    box.replaceChildren(el("p", { class: "empty", text: bonus.rows.length ? "Everyone found was mugged lately and is hidden (change this in Settings)." : "Nothing on the table yet. Hit Scan." }));
+    $("hidden-note").textContent = hiddenNote(bonus.rows);
     return;
   }
+  $("hidden-note").textContent = hiddenNote(bonus.rows);
   const { sort, dir } = bonus.filters;
   const mul = dir === "asc" ? 1 : -1;
   const rows = [...shown].sort((a, b) => {
@@ -40,3 +43,6 @@ export function applyRecord(id, p) {
   }
   refreshStatuses(Date.now() / 1000);
 }
+
+// Marking a player as mugged by hand (a card button) redraws the list.
+document.addEventListener("cdm:mugged", render);

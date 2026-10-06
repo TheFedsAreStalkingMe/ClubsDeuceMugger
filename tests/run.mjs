@@ -255,6 +255,8 @@ async function runChecks() {
   r = await sync();
   check("link before any tap", r.data.linked === "Mugsy" && r.data.counted === 0 && r.data.taps === 0);
   check("explains when there are no taps", /No Attack taps/.test(r.data.note), r.data.note);
+  r = await bob.get("/api/targets/recent?ids=23,999");
+  check("mugs are recorded even when no tap is waiting", r.data.recent[23] && r.data.recent[23].n24 === 1 && r.data.recent[999] && r.data.recent[999].n24 === 1, JSON.stringify(r.data));
 
   await tap(111);
   await setFakeFlag("attacklogFail", true);

@@ -2,7 +2,7 @@
 
 import { el } from "/js/core/dom.js";
 import { fmtMoney, fmtShortMoney, fmtStats } from "/js/core/format.js";
-import { attackLink } from "../features/cards.js";
+import { attackLink, mugEdge, muggedButton } from "../features/cards.js";
 import { mugRate } from "../features/mugrate.js";
 import { recentDrain, recentNote } from "../features/recent.js";
 
@@ -38,8 +38,9 @@ export function bonusCard(r, index) {
     el("p", { class: `sub rarity-${r.rarity}`, text: `${r.rarity} ${r.kind}` }),
     el("p", { class: "bonus-line", text: bonuses }),
     dl,
-    el("div", { class: "btns" }, link(`https://www.torn.com/bazaar.php?userId=${r.id}`, "Listing"), link(`https://www.torn.com/profiles.php?XID=${r.id}`, "Profile"), attackLink(r.id, () => ({ src: "bonus", mug: r.price * mugRate() * (1 - recentDrain(r)), cash: r.price, recent: (r.recent && r.recent.n24) || 0 })))
+    el("div", { class: "btns" }, link(`https://www.torn.com/bazaar.php?userId=${r.id}`, "Listing"), link(`https://www.torn.com/profiles.php?XID=${r.id}`, "Profile"), muggedButton(r.id), attackLink(r.id, () => ({ src: "bonus", mug: r.price * mugRate() * (1 - recentDrain(r)), cash: r.price, recent: (r.recent && r.recent.n24) || 0 })))
   );
+  mugEdge(art, r);
   art.style.animationDelay = `${Math.min(index, 12) * 40}ms`;
   return art;
 }

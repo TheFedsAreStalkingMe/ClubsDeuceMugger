@@ -1,5 +1,6 @@
 // Pure rules for the Bonus Weapon Sellers page.
 
+import { isRecentlyMugged } from "../features/recent.js";
 import { remaining } from "../features/rules.js";
 import { NUM_MAX } from "../state.js";
 import { KINDS, RARITIES, bonus } from "./state.js";
@@ -49,4 +50,4 @@ export function sortValue(r, key) {
   }
 }
 
-export const visibleRows = () => bonus.rows;
+export const visibleRows = () => bonus.rows.filter((r) => !isRecentlyMugged(r));

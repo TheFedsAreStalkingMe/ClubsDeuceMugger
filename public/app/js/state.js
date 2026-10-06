@@ -17,6 +17,7 @@ export const DEFAULT_FILTERS = {
   minStack: 0, // also count stacks of 2+ worth at least this much, even if each item is under minPrice (0 = off)
   maxSellers: 80, // sellers who get the slower status checks
   bazaarPages: 3, // pages of 100 listings read per item (it stops early once listings are above the price band)
+  historyTop: 8, // read the attack history (3 Torn calls each) of this many best sellers at the end (0 = off)
   maxItems: 40, // items read per scan
   autoScan: true, // read every item whose cheapest listing is above the minimum
   includeUnknown: false, // keep players that have no stat estimate

@@ -3,7 +3,7 @@
 import { remaining } from "../features/rules.js";
 import { STORE, load } from "/js/core/storage.js";
 import { mugRate } from "../features/mugrate.js";
-import { recentDrain, recentNote } from "../features/recent.js";
+import { isRecentlyMugged, recentDrain, recentNote } from "../features/recent.js";
 import { WAGE_CAP, earn } from "./state.js";
 
 const DAY = 86400;
@@ -95,7 +95,7 @@ export function mugScore(r, now = Date.now() / 1000) {
 }
 
 // Rows to show: at least the minimum days inactive (a fresh status check can show they came back).
-export const visibleRows = () => earn.rows.filter((r) => (daysInactive(r) ?? 0) >= earn.filters.minDays);
+export const visibleRows = () => earn.rows.filter((r) => (daysInactive(r) ?? 0) >= earn.filters.minDays && !isRecentlyMugged(r));
 
 export function sortValue(r, key) {
   switch (key) {

@@ -66,6 +66,7 @@ export function initFilters() {
   bindAmount("minStack");
   bindAmount("minPart");
   bindNumber("bazaarPages", 1, 8, 3);
+  bindNumber("historyTop", 0, 50, 8);
   bindNumber("maxItems", 1, 150, 40);
   bindNumber("autoEvery", 30, 3600, 120);
   bindNumber("maxSellers", 1, 500, 80);

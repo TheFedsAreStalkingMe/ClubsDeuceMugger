@@ -10,14 +10,14 @@
 import { api } from "/js/core/api.js";
 import { pool } from "/js/core/async.js";
 import { estimateStats } from "../features/estimates.js";
-import { loadRecentMugs } from "../features/recent.js";
+import { hiddenNote, loadRecentMugs } from "../features/recent.js";
 import { profileFresh, profiles, recordFrom } from "../features/records.js";
 import { statVerdict, explainDrops } from "../features/rules.js";
 import { phase, setProgress, setScanMsg } from "../features/ui.js";
 import { tornCall } from "../features/torncall.js";
 import { state } from "../state.js";
 import { cached, flushCache, keep, loadTypes } from "./data.js";
-import { readHistory } from "./history.js";
+import { readHistory } from "../features/history.js";
 import { applyRecord, render } from "./results.js";
 import { daysInactive, estimateCash, mugScore } from "./rules.js";
 import { earn } from "./state.js";
@@ -220,7 +220,7 @@ export async function scanEarners() {
     if (!earn.rows.length) {
       throw new Stop(inactive ? explainDrops(why, inactive).replace("sellers", "inactive players") : `No one at ${checked} companies has been inactive for ${f.minDays}+ days.`, "info", 1);
     }
-    setScanMsg(`Done. ${earn.rows.length} inactive player(s) found${full ? " (stopped at your limit)" : ""} after checking ${checked} of ${companies.length} companies.${networthDenied ? " Net worth could not be read: your key may need the personalstats permission (Settings, Check my key)." : ""}`, networthDenied ? "info" : "ok");
+    setScanMsg(`Done. ${earn.rows.length} inactive player(s) found${full ? " (stopped at your limit)" : ""} after checking ${checked} of ${companies.length} companies.${hiddenNote(earn.rows) ? ` ${hiddenNote(earn.rows)}` : ""}${networthDenied ? " Net worth could not be read: your key may need the personalstats permission (Settings, Check my key)." : ""}`, networthDenied ? "info" : "ok");
     setProgress(1);
   } catch (e) {
     if (isCancel(e) || runId !== state.runId) return;

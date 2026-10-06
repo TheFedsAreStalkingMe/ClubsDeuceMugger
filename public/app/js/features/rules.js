@@ -2,7 +2,7 @@
 
 import { NUM_MAX, state } from "../state.js";
 import { mugRate } from "./mugrate.js";
-import { recentDrain } from "./recent.js";
+import { isRecentlyMugged, recentDrain } from "./recent.js";
 
 // A row is one seller with everything of theirs that qualifies: { id, name, items: [...], total, topPrice, activity, ... }
 export const rowKey = (r) => String(r.id);
@@ -17,7 +17,7 @@ export function remaining(r) {
 }
 
 // The rows to show. With "only Okay", players who are out are hidden (players not checked yet stay until they are).
-export const visibleRows = () => (state.filters.onlyOkay ? state.rows.filter((r) => r.state == null || remaining(r) === 0) : state.rows);
+export const visibleRows = () => (state.filters.onlyOkay ? state.rows.filter((r) => r.state == null || remaining(r) === 0) : state.rows).filter((r) => !isRecentlyMugged(r)); // players mugged lately are hidden (Settings)
 
 export function sortValue(r, key) {
   switch (key) {
@@ -39,6 +39,7 @@ export function isMug(r, now, jackpot) {
   const rem = remaining(r);
   if (rem == null || rem > pf.outMinutes * 60) return false;
   if (state.filters.onlyOkay && rem !== 0) return false;
+  if (isRecentlyMugged(r, now)) return false; // already mugged: not a good mug
   if (!r.last || (now - r.last) / 60 < pf.offlineMinutes) return false;
   if (jackpot && r.topPrice < pf.minJackpot) return false;
   return true;

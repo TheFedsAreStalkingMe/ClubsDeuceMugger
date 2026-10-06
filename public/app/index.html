@@ -81,6 +81,8 @@
           <label class="check"><input type="checkbox" id="onlyOkay"> Only players who are Okay</label>
           <label class="check"><input type="checkbox" id="includeUnknown"> Keep players with no stat estimate</label>
           <label class="check"><input type="checkbox" id="autoScan"> Scan every item above the price</label>
+          <label>Check recent attacks for the best this many sellers <span class="hint">Torn's public stats show how often anyone attacked them lately (3 Torn calls each). 0 = off.</span>
+            <input type="number" id="historyTop" inputmode="numeric" min="0" max="50" step="1"></label>
           <label>Pages read per item <span class="hint">100 listings each, cheapest first. A next page is read only while listings are still near market price.</span>
             <input type="number" id="bazaarPages" inputmode="numeric" min="1" max="8" step="1"></label>
           <label>Items per scan <span class="hint">Highest value first.</span>
@@ -124,6 +126,7 @@
       </label>
     </div>
 
+    <p class="hint" id="hidden-note"></p>
     <section class="results" id="results" aria-live="polite"></section>
   <p class="foot">Font: Fontstuck by KevinHilt, <a href="/fonts/LICENSE-fontstuck.txt">CC BY-SA 3.0</a></p>
   </main>

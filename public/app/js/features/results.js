@@ -5,6 +5,7 @@ import { state } from "../state.js";
 import { updateAlerts } from "./alerts.js";
 import { card, refreshStatuses } from "./cards.js";
 import { collectMugs } from "./feed.js";
+import { hiddenNote } from "./recent.js";
 import { sortValue, visibleRows } from "./rules.js";
 
 export function render() {
@@ -12,9 +13,11 @@ export function render() {
   const shown = visibleRows();
   if (!shown.length) {
     const hidden = state.rows.length - shown.length;
-    box.replaceChildren(el("p", { class: "empty", text: hidden ? `${hidden} player${hidden === 1 ? " is" : "s are"} hidden because they are not Okay.` : "Nothing on the table yet. Hit Scan." }));
+    box.replaceChildren(el("p", { class: "empty", text: hidden ? `${hidden} player${hidden === 1 ? " is" : "s are"} hidden (not Okay, or mugged lately: see Settings).` : "Nothing on the table yet. Hit Scan." }));
+    $("hidden-note").textContent = hiddenNote(state.rows);
     return;
   }
+  $("hidden-note").textContent = hiddenNote(state.rows);
   const { sort, dir } = state.filters;
   const mul = dir === "asc" ? 1 : -1;
   const rows = [...shown].sort((a, b) => {
@@ -42,3 +45,6 @@ export function tick() {
   collectMugs(now);
   refreshStatuses(now);
 }
+
+// Marking a player as mugged by hand (a card button) redraws the list.
+document.addEventListener("cdm:mugged", render);

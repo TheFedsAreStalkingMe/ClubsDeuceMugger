@@ -10,7 +10,8 @@ import { api } from "/js/core/api.js";
 import { pool } from "/js/core/async.js";
 import { Cache, STORE, load, save } from "/js/core/storage.js";
 import { estimateStats } from "../features/estimates.js";
-import { loadRecentMugs } from "../features/recent.js";
+import { readHistory } from "../features/history.js";
+import { hiddenNote, loadRecentMugs } from "../features/recent.js";
 import { explainDrops, statVerdict } from "../features/rules.js";
 import { checkStatuses } from "../features/status-stage.js";
 import { phase, setProgress, setScanMsg } from "../features/ui.js";
@@ -127,8 +128,17 @@ export async function scanBonus() {
     render();
 
     const keyProblem = await checkStatuses(bonus.rows.map((r) => r.id), runId, { apply: applyRecord, progress: STAGES.status, render });
+    // How often were the sellers of the priciest listings attacked lately by anyone? Lowers their rating.
+    const seen = new Set();
+    const topIds = bonus.rows.slice().sort((a, b) => b.price - a.price).map((r) => r.id).filter((id) => !seen.has(id) && seen.add(id)).slice(0, f.historyTop || 0);
+    for (let i = 0; i < topIds.length && runId === state.runId && !keyProblem; i++) {
+      setScanMsg(`Reading recent attacks on sellers ${i + 1}/${topIds.length} (3 Torn calls each)...`);
+      const h = await readHistory(topIds[i], runId);
+      for (const r of bonus.rows) if (r.id === topIds[i]) r.history = h;
+      render();
+    }
     if (runId === state.runId && !keyProblem) {
-      setScanMsg(`Done. ${bonus.rows.length} listing(s) from ${new Set(bonus.rows.map((r) => r.id)).size} seller(s).${more ? " More pages are left: scan again to read the next ones." : ""}${weav3rGaveUp() ? " Weav3r was busy, so some searches were skipped." : ""}`, "ok");
+      setScanMsg(`Done. ${bonus.rows.length} listing(s) from ${new Set(bonus.rows.map((r) => r.id)).size} seller(s).${hiddenNote(bonus.rows) ? ` ${hiddenNote(bonus.rows)}` : ""}${more ? " More pages are left: scan again to read the next ones." : ""}${weav3rGaveUp() ? " Weav3r was busy, so some searches were skipped." : ""}`, "ok");
       setProgress(1);
     }
     render();

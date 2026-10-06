@@ -60,7 +60,7 @@ async function runChecks() {
   check("one sort menu", (await page.$$("#sort option")).length === 9 && (await page.$("#dir")) === null);
 
   section("Scan");
-  const filters = { minPrice: 15000000, priceTol: 100, maxItems: 5, autoScan: true, maxSellers: 20 };
+  const filters = { minPrice: 15000000, priceTol: 100, maxItems: 5, autoScan: true, maxSellers: 20, historyTop: 0 };
   await page.evaluate(() => localStorage.clear());
   await setStore("cdm.keys", { torn: "abcdefgh12345678", ff: "" });
   await setStore("cdm.filters", filters);
@@ -301,6 +301,7 @@ async function runChecks() {
   await setFakeFlag("keyLimited", false);
 
   section("Inactive earners");
+  await page.evaluate(() => localStorage.setItem("cdm.prefs", JSON.stringify({ hideMuggedHours: 0 }))); // show everyone while these tests run
   const earnCards = () => page.$$eval("#results .target", (els) => els.map((e) => ({
     name: e.querySelector(".name").textContent,
     text: e.textContent,
@@ -357,13 +358,13 @@ async function runChecks() {
   const lastTap = await page.evaluate(() => JSON.parse(localStorage.getItem("cdm.taps") || "[]").pop());
   check("the Attack tap saves the prediction (mug, cash, net worth, score, recent mugs)", lastTap && lastTap.pred && lastTap.pred.src === "earners" && lastTap.pred.mug > 0 && lastTap.pred.networth === 2300000000 && lastTap.pred.score > 0 && lastTap.pred.recent === 1, JSON.stringify(lastTap));
   check("a player mugged recently is ranked below one who was not (Pia above Rex)", efound[0].name === "Pia", efound.map((c) => c.name).join());
-  await page.evaluate(() => localStorage.setItem("cdm.prefs", JSON.stringify({ merits: 2, plunder: 20 })));
+  await page.evaluate(() => localStorage.setItem("cdm.prefs", JSON.stringify({ merits: 2, plunder: 20, hideMuggedHours: 0 })));
   await page.reload();
   await page.waitForSelector("#types label");
   await page.click("#scan");
   await page.waitForSelector("#scan:not([disabled])", { timeout: 120000 });
   check("merits and Plunder from Settings raise the predicted mug", /Predicted mug~\$(26[5-9]|27[0-9])k/.test((await earnCards()).find((c) => c.name === "Rex").text), (await earnCards()).find((c) => c.name === "Rex").text.slice(0, 200));
-  await page.evaluate(() => localStorage.removeItem("cdm.prefs"));
+  await page.evaluate(() => localStorage.setItem("cdm.prefs", JSON.stringify({ hideMuggedHours: 0 })));
   await page.selectOption("#sort", "days:asc");
   check("sorting by days inactive", (await earnCards()).map((c) => c.name).join() === "Pia,Rex");
   // the second scan is served from the browser cache: no new company or employee calls
@@ -457,7 +458,7 @@ async function runChecks() {
   section("Profit tools");
   // Win chance and expected value need your own stats (Settings); the sort can use them.
   await setStore("cdm.earn.filters", { historyTop: 0, types: [12], minStars: 5, minDays: 7 });
-  await page.evaluate(() => { localStorage.setItem("cdm.prefs", JSON.stringify({ myBs: 4000000000 })); localStorage.removeItem("cdm.earn.cache"); localStorage.removeItem("cdm.calls"); localStorage.removeItem("cdm.profiles"); });
+  await page.evaluate(() => { localStorage.setItem("cdm.prefs", JSON.stringify({ myBs: 4000000000, hideMuggedHours: 0 })); localStorage.removeItem("cdm.earn.cache"); localStorage.removeItem("cdm.calls"); localStorage.removeItem("cdm.profiles"); });
   await page.goto(BASE + "/app/earners.html");
   await page.waitForSelector("#types label");
   await page.click("#scan");
@@ -467,7 +468,7 @@ async function runChecks() {
   check("win chance from their stats against yours, and the expected value", /Win chance~9[12]% \(rough\)/.test(rex3.text) && /Expected value~\$\d+k/.test(rex3.text), rex3.text.slice(0, 260));
   await page.selectOption("#sort", "ev:desc");
   check("sorting by expected value puts the bigger mug first", (await earnCards())[0].name === "Rex", (await earnCards()).map((c) => c.name).join());
-  await page.evaluate(() => localStorage.removeItem("cdm.prefs"));
+  await page.evaluate(() => localStorage.setItem("cdm.prefs", JSON.stringify({ hideMuggedHours: 0 })));
   await page.reload();
   await page.waitForSelector("#types label");
   await page.click("#scan");
@@ -486,7 +487,46 @@ async function runChecks() {
   await page.click("#results .target:has-text('Rex') a:has-text('Attack')");
   const calTap = await page.evaluate(() => JSON.parse(localStorage.getItem("cdm.taps") || "[]").pop());
   check("the tap still saves the plain prediction, so the correction never feeds on itself", calTap && calTap.pred && calTap.pred.mug > 190000, JSON.stringify(calTap));
-  await page.evaluate(() => { localStorage.removeItem("cdm.calMin"); localStorage.removeItem("cdm.prefs"); });
+  await page.evaluate(() => { localStorage.removeItem("cdm.calMin"); localStorage.setItem("cdm.prefs", JSON.stringify({ hideMuggedHours: 0 })); });
+  await setStore("cdm.earn.filters", { historyTop: 0, types: [12], minStars: 5, minDays: 7 });
+
+  section("Avoiding mugged players");
+  // Rex was mugged 9 hours ago (by a member, in the record). By default players mugged in the last 12 hours are hidden.
+  const reScan = async () => { await page.reload(); await page.waitForSelector("#types label"); await page.click("#scan"); await page.waitForSelector("#scan:not([disabled])", { timeout: 150000 }); return (await earnCards()).map((c) => c.name).sort().join(); };
+  await setStore("cdm.earn.filters", { historyTop: 0, types: [12], minStars: 5, minDays: 7 });
+  await page.evaluate(() => { localStorage.removeItem("cdm.prefs"); localStorage.removeItem("cdm.muggedLocal"); localStorage.removeItem("cdm.earn.cache"); localStorage.removeItem("cdm.calls"); localStorage.removeItem("cdm.profiles"); });
+  await page.goto(BASE + "/app/earners.html");
+  let shownNames = await reScan();
+  check("a player mugged 9 hours ago is hidden by default (the setting is 12 hours) and the page says so", shownNames === "Pia" && /1 hidden: mugged in the last 12 hours/.test(await text("#hidden-note")), `${shownNames} | ${await text("#hidden-note")}`);
+  await page.evaluate(() => localStorage.setItem("cdm.prefs", JSON.stringify({ hideMuggedHours: 6 })));
+  shownNames = await reScan();
+  check("with a 6 hour setting he shows again, with a red edge on the card", shownNames === "Pia,Rex" && (await page.$$("#results .card.recent-mug")).length === 1, shownNames);
+  await page.evaluate(() => localStorage.removeItem("cdm.prefs")); // 12 hours again
+  shownNames = await reScan();
+  await page.click("#results .target:has-text('Pia') button:has-text('Mark mugged')");
+  const marked = await page.evaluate(() => JSON.parse(localStorage.getItem("cdm.muggedLocal") || "{}"));
+  check("Mark mugged hides the player at once and remembers it", shownNames === "Pia" && marked["21"] > 1e9 && (await page.$$("#results .target")).length === 0 && /Everyone found was mugged lately/.test(await text("#results")), JSON.stringify(marked));
+  await page.evaluate(() => localStorage.removeItem("cdm.muggedLocal"));
+  // Settings: the hours are saved with the other mugging bonuses
+  await page.goto(BASE + "/app/settings.html");
+  await page.fill("#m-hide", "3");
+  await page.click("#save-mugbonus");
+  const savedHide = await page.evaluate(() => JSON.parse(localStorage.getItem("cdm.prefs") || "{}").hideMuggedHours);
+  check("the hide setting is saved in Settings", savedHide === 3, String(savedHide));
+  await page.evaluate(() => localStorage.setItem("cdm.prefs", JSON.stringify({ hideMuggedHours: 12 })));
+  // The bazaar finder: a seller you mark as mugged is hidden, and sellers' recent attacks come from Torn's stats too
+  await page.goto(BASE + "/app/");
+  await page.waitForFunction(() => document.getElementById("maxBs").value !== "");
+  await setStore("cdm.filters", { ...filters, historyTop: 5 });
+  await page.reload();
+  await page.click("#scan");
+  await scanDone();
+  const bravo = (await page.$$eval("#results .target", (els) => els.map((e) => e.textContent))).find((t) => t.includes("Bravo")) || "";
+  check("bazaar sellers get the attack history too (Bravo lost 2 fights in a day)", /Torn stats: 2 fights lost in ~24h/.test(bravo), bravo.slice(0, 300));
+  await page.click("#results .target:has-text('Alpha') button:has-text('Mark mugged')");
+  check("a bazaar seller marked as mugged is hidden", !(await names()).includes("Alpha") && /hidden/.test(await text("#hidden-note")), `${await names()} | ${await text("#hidden-note")}`);
+  await page.evaluate(() => { localStorage.removeItem("cdm.muggedLocal"); localStorage.setItem("cdm.prefs", JSON.stringify({ hideMuggedHours: 0 })); });
+  await setStore("cdm.filters", filters);
   await setStore("cdm.earn.filters", { historyTop: 0, types: [12], minStars: 5, minDays: 7 });
 
   section("Bonus weapon sellers");
@@ -501,7 +541,7 @@ async function runChecks() {
   await page.waitForFunction(() => document.getElementById("maxBs").value !== ""); // the page has started and saved its own filters
   check("three finder tabs on the bonus page", (await page.$$("nav.tabs a")).length === 3 && (await page.$("nav.tabs a[aria-current=page]")) !== null);
   await setStore("cdm.keys", { torn: "abcdefgh12345678", ff: "" });
-  await setStore("cdm.bonus.filters", { maxBs: 5000000000 });
+  await setStore("cdm.bonus.filters", { historyTop: 0, maxBs: 5000000000 });
   await page.reload();
   await page.waitForSelector("#bonuses label");
   let bw = await scanBonusPage();
@@ -513,12 +553,12 @@ async function runChecks() {
   check("sorting by bonus", (await bonusCards()).map((c) => c.name).join() === "Fake Magnum,Fake Katana");
   await page.selectOption("#sort", "bonus:asc");
   check("sorting by bonus, smallest first", (await bonusCards()).map((c) => c.name).join() === "Fake Katana,Fake Magnum");
-  await setStore("cdm.bonus.filters", { maxBs: 5000000000, bonuses: ["Expose"] });
+  await setStore("cdm.bonus.filters", { historyTop: 0, maxBs: 5000000000, bonuses: ["Expose"] });
   await page.reload();
   await page.waitForSelector("#bonuses label");
   bw = await scanBonusPage();
   check("a bonus choice finds only that bonus", bw.map((c) => c.name).join() === "Fake Katana" && /rarity-red/.test(bw[0].rarity), bw.map((c) => c.name).join());
-  await setStore("cdm.bonus.filters", { maxBs: 5000000000, rarities: ["yellow"], maxPrice: 50000000 });
+  await setStore("cdm.bonus.filters", { historyTop: 0, maxBs: 5000000000, rarities: ["yellow"], maxPrice: 50000000 });
   await page.reload();
   await page.waitForSelector("#bonuses label");
   bw = await scanBonusPage();
@@ -544,7 +584,7 @@ async function runChecks() {
   await page.goto(BASE + "/app/bonus.html");
   await page.waitForFunction(() => document.getElementById("maxBs").value !== "");
   await page.evaluate(() => { localStorage.removeItem("cdm.bonus.cursor"); localStorage.removeItem("cdm.bonus.cache"); });
-  await setStore("cdm.bonus.filters", { maxBs: 5000000000, rarities: ["yellow"], pages: 2 });
+  await setStore("cdm.bonus.filters", { historyTop: 0, maxBs: 5000000000, rarities: ["yellow"], pages: 2 });
   await page.reload();
   await page.waitForSelector("#bonuses label");
   const seen = [];

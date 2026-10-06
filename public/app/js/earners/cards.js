@@ -2,7 +2,7 @@
 
 import { el } from "/js/core/dom.js";
 import { fmtShortMoney, fmtStats } from "/js/core/format.js";
-import { attackLink } from "../features/cards.js";
+import { attackLink, mugEdge, muggedButton } from "../features/cards.js";
 import { daysInactive, estimateCash, expectedValue, mugScore, predictedMug, winChance } from "./rules.js";
 import { earn } from "./state.js";
 
@@ -46,11 +46,12 @@ export function earnCard(r, index) {
     el("p", { class: "sub", text: `ID ${r.id} · ${r.position || "Employee"} · ${r.daysIn} days in company` }),
     el("p", { class: "sub", text: `${c.name} · ${c.typeName} · ${c.stars}★` }),
     dl,
-    el("div", { class: "btns" }, profileLink(r.id), attackLink(r.id, () => ({
+    el("div", { class: "btns" }, profileLink(r.id), muggedButton(r.id), attackLink(r.id, () => ({
       src: "earners", mug: predictedMug(r, undefined, true), cash: estimateCash(r), networth: r.networth, score: mugScore(r).score,
       recent: ((r.recent && r.recent.n24) || 0) + (r.history ? Math.max(0, r.history.lost24 - ((r.recent && r.recent.n24) || 0)) : 0), hosp: /mugged/i.test(r.details || ""),
     })))
   );
+  mugEdge(art, r);
   art.style.animationDelay = `${Math.min(index, 12) * 40}ms`;
   return art;
 }

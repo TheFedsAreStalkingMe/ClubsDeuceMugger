@@ -18,6 +18,7 @@ export const DEFAULT_BONUS = {
   maxBs: NUM_MAX,
   maxFf: 10,
   includeUnknown: false,
+  historyTop: 8, // read the attack history (3 Torn calls each) of this many sellers at the end (0 = off)
   pages: 2, // pages of 100 read per search
   maxListings: 100, // listings kept after the stat filter
   sort: "price",
