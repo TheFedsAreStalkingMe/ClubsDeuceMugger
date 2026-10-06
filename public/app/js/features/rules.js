@@ -2,6 +2,7 @@
 
 import { NUM_MAX, state } from "../state.js";
 import { mugRate } from "./mugrate.js";
+import { recentDrain } from "./recent.js";
 
 // A row is one seller with everything of theirs that qualifies: { id, name, items: [...], total, topPrice, activity, ... }
 export const rowKey = (r) => String(r.id);
@@ -71,7 +72,7 @@ export function mugOutlook(r, f = state.filters) {
   const spend = r.total;
   const resale = r.items.reduce((sum, i) => sum + (i.market ? (i.market - i.price) * i.qty : 0), 0);
   const rate = mugRate();
-  const mug = spend * rate;
+  const mug = spend * rate * (1 - recentDrain(r)); // a seller mugged recently pays less
   const profit = resale + mug;
   const rating = profit <= 0 ? "bad" : profit >= 500000 && profit >= spend * 0.05 ? "good" : "mediocre";
   return { resale, mug, rate, profit, rating };

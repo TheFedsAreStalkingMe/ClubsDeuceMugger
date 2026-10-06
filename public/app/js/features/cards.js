@@ -3,6 +3,7 @@
 import { el } from "/js/core/dom.js";
 import { fmtAgo, fmtCountdown, fmtMoney, fmtShortAgo, fmtShortMoney, fmtStats } from "/js/core/format.js";
 import { mugOutlook } from "./rules.js";
+import { recentDrain, recentNote } from "./recent.js";
 import { trackAttack } from "./tracking.js";
 
 // `pred` is a function returning what the page predicted for this player (read when Attack is tapped).
@@ -49,6 +50,7 @@ export function card(r, index, opts = {}) {
   };
   const dl = el("dl", {},
     ...row("Total", fmtMoney(r.total)),
+    ...row("Recently mugged", el("span", { class: `rating ${recentDrain(r) >= 0.3 ? "bad" : recentDrain(r) > 0 ? "mediocre" : "good"}`, text: `${recentNote(r)}${recentDrain(r) > 0 ? ` (-${Math.round(recentDrain(r) * 100)}%)` : ""}` })),
     ...row("Expected profit", el("span", { class: `rating ${out.rating}`, text: `${signed(out.profit)} · ${out.rating} mug`, title: `Resale ${signed(out.resale)}, mug ${signed(out.mug)} (${(out.rate * 100).toFixed(1)}% of their cash)` })),
     ...row("Est. stats", fmtStats(r.bs)),
     ...row("Fair fight", r.ff != null ? Number(r.ff).toFixed(2) : "?"),
@@ -64,7 +66,7 @@ export function card(r, index, opts = {}) {
     el("p", { class: "sub", text: `ID ${r.id} · ${r.items.length} item${r.items.length === 1 ? "" : "s"}` }),
     itemList(r),
     dl,
-    el("div", { class: "btns" }, bazaarLink(r.id), attackLink(r.id, () => ({ src: "bazaar", mug: mugOutlook(r).mug, cash: r.total })))
+    el("div", { class: "btns" }, bazaarLink(r.id), attackLink(r.id, () => ({ src: "bazaar", mug: mugOutlook(r).mug, cash: r.total, recent: (r.recent && r.recent.n24) || 0 })))
   );
   if (opts.dismiss) {
     const x = el("button", { class: "x", type: "button", "aria-label": "Dismiss", text: "X" });

@@ -181,14 +181,19 @@ export async function leaderboard({ env, url, user }) {
 }
 
 // The member's latest taps with what was predicted and what happened, plus how close the predictions are.
-export async function outcomes({ env, user }) {
+export async function outcomes({ env, url, user }) {
   const since = nowSec() - 7 * 86400;
   const { results } = await env.DB.prepare(
     `SELECT c.id, c.target_id, c.clicked_at, c.src, c.predicted, c.est_cash, c.networth, c.score, c.recent_mugs, c.hosp, c.matched, c.result, c.actual,
             (SELECT COUNT(*) FROM seen_mugs s WHERE s.target_id = c.target_id AND s.user_id != c.user_id AND s.mugged_at BETWEEN c.clicked_at - 86400 AND c.clicked_at) AS others_24h
      FROM clicks c WHERE c.user_id = ? AND c.clicked_at > ? ORDER BY c.clicked_at DESC LIMIT 40`
   ).bind(user.id, since).all();
-  const ratios = results.filter((r) => r.matched === 1 && r.predicted > 0 && r.actual > 0).map((r) => r.actual / r.predicted).sort((a, b) => a - b);
+  // How close predictions are, over this member's last 200 mugs (of one finder if ?src= is given), not only the 40 shown.
+  const src = SOURCES.includes(url.searchParams.get("src")) ? url.searchParams.get("src") : null;
+  const { results: compared } = await env.DB.prepare(
+    `SELECT predicted, actual FROM clicks WHERE user_id = ? AND matched = 1 AND predicted > 0 AND actual > 0 ${src ? "AND src = ?" : ""} ORDER BY clicked_at DESC LIMIT 200`
+  ).bind(...(src ? [user.id, src] : [user.id])).all();
+  const ratios = compared.map((r) => r.actual / r.predicted).sort((a, b) => a - b);
   const median = ratios.length ? ratios[Math.floor(ratios.length / 2)] : null;
   const mean = ratios.length ? ratios.reduce((n, x) => n + x, 0) / ratios.length : null;
   return json({ rows: results, summary: { compared: ratios.length, median, mean } });

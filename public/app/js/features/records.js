@@ -13,6 +13,7 @@ export const recordFrom = (p) => ({
   desc: p.status?.description || "",
   details: p.status?.details || "", // for example "Mugged by X" while in hospital
   age: p.age,
+  level: p.level,
   last: p.last_action?.timestamp || 0,
 });
 

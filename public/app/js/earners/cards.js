@@ -3,7 +3,8 @@
 import { el } from "/js/core/dom.js";
 import { fmtShortMoney, fmtStats } from "/js/core/format.js";
 import { attackLink } from "../features/cards.js";
-import { daysInactive, estimateCash, mugScore, predictedMug } from "./rules.js";
+import { daysInactive, estimateCash, expectedValue, mugScore, predictedMug, winChance } from "./rules.js";
+import { earn } from "./state.js";
 
 const profileLink = (id) =>
   el("a", { class: "btn small ghost", href: `https://www.torn.com/profiles.php?XID=${id}`, target: "_blank", rel: "noopener noreferrer", text: "Profile" });
@@ -27,7 +28,9 @@ export function earnCard(r, index) {
   const mug = predictedMug(r);
   const dl = el("dl", {},
     ...row("Mug rating", el("span", { class: `rating ${tone}`, title: `${why}\nUnknown parts are left out and the rest scaled up.`, text: `${ms.label} (${ms.score}/100)` })),
-    ...row("Predicted mug", el("span", { class: "rating good", title: "Estimated cash x your mug rate (5%, plus the merits and Plunder set in Settings). A rough guess.", text: mug != null ? `~${fmtShortMoney(mug)} (rough)` : "?" })),
+    ...row("Predicted mug", el("span", { class: "rating good", title: `Estimated cash x your mug rate (5%, plus the merits and Plunder set in Settings) x what is left after recent mugs. A rough guess.${earn.calibration.n ? ` Adjusted x${earn.calibration.factor.toFixed(2)} from your ${earn.calibration.n} real mugs.` : ""}`, text: mug != null ? `~${fmtShortMoney(mug)} (rough)` : "?" })),
+    ...row("Win chance", el("span", { title: "From their estimated stats against yours (set your stats in Settings). A rough guess.", text: winChance(r) != null ? `~${Math.round(winChance(r) * 100)}% (rough)` : "set your stats in Settings" })),
+    ...row("Expected value", el("span", { class: "rating good", title: "Predicted mug x win chance.", text: expectedValue(r) != null ? `~${fmtShortMoney(expectedValue(r))}` : "?" })),
     ...row("Net worth", r.networth != null ? fmtShortMoney(r.networth) : "?"),
     ...row("Recently mugged", el("span", { class: `rating ${ms.drain >= 0.3 ? "bad" : ms.drain > 0 ? "mediocre" : "good"}`, text: `${ms.drainNote}${ms.drain > 0 ? ` (-${Math.round(ms.drain * 100)}%)` : ""}` })),
     ...row("Est. cash", el("span", { class: "rating good", title: "A rough guess: assumed daily wage (see Settings) x days inactive. Torn does not show wages.", text: cash != null ? `~${fmtShortMoney(cash)} (rough)` : "?" })),
@@ -44,7 +47,7 @@ export function earnCard(r, index) {
     el("p", { class: "sub", text: `${c.name} · ${c.typeName} · ${c.stars}★` }),
     dl,
     el("div", { class: "btns" }, profileLink(r.id), attackLink(r.id, () => ({
-      src: "earners", mug: predictedMug(r), cash: estimateCash(r), networth: r.networth, score: mugScore(r).score,
+      src: "earners", mug: predictedMug(r, undefined, true), cash: estimateCash(r), networth: r.networth, score: mugScore(r).score,
       recent: ((r.recent && r.recent.n24) || 0) + (r.history ? Math.max(0, r.history.lost24 - ((r.recent && r.recent.n24) || 0)) : 0), hosp: /mugged/i.test(r.details || ""),
     })))
   );

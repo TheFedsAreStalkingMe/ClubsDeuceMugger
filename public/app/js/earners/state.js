@@ -33,6 +33,7 @@ export const earn = {
   wages: { ...DEFAULT_WAGES, ...load(STORE.earnWages, {}) },
   types: [], // [{ id, name }] every company type
   rows: [], // players from the last scan
+  calibration: { factor: 1, n: 0 }, // how real mugs compared with the prediction (see loadCalibration)
 };
 
 // Older saved settings had smaller limits (60 companies, 200 per type): the scan now keeps going, so use the new ones.

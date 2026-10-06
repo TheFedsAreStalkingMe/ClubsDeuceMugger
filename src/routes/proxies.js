@@ -121,6 +121,7 @@ export async function tornProfile({ request, env, url, user }) {
   return json({
     player_id: data.player_id,
     name: data.name,
+    level: data.level,
     age: data.age,
     last_action: data.last_action && { timestamp: data.last_action.timestamp, status: data.last_action.status },
     status: data.status && { state: data.status.state, description: data.status.description, details: data.status.details || "", until: data.status.until },
@@ -190,7 +191,7 @@ export async function playerData({ request, env, url, user }) {
   if (response) return response;
   const p = data.profile || {};
   return json({
-    player_id: p.id, name: p.name, age: p.age,
+    player_id: p.id, name: p.name, level: p.level, age: p.age,
     last_action: p.last_action && { timestamp: p.last_action.timestamp, status: p.last_action.status },
     status: p.status && { state: p.status.state, description: p.status.description, details: p.status.details || "", until: p.status.until },
     networth: findNetworth(data.personalstats),

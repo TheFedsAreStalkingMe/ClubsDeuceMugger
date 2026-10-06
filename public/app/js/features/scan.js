@@ -14,6 +14,7 @@ import { explainDrops, statVerdict, visibleRows } from "./rules.js";
 import { render, scheduleRender, tick } from "./results.js";
 import { STAGES, countdown, setProgress, setScanMsg, updateRunButtons } from "./ui.js";
 import { estimateStats } from "./estimates.js";
+import { loadRecentMugs } from "./recent.js";
 import { resetWeav3r, weav3rGaveUp, weav3rRead } from "./weav3r.js";
 import { applyProfile, profileFresh, profiles, recordFrom } from "./status.js";
 import { renderWatch } from "./watchlist.js";
@@ -236,6 +237,7 @@ export async function scan() {
     rows = rows.filter((r) => keep.has(r.id));
 
     state.rows = rows;
+    await loadRecentMugs(rows, call); // recently mugged sellers are worth less
     render();
     if (!rows.length) throw new Stop(explainDrops(why, sellers), "info", "ok", 1);
 

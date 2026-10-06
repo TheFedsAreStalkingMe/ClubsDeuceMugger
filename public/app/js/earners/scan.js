@@ -10,6 +10,7 @@
 import { api } from "/js/core/api.js";
 import { pool } from "/js/core/async.js";
 import { estimateStats } from "../features/estimates.js";
+import { loadRecentMugs } from "../features/recent.js";
 import { profileFresh, profiles, recordFrom } from "../features/records.js";
 import { statVerdict, explainDrops } from "../features/rules.js";
 import { phase, setProgress, setScanMsg } from "../features/ui.js";
@@ -141,19 +142,6 @@ async function checkPlayers(rows, runId) {
   return keyProblem;
 }
 
-// ---------------------------------------------------------------- recently mugged
-
-// How often members mugged these players lately (from our own record; no Torn calls). Feeds the rating.
-async function loadRecent(rows, call) {
-  const ids = [...new Set(rows.map((r) => r.id))];
-  for (let i = 0; i < ids.length; i += 100) {
-    try {
-      const { recent } = await call(`/api/targets/recent?ids=${ids.slice(i, i + 100).join(",")}`);
-      for (const r of rows) r.recent = recent[r.id] || { n24: 0, n7: 0, last: 0, sum24: 0 };
-    } catch { /* the rating just goes without it */ }
-  }
-}
-
 // ---------------------------------------------------------------- the scan
 
 export async function scanEarners() {
@@ -206,7 +194,7 @@ export async function scanEarners() {
           earn.rows = [...earn.rows, ...good];
           render(); // matches show up as they are found
           keyProblem = await checkPlayers(good, runId);
-          await loadRecent(good, call);
+          await loadRecentMugs(good, call);
           render();
         }
       }

@@ -10,6 +10,7 @@ import { api } from "/js/core/api.js";
 import { pool } from "/js/core/async.js";
 import { Cache, STORE, load, save } from "/js/core/storage.js";
 import { estimateStats } from "../features/estimates.js";
+import { loadRecentMugs } from "../features/recent.js";
 import { explainDrops, statVerdict } from "../features/rules.js";
 import { checkStatuses } from "../features/status-stage.js";
 import { phase, setProgress, setScanMsg } from "../features/ui.js";
@@ -122,6 +123,7 @@ export async function scanBonus() {
     if (!rows.length) throw new Stop(explainDrops(why, sellers.length).replace("sellers", "weapon sellers"), "info", 1);
     rows.sort((a, b) => a.price - b.price);
     bonus.rows = rows.slice(0, f.maxListings);
+    await loadRecentMugs(bonus.rows, call); // recently mugged sellers are worth less
     render();
 
     const keyProblem = await checkStatuses(bonus.rows.map((r) => r.id), runId, { apply: applyRecord, progress: STAGES.status, render });

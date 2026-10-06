@@ -75,6 +75,7 @@
         <button class="btn green" id="scan" type="button">Scan once &clubs;</button>
         <button class="btn ghost" id="cancel" type="button" hidden>Cancel</button>
       </div>
+      <p class="hint" id="calib-note" hidden></p>
       <p class="hint">The scan keeps searching company after company until it finds enough matches or runs out. Matches appear as they are found; Cancel stops it. Company lists and employees are kept for 3 hours, so repeat scans are quick.</p>
       <p class="msg info" id="scan-msg" role="status" aria-live="polite"></p>
     </section>
@@ -82,6 +83,7 @@
     <div class="sortbar">
       <label>Sort
         <select id="sort">
+          <option value="ev:desc">Best expected value (mug x win chance)</option>
           <option value="score:desc">Best mug first</option>
           <option value="score:asc">Worst mug first</option>
           <option value="mug:desc">Biggest predicted mug</option>

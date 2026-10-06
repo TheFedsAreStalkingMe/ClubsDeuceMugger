@@ -11,7 +11,7 @@ export { profileFresh, profiles, recordFrom };
 // Writes a record onto every row and feed entry for that player, and updates their cards in place
 // (no redraw, so taps on buttons are never lost).
 export function applyProfile(id, p) {
-  const fields = { state: p.state, until: p.until, desc: p.desc, age: p.age, last: p.last, checkedAt: p.t || Date.now() };
+  const fields = { state: p.state, until: p.until, desc: p.desc, details: p.details || "", age: p.age, last: p.last, checkedAt: p.t || Date.now() };
   for (const r of state.rows) if (r.id === id) Object.assign(r, fields);
   for (const e of state.feed) if (e.id === id) Object.assign(e, fields);
 

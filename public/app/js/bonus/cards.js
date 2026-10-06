@@ -1,8 +1,10 @@
 // One bonus weapon listing as a card.
 
 import { el } from "/js/core/dom.js";
-import { fmtMoney, fmtStats } from "/js/core/format.js";
+import { fmtMoney, fmtShortMoney, fmtStats } from "/js/core/format.js";
 import { attackLink } from "../features/cards.js";
+import { mugRate } from "../features/mugrate.js";
+import { recentDrain, recentNote } from "../features/recent.js";
 
 const link = (href, text, cls = "btn small ghost") => el("a", { class: cls, href, target: "_blank", rel: "noopener noreferrer", text });
 const num = (n) => (n != null ? Number(n).toFixed(1) : "?");
@@ -20,6 +22,8 @@ export function bonusCard(r, index) {
   const bonuses = r.bonuses.map((b) => `${b.name} ${b.value}%`).join(", ");
   const dl = el("dl", {},
     ...row("Price", fmtMoney(r.price)),
+    ...row("Predicted mug", el("span", { class: "rating good", title: "What you pay lands in their cash: price x your mug rate (Settings), lowered if they were mugged recently.", text: `~${fmtShortMoney(r.price * mugRate() * (1 - recentDrain(r)))} (rough)` })),
+    ...row("Recently mugged", el("span", { class: `rating ${recentDrain(r) >= 0.3 ? "bad" : recentDrain(r) > 0 ? "mediocre" : "good"}`, text: `${recentNote(r)}${recentDrain(r) > 0 ? ` (-${Math.round(recentDrain(r) * 100)}%)` : ""}` })),
     ...row("Location", "Bazaar"),
     ...row("Damage / Acc / Quality", `${num(r.damage)} / ${num(r.accuracy)} / ${num(r.quality)}`),
     ...row("Seller", `${r.sellerName} (ID ${r.id})`),
@@ -34,7 +38,7 @@ export function bonusCard(r, index) {
     el("p", { class: `sub rarity-${r.rarity}`, text: `${r.rarity} ${r.kind}` }),
     el("p", { class: "bonus-line", text: bonuses }),
     dl,
-    el("div", { class: "btns" }, link(`https://www.torn.com/bazaar.php?userId=${r.id}`, "Listing"), link(`https://www.torn.com/profiles.php?XID=${r.id}`, "Profile"), attackLink(r.id, () => ({ src: "bonus", mug: r.price * 0.05, cash: r.price })))
+    el("div", { class: "btns" }, link(`https://www.torn.com/bazaar.php?userId=${r.id}`, "Listing"), link(`https://www.torn.com/profiles.php?XID=${r.id}`, "Profile"), attackLink(r.id, () => ({ src: "bonus", mug: r.price * mugRate() * (1 - recentDrain(r)), cash: r.price, recent: (r.recent && r.recent.n24) || 0 })))
   );
   art.style.animationDelay = `${Math.min(index, 12) * 40}ms`;
   return art;

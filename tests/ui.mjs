@@ -123,6 +123,7 @@ async function runChecks() {
   check("items added up reach the minimum price", (await names()).includes("Foxtrot") && (await names()).includes("Delta") && !(await names()).includes("Echo"), await names());
   const profitText = async () => page.$$eval("#results .target", (cs) => cs.map((c) => c.textContent).join("|"));
   check("cards show expected profit and a rating", /Expected profit/.test(await profitText()) && /(good|mediocre|bad) mug/.test(await profitText()));
+  check("bazaar cards show whether the seller was mugged recently", /Recently muggednone known/.test(await profitText()), (await profitText()).slice(0, 200));
   // Foxtrot: $16m at market, so profit is the mug alone: 16m x 5% = +$800k (good). Merits + 20% plunder: 5% x 1.3 = 6.5% = +$1.04m.
   const foxtrot = async () => page.$$eval("#results .target", (cs) => (cs.find((c) => c.textContent.includes("Foxtrot")) || {}).textContent || "");
   check("expected profit at base rate", /\+\$800k/.test(await foxtrot()), await foxtrot());
@@ -347,9 +348,11 @@ async function runChecks() {
   check("estimated cash: 60% of $1m daily income / 3 employees = $200k a day x days inactive, labelled rough", /~\$6m \(rough\)/.test(rex.text) && /~\$2m \(rough\)/.test(pia.text), efound.map((c) => c.text.slice(0, 120)).join(" | "));
   check("cards show company, type, stars, position, profile and attack buttons", /Deep Co · Mining Corporation · 10★/.test(rex.text) && /Miner/.test(rex.text) && rex.link === "Profile,Attack", efound[0].link);
   check("cards show stats, fair fight, age and status", /Est\. stats2b/.test(rex.text) && /Fair fight1\.50/.test(rex.text) && /Account age\d+ days/.test(rex.text) && /Status(Okay|Out|Hospital)/.test(rex.text), rex.text);
-  check("mug rating and predicted mug shown", /Mug rating(Excellent|Good|Fair|Poor) \(\d+\/100\)/.test(rex.text) && /Predicted mug~\$201k \(rough\)/.test(rex.text), rex.text.slice(0, 220));
+  check("mug rating and predicted mug shown", /Mug rating(Excellent|Good|Fair|Poor) \(\d+\/100\)/.test(rex.text) && /Predicted mug~\$(20[5-9]|21[0-4])k \(rough\)/.test(rex.text), rex.text.slice(0, 220));
   check("net worth shown and counted in the rating", /Net worth\$2\.3b/.test(rex.text), rex.text.slice(0, 220));
-  check("a player mugged recently is marked and rated lower (Rex was mugged an hour ago)", /Recently mugged1 mug in 24h \(-33%\)/.test(rex.text), rex.text.slice(0, 320));
+  check("a player mugged 9 hours ago is marked and rated lower (the yield is back to about 70%)", /Recently mugged1 mug in 24h \(last 9h ago\) \(-30%\)/.test(rex.text), rex.text.slice(0, 320));
+  const rec = await page.evaluate(async () => { const m = await import("/app/js/earners/rules.js"); return [m.recovery(0), m.recovery(8), m.recovery(9), m.recovery(10), m.recovery(15), m.recovery(40)]; });
+  check("mug yield recovers over 15 hours (about 65% at 8h, 70% at 9h, full at 15h)", rec[0] === 0.1 && rec[1] > 0.6 && rec[1] < 0.7 && rec[2] > 0.68 && rec[2] < 0.72 && rec[3] > rec[2] && rec[4] === 1 && rec[5] === 1, JSON.stringify(rec));
   await page.click("#results .target:has-text('Rex') a:has-text('Attack')");
   const lastTap = await page.evaluate(() => JSON.parse(localStorage.getItem("cdm.taps") || "[]").pop());
   check("the Attack tap saves the prediction (mug, cash, net worth, score, recent mugs)", lastTap && lastTap.pred && lastTap.pred.src === "earners" && lastTap.pred.mug > 0 && lastTap.pred.networth === 2300000000 && lastTap.pred.score > 0 && lastTap.pred.recent === 1, JSON.stringify(lastTap));
@@ -359,7 +362,7 @@ async function runChecks() {
   await page.waitForSelector("#types label");
   await page.click("#scan");
   await page.waitForSelector("#scan:not([disabled])", { timeout: 120000 });
-  check("merits and Plunder from Settings raise the predicted mug", /Predicted mug~\$261k/.test((await earnCards()).find((c) => c.name === "Rex").text), (await earnCards()).find((c) => c.name === "Rex").text.slice(0, 200));
+  check("merits and Plunder from Settings raise the predicted mug", /Predicted mug~\$(26[5-9]|27[0-9])k/.test((await earnCards()).find((c) => c.name === "Rex").text), (await earnCards()).find((c) => c.name === "Rex").text.slice(0, 200));
   await page.evaluate(() => localStorage.removeItem("cdm.prefs"));
   await page.selectOption("#sort", "days:asc");
   check("sorting by days inactive", (await earnCards()).map((c) => c.name).join() === "Pia,Rex");
@@ -446,9 +449,44 @@ async function runChecks() {
   await page.waitForSelector("#scan:not([disabled])", { timeout: 150000 });
   efound = await earnCards();
   const rex2 = efound.find((c) => c.name === "Rex"), pia2 = efound.find((c) => c.name === "Pia");
-  check("outside attacks are found from Torn's stats and lower the rating", /Torn stats: 2 fights lost in ~24h, 5 in ~7 days \(anyone\)/.test(rex2.text) && /net worth down 21% since yesterday/.test(rex2.text) && /\(-59%\)/.test(rex2.text), rex2.text.slice(0, 420));
-  check("the predicted mug shrinks with them (6m x 5% x 0.41)", /Predicted mug~\$123k/.test(rex2.text), rex2.text.slice(0, 200));
+  check("outside attacks are found from Torn's stats and lower the rating", /Torn stats: 2 fights lost in ~24h, 5 in ~7 days \(anyone\)/.test(rex2.text) && /net worth down 21% since yesterday/.test(rex2.text) && /\(-48%\)/.test(rex2.text), rex2.text.slice(0, 420));
+  check("the predicted mug shrinks with them (6m x 5% x 0.52)", /Predicted mug~\$(15[0-9]|16[0-4])k/.test(rex2.text), rex2.text.slice(0, 200));
   check("a quiet player is not marked", /Recently muggednone known/.test(pia2.text), pia2.text.slice(0, 260));
+  await setStore("cdm.earn.filters", { historyTop: 0, types: [12], minStars: 5, minDays: 7 });
+
+  section("Profit tools");
+  // Win chance and expected value need your own stats (Settings); the sort can use them.
+  await setStore("cdm.earn.filters", { historyTop: 0, types: [12], minStars: 5, minDays: 7 });
+  await page.evaluate(() => { localStorage.setItem("cdm.prefs", JSON.stringify({ myBs: 4000000000 })); localStorage.removeItem("cdm.earn.cache"); localStorage.removeItem("cdm.calls"); localStorage.removeItem("cdm.profiles"); });
+  await page.goto(BASE + "/app/earners.html");
+  await page.waitForSelector("#types label");
+  await page.click("#scan");
+  await page.waitForSelector("#scan:not([disabled])", { timeout: 150000 });
+  efound = await earnCards();
+  const rex3 = efound.find((c) => c.name === "Rex");
+  check("win chance from their stats against yours, and the expected value", /Win chance~9[12]% \(rough\)/.test(rex3.text) && /Expected value~\$\d+k/.test(rex3.text), rex3.text.slice(0, 260));
+  await page.selectOption("#sort", "ev:desc");
+  check("sorting by expected value puts the bigger mug first", (await earnCards())[0].name === "Rex", (await earnCards()).map((c) => c.name).join());
+  await page.evaluate(() => localStorage.removeItem("cdm.prefs"));
+  await page.reload();
+  await page.waitForSelector("#types label");
+  await page.click("#scan");
+  await page.waitForSelector("#scan:not([disabled])", { timeout: 150000 });
+  check("without your stats it says so, and the expected value is the mug", /Win chanceset your stats in Settings/.test((await earnCards())[0].text), (await earnCards())[0].text.slice(0, 200));
+  // Learning from real mugs: the one matched mug (predicted $5m, took $2.5m) halves later predictions once it counts.
+  await page.evaluate(() => localStorage.setItem("cdm.calMin", "1"));
+  await page.reload();
+  await page.waitForSelector("#types label");
+  check("the page says predictions were adjusted from real mugs", /adjusted x0\.50 from your 1 real mug/.test(await text("#calib-note")), await text("#calib-note"));
+  await page.click("#scan");
+  await page.waitForSelector("#scan:not([disabled])", { timeout: 150000 });
+  efound = await earnCards();
+  const rex4 = efound.find((c) => c.name === "Rex");
+  check("predicted mug is halved (about $105k instead of $210k)", /Predicted mug~\$10[0-9]k/.test(rex4.text), rex4.text.slice(0, 200));
+  await page.click("#results .target:has-text('Rex') a:has-text('Attack')");
+  const calTap = await page.evaluate(() => JSON.parse(localStorage.getItem("cdm.taps") || "[]").pop());
+  check("the tap still saves the plain prediction, so the correction never feeds on itself", calTap && calTap.pred && calTap.pred.mug > 190000, JSON.stringify(calTap));
+  await page.evaluate(() => { localStorage.removeItem("cdm.calMin"); localStorage.removeItem("cdm.prefs"); });
   await setStore("cdm.earn.filters", { historyTop: 0, types: [12], minStars: 5, minDays: 7 });
 
   section("Bonus weapon sellers");

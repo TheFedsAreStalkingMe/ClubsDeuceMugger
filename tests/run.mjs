@@ -298,6 +298,10 @@ async function runChecks() {
   check("outcome keeps the prediction next to what was mugged", o999 && o999.matched === 1 && o999.result === "Mugged" && o999.predicted === 2000000 && o999.actual === 2500000 && o999.src === "earners" && o999.score === 80 && o999.hosp === 1 && o999.recent_mugs === 1, JSON.stringify(o999));
   check("a tap that never became an attack is closed with that result", o777 && o777.matched === 2 && o777.result === "No attack seen" && o777.actual === 0, JSON.stringify(o777));
   check("outcomes say how close predictions are", r.data.summary.compared >= 1 && Math.abs(r.data.summary.median - 1.25) < 0.01, JSON.stringify(r.data.summary));
+  r = await bob.get("/api/mug/outcomes?src=earners");
+  check("outcome summary can be limited to one finder", r.data.summary.compared >= 1, JSON.stringify(r.data.summary));
+  r = await bob.get("/api/mug/outcomes?src=bazaar");
+  check("a finder with no matched mugs has nothing to compare", r.data.summary.compared === 0 && r.data.summary.median === null, JSON.stringify(r.data.summary));
   r = await bob.get("/api/targets/recent?ids=999,111,5");
   check("recent mugs of players: counts and money in 24h", r.data.recent[999] && r.data.recent[999].n24 >= 1 && r.data.recent[999].n7 >= 1 && r.data.recent[999].sum24 === 2500000 && r.data.recent[5] === undefined, JSON.stringify(r.data));
   r = await bob.get("/api/targets/recent?ids=abc");

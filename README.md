@@ -104,7 +104,10 @@ what the fight ended as. The Leaderboard page lists predicted against actual wit
 (`features/outcomes.js`): other members' mugs in the 24 hours before, a mug the site already knew about, "Mugged by" in
 the hospital status, or no known cause. **Recently mugged** lowers the rating on the Inactive earners tab: every mug a
 member made is remembered (`seen_mugs`), each one in the last 24 hours takes about 18% off, older ones this week a
-little, a mug in the last hour and a "Mugged by" hospital status extra (`recentDrain` in `earners/rules.js`).
+little, a mug in the last hour and a "Mugged by" hospital status extra (`recentDrain` in `earners/rules.js`). The time since the latest known mug matters most: following a community mugging guide, the yield
+after a mug recovers over about 15 hours (0.1 right after, about 0.7 after 9 hours, 1 after 15; `recovery`), and players mugged
+several times in a day or week are treated as shared targets. The score also has a small "level for age" part (the guide: a
+high level for a young account tends to carry more cash).
 
 **Mugging bonuses.** Merits (0 to 10, each adding 5% by default) and Plunder are set once in Settings
 (`settings/mugbonus.js`) and read by every finder through `features/mugrate.js`: rate = 5% x (1 + merits x boost + Plunder).

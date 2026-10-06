@@ -3,6 +3,7 @@
 import { remaining } from "../features/rules.js";
 import { STORE, load } from "/js/core/storage.js";
 import { mugRate } from "../features/mugrate.js";
+import { recentDrain, recentNote } from "../features/recent.js";
 import { WAGE_CAP, earn } from "./state.js";
 
 const DAY = 86400;
@@ -25,39 +26,37 @@ export function estimateCash(r, wages = earn.wages, now = Date.now() / 1000) {
   return dailyWage(r.company, wages) * Math.min(Math.floor(idle), r.daysIn ?? Infinity);
 }
 
-// How much of their cash recent mugs have probably taken, 0 to 0.9. Each member mug in the last 24h took roughly a
-// fifth of what was left, older mugs this week count a little, a mug in the last hour counts extra, and a player in
-// hospital right after a mug (Torn says "Mugged by ...") was just mugged, maybe by someone outside the site.
-export function recentDrain(r, now = Date.now() / 1000) {
-  const rec = r.recent || {};
-  let d = Math.min(0.6, 0.18 * (rec.n24 || 0));
-  d += Math.min(0.15, 0.03 * Math.max(0, (rec.n7 || 0) - (rec.n24 || 0)));
-  if (rec.last && now - rec.last < 3600) d += 0.15;
-  if (/mugged/i.test(r.details || "")) d += 0.25;
-  // Attacks by anyone (Torn's public stats): fights they lost as the defender beyond the ones members made.
-  const h = r.history;
-  if (h) {
-    d += Math.min(0.3, 0.1 * Math.max(0, h.lost24 - (rec.n24 || 0)));
-    d += Math.min(0.1, 0.02 * Math.max(0, h.lost7 - h.lost24 - Math.max(0, (rec.n7 || 0) - (rec.n24 || 0))));
-    if (h.drop24 >= 0.2) d += 0.1; // net worth fell a fifth in a day: money left
-  }
-  return Math.min(0.9, d);
-}
-export const recentNote = (r) => {
-  const rec = r.recent || {};
-  const bits = [];
-  if (rec.n24) bits.push(`${rec.n24} mug${rec.n24 === 1 ? "" : "s"} in 24h`);
-  if ((rec.n7 || 0) > (rec.n24 || 0)) bits.push(`${rec.n7 - (rec.n24 || 0)} earlier this week`);
-  if (/mugged/i.test(r.details || "")) bits.push("in hospital after a mug");
-  const h = r.history;
-  if (h && (h.lost24 || h.lost7)) bits.push(`Torn stats: ${h.lost24} fight${h.lost24 === 1 ? "" : "s"} lost in ~24h, ${h.lost7} in ~7 days (anyone)`);
-  if (h && h.drop24 >= 0.2) bits.push(`net worth down ${Math.round(h.drop24 * 100)}% since yesterday`);
-  return bits.length ? bits.join(", ") : r.recent || r.history ? "none known" : "not checked";
-};
+// (recent-mug logic is shared with the other finders: features/recent.js)
+export { recentDrain, recentNote, recovery, hoursSinceMug } from "../features/recent.js";
 
-export function predictedMug(r, wages = earn.wages) {
+// `raw` leaves out the correction learned from your real mugs (that is what gets saved with a tap, so the correction
+// is always measured against the plain prediction).
+export function predictedMug(r, wages = earn.wages, raw = false) {
   const cash = estimateCash(r, wages);
-  return cash == null ? null : cash * mugRate() * (1 - recentDrain(r));
+  if (cash == null) return null;
+  return cash * mugRate() * (1 - recentDrain(r)) * (raw ? 1 : earn.calibration.factor);
+}
+
+// A rough chance of winning the fight, from their estimated stats against yours (set in Settings). null when either is unknown.
+// Losing wastes the energy and can cost a hospital stay, so a big mug on someone who is likely to beat you is worth less.
+export function winChance(r) {
+  const myBs = Number((load(STORE.prefs, {}) || {}).myBs) || 0;
+  if (!myBs || r.bs == null) return null;
+  const x = r.bs / myBs; // their stats as a share of yours
+  const seg = (from, to, a, b) => a + ((x - from) / (to - from)) * (b - a);
+  if (x <= 0.3) return 0.98;
+  if (x <= 0.7) return seg(0.3, 0.7, 0.98, 0.85);
+  if (x <= 1.0) return seg(0.7, 1.0, 0.85, 0.45);
+  if (x <= 1.3) return seg(1.0, 1.3, 0.45, 0.15);
+  return 0.1;
+}
+
+// Predicted mug x win chance (the mug alone when your stats are not set).
+export function expectedValue(r) {
+  const m = predictedMug(r);
+  if (m == null) return null;
+  const w = winChance(r);
+  return w == null ? m : m * w;
 }
 
 // How good a mug target they look, 0 to 100, from what the site can see. Each part says why:
@@ -81,7 +80,9 @@ export function mugScore(r, now = Date.now() / 1000) {
     { label: "Net worth", max: 25, v: r.networth == null ? null : logScale(r.networth, 5e7, 2.5e9), note: r.networth == null ? "not known" : `$${Math.round(r.networth).toLocaleString("en-US")}` },
     { label: "Account age", max: 15, v: r.age == null ? null : scale(r.age, 100, 3000), note: r.age == null ? "not known" : `${r.age} days` },
     { label: "Weak stats", max: 15, v: r.bs == null ? null : 1 - (myBs > 0 ? clamp01(r.bs / myBs) : logScale(r.bs, 1e7, 1e10)), note: r.bs == null ? "no estimate" : myBs > 0 ? `${Math.round((r.bs / myBs) * 100)}% of yours` : "est. stats" },
-    { label: "Inactive", max: 10, v: idle == null ? null : scale(idle, 7, 60), note: idle == null ? "unknown" : `${idle.toFixed(0)} days` },
+    { label: "Inactive", max: 10, v: idle == null ? null : scale(idle, 1, 30), note: idle == null ? "unknown" : `${idle.toFixed(0)} days` },
+    // From a mugging guide: a high level for a young account (1 level is about 100 days) tends to carry more cash.
+    { label: "Level for age", max: 5, v: r.level && r.age ? scale(r.level / (r.age / 100), 0.5, 1.5) : null, note: r.level && r.age ? `level ${r.level} at ${r.age} days` : "not known" },
     { label: "Company", max: 5, v: r.company ? r.company.stars / 10 : null, note: r.company ? `${r.company.stars} stars` : "unknown" },
   ];
   const known = parts.filter((p) => p.v != null);
@@ -100,6 +101,7 @@ export function sortValue(r, key) {
   switch (key) {
     case "score": return mugScore(r).score;
     case "mug": return predictedMug(r);
+    case "ev": return expectedValue(r);
     case "cash": return estimateCash(r);
     case "days": return daysInactive(r);
     case "stats": return r.bs;

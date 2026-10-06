@@ -9,7 +9,9 @@ import { loadAccountKeys } from "../features/account-keys.js";
 import { setScanMsg } from "../features/ui.js";
 import { state } from "../state.js";
 import { loadTypes } from "../earners/data.js";
+import { loadCalibration } from "../earners/calibration.js";
 import { initEarnFilters, renderTypes, showTypesError } from "../earners/filters.js";
+import { earn } from "../earners/state.js";
 import { render } from "../earners/results.js";
 import { cancelEarners, scanEarners } from "../earners/scan.js";
 
@@ -23,6 +25,12 @@ async function boot() {
   await loadAccountKeys();
   $("setup-note").hidden = !!state.keys.torn;
   initEarnFilters();
+  await loadCalibration((path) => api(path));
+  if (earn.calibration.n) {
+    const f = earn.calibration.factor;
+    $("calib-note").hidden = false;
+    $("calib-note").textContent = `Predictions are adjusted x${f.toFixed(2)} from your ${earn.calibration.n} real mugs (they were running ${f < 1 ? "high" : "low"}).`;
+  }
   render();
   $("scan").addEventListener("click", scanEarners);
   $("cancel").addEventListener("click", cancelEarners);

@@ -28,7 +28,7 @@ export function render() {
 
 // A fresh Torn record for a seller: write it on all their listings and cards (in place, so button taps are not lost).
 export function applyRecord(id, p) {
-  const fields = { state: p.state, until: p.until, desc: p.desc, age: p.age, checkedAt: p.t || Date.now() };
+  const fields = { state: p.state, until: p.until, desc: p.desc, details: p.details || "", age: p.age, checkedAt: p.t || Date.now() };
   for (const r of bonus.rows) if (r.id === id) Object.assign(r, fields);
   for (const s of document.querySelectorAll(`.status[data-pid="${id}"]`)) {
     s.dataset.state = fields.state || "";

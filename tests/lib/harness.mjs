@@ -135,7 +135,7 @@ function fakeServer() {
       const id = u.searchParams.get("id");
       const o = statusOverride[id];
       const status = o ? { state: o.state, until: o.state === "Abroad" ? 0 : o.until, description: o.state } : { state: "Okay", until: 0, description: "Okay" };
-      return send({ profile: { id: Number(id), name: "A", age: 100, last_action: { timestamp: 5, status: "Offline", relative: "x" }, status }, personalstats: { networth: { total: Number(id) * 100000000 } } });
+      return send({ profile: { id: Number(id), name: "A", age: 100, level: 30, last_action: { timestamp: 5, status: "Offline", relative: "x" }, status }, personalstats: { networth: { total: Number(id) * 100000000 } } });
     }
 
     // Torn v2 (leaderboard)
@@ -144,7 +144,7 @@ function fakeServer() {
     if (p === "/v2/user/attacks") {
       const t = now() + 5; // after the test's click
       return send({ attacks: [
-        { id: 5, code: "EEE", started: t, result: "Mugged", attacker: { id: 555 }, defender: { id: 23 } }, // Rex, never tapped by the test: counts as a recent mug of him
+        { id: 5, code: "EEE", started: t - 9 * 3600, result: "Mugged", attacker: { id: 555 }, defender: { id: 23 } }, // Rex, never tapped by the test: counts as a recent mug of him
         { id: 1, code: "AAA", started: t, result: "Mugged", attacker: { id: 555 }, defender: { id: 111 } },
         { id: 2, code: "BBB", started: t, result: "Mugged", attacker: { id: 555 }, defender: { id: 999 } }, // never clicked
         { id: 3, code: "CCC", started: t, result: "Hospitalized", attacker: { id: 555 }, defender: { id: 111 } }, // not a mug
