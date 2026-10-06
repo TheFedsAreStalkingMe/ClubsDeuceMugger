@@ -3,11 +3,12 @@
 
 import { api } from "/js/core/api.js";
 import { $, el, say } from "/js/core/dom.js";
-import { checkKey, keyLink } from "/js/core/keyneeds.js";
+import { checkKey, keyLink, limitedKeyLink } from "/js/core/keyneeds.js";
 import { loadKeys } from "/js/core/storage.js";
 
 export function initKeyCheck() {
   $("make-key").href = keyLink();
+  $("make-key-limited").href = limitedKeyLink();
   $("check-key").addEventListener("click", async () => {
     const key = $("key-torn").value.trim() || loadKeys().torn;
     if (!key) return say("keycheck-msg", "Paste and save your Torn key first.", "err");

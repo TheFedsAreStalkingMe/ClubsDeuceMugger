@@ -1,6 +1,7 @@
 // Pure rules about a listing row. No page access here.
 
-import { BASE_MUG, MERIT_BONUS, NUM_MAX, state } from "../state.js";
+import { NUM_MAX, state } from "../state.js";
+import { mugRate } from "./mugrate.js";
 
 // A row is one seller with everything of theirs that qualifies: { id, name, items: [...], total, topPrice, activity, ... }
 export const rowKey = (r) => String(r.id);
@@ -64,12 +65,12 @@ export function explainDrops(why, sellers) {
 
 // Expected profit if you buy everything this seller lists and then mug them.
 //   resale  = what the items are worth on the market minus what you pay (negative if overpriced)
-//   mug     = the cash they hold after your purchase (what you paid) x 5% x (1 + merits + plunder)
+//   mug     = the cash they hold after your purchase (what you paid) x 5% x (1 + merits + plunder), the bonuses from Settings
 // Rating: bad if you lose money, good if the profit is at least 5% of what you spend (and $500k), else mediocre.
 export function mugOutlook(r, f = state.filters) {
   const spend = r.total;
   const resale = r.items.reduce((sum, i) => sum + (i.market ? (i.market - i.price) * i.qty : 0), 0);
-  const rate = BASE_MUG * (1 + (f.merits ? MERIT_BONUS : 0) + (Number(f.plunder) || 0) / 100);
+  const rate = mugRate();
   const mug = spend * rate;
   const profit = resale + mug;
   const rating = profit <= 0 ? "bad" : profit >= 500000 && profit >= spend * 0.05 ? "good" : "mediocre";

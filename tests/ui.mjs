@@ -126,10 +126,13 @@ async function runChecks() {
   // Foxtrot: $16m at market, so profit is the mug alone: 16m x 5% = +$800k (good). Merits + 20% plunder: 5% x 1.3 = 6.5% = +$1.04m.
   const foxtrot = async () => page.$$eval("#results .target", (cs) => (cs.find((c) => c.textContent.includes("Foxtrot")) || {}).textContent || "");
   check("expected profit at base rate", /\+\$800k/.test(await foxtrot()), await foxtrot());
-  await page.click("summary:has-text('More options')");
-  await page.check("#merits");
-  await page.fill("#plunder", "20");
-  check("merits and plunder raise the expected profit", /\+\$1\.04m/.test(await foxtrot()), await foxtrot());
+  // merits and Plunder now live in Settings (2 merits x 5% + 20% Plunder = 1.3x)
+  await page.evaluate(() => localStorage.setItem("cdm.prefs", JSON.stringify({ merits: 2, plunder: 20 })));
+  await page.reload();
+  await page.click("#scan");
+  await scanDone();
+  check("merits and plunder from Settings raise the expected profit", /\+\$1\.04m/.test(await foxtrot()), await foxtrot());
+  await page.evaluate(() => localStorage.removeItem("cdm.prefs")); // back to no bonuses for the tests that follow
   await setStore("cdm.filters", filters);
   await page.reload();
 
@@ -320,9 +323,12 @@ async function runChecks() {
   await page.click("#types button");
   await page.waitForSelector("#types label");
   check("Try again loads the list", (await page.$$("#types label")).length === 2);
+  // the attack history reads are tested on their own below; keep these scans to the basic calls
+  await setStore("cdm.earn.filters", { historyTop: 0, types: [12], minStars: 5, minDays: 7 });
   await page.goto(BASE + "/app/settings.html");
   const keyLink = await page.getAttribute("#make-key", "href");
   check("the key made from Settings asks for everything the site uses", /company=[^&]*employees/.test(keyLink) && /torn=[^&]*companies/.test(keyLink) && /torn=[^&]*attacklog/.test(keyLink) && /user=[^&]*personalstats/.test(keyLink) && /user=basic,profile,battlestats,attacks/.test(keyLink), keyLink);
+  check("a Limited Access key link is offered too", /type=3/.test(await page.getAttribute("#make-key-limited", "href")));
   await page.click("#check-key");
   await page.waitForSelector("#keycheck-list li");
   check("Check my key says a full key covers everything", /covers everything the site needs/.test(await text("#keycheck-msg")) && !/Missing/.test(await text("#keycheck-list")), await text("#keycheck-msg"));
@@ -348,12 +354,13 @@ async function runChecks() {
   const lastTap = await page.evaluate(() => JSON.parse(localStorage.getItem("cdm.taps") || "[]").pop());
   check("the Attack tap saves the prediction (mug, cash, net worth, score, recent mugs)", lastTap && lastTap.pred && lastTap.pred.src === "earners" && lastTap.pred.mug > 0 && lastTap.pred.networth === 2300000000 && lastTap.pred.score > 0 && lastTap.pred.recent === 1, JSON.stringify(lastTap));
   check("a player mugged recently is ranked below one who was not (Pia above Rex)", efound[0].name === "Pia", efound.map((c) => c.name).join());
-  await page.click("details.more > summary");
-  await page.check("#merits");
-  await page.fill("#plunder", "20");
-  check("merits and Plunder raise the predicted mug", /Predicted mug~\$261k/.test((await earnCards()).find((c) => c.name === "Rex").text), (await earnCards()).find((c) => c.name === "Rex").text.slice(0, 200));
-  await page.uncheck("#merits");
-  await page.fill("#plunder", "0");
+  await page.evaluate(() => localStorage.setItem("cdm.prefs", JSON.stringify({ merits: 2, plunder: 20 })));
+  await page.reload();
+  await page.waitForSelector("#types label");
+  await page.click("#scan");
+  await page.waitForSelector("#scan:not([disabled])", { timeout: 120000 });
+  check("merits and Plunder from Settings raise the predicted mug", /Predicted mug~\$261k/.test((await earnCards()).find((c) => c.name === "Rex").text), (await earnCards()).find((c) => c.name === "Rex").text.slice(0, 200));
+  await page.evaluate(() => localStorage.removeItem("cdm.prefs"));
   await page.selectOption("#sort", "days:asc");
   check("sorting by days inactive", (await earnCards()).map((c) => c.name).join() === "Pia,Rex");
   // the second scan is served from the browser cache: no new company or employee calls
@@ -364,7 +371,7 @@ async function runChecks() {
   const after = await tornCalls();
   check("a repeat scan reuses the cached company data", after - before <= 2, `${after - before} Torn calls`);
   // The days-in-company cap and the other type: Petals (5 stars), Tess idle 15 days but employed 8.
-  await setStore("cdm.earn.filters", { types: [5], minStars: 5, minDays: 7, sort: "cash", dir: "desc" });
+  await setStore("cdm.earn.filters", { historyTop: 0, types: [5], minStars: 5, minDays: 7, sort: "cash", dir: "desc" });
   await page.reload();
   await page.waitForSelector("#types label");
   await page.click("#scan");
@@ -385,7 +392,7 @@ async function runChecks() {
   await scanDone();
   efound = await earnCards();
   check("a wage set in Settings changes the estimate", /~\$8m \(rough\)/.test(efound[0].text), efound[0] && efound[0].text.slice(0, 100));
-  await setStore("cdm.earn.filters", { types: [12], minStars: 5, minDays: 7 });
+  await setStore("cdm.earn.filters", { historyTop: 0, types: [12], minStars: 5, minDays: 7 });
   await setStore("cdm.earn.wages", { base: 500000, types: {} });
 
   section("Inactive earners keep searching");
@@ -394,7 +401,7 @@ async function runChecks() {
   await page.goto(BASE + "/app/earners.html");
   await page.waitForFunction(() => document.getElementById("maxBs").value !== "");
   await page.evaluate(() => { localStorage.removeItem("cdm.earn.cache"); localStorage.removeItem("cdm.calls"); localStorage.removeItem("cdm.profiles"); });
-  await setStore("cdm.earn.filters", { types: [12], minStars: 5, minDays: 7, maxPlayers: 80 });
+  await setStore("cdm.earn.filters", { historyTop: 0, types: [12], minStars: 5, minDays: 7, maxPlayers: 80 });
   await page.reload();
   await page.waitForSelector("#types label");
   await page.evaluate(() => localStorage.removeItem("cdm.calls")); // a fresh minute of Torn calls
@@ -405,7 +412,7 @@ async function runChecks() {
   const callsUsed = await page.evaluate(() => JSON.parse(localStorage.getItem("cdm.calls") || "[]").length);
   check("one combined call per match: 26 employee lists + 27 players is about 55 Torn calls, not 80+", callsUsed > 0 && callsUsed <= 62, `${callsUsed} Torn calls`);
   check("the message says how many companies were checked", /after checking 26 of 26 companies|after checking \d+ of \d+ companies/.test(await text("#scan-msg")), await text("#scan-msg"));
-  await setStore("cdm.earn.filters", { types: [12], minStars: 5, minDays: 7, maxPlayers: 5 });
+  await setStore("cdm.earn.filters", { historyTop: 0, types: [12], minStars: 5, minDays: 7, maxPlayers: 5 });
   await page.reload();
   await page.waitForSelector("#types label");
   await page.evaluate(() => localStorage.removeItem("cdm.calls")); // a fresh minute of Torn calls
@@ -417,7 +424,7 @@ async function runChecks() {
   // A key without personal stats access: the scan falls back to the profile alone and says net worth is missing.
   await setFakeFlag("combinedFail", true);
   await page.evaluate(() => { localStorage.removeItem("cdm.earn.cache"); localStorage.removeItem("cdm.calls"); localStorage.removeItem("cdm.profiles"); });
-  await setStore("cdm.earn.filters", { types: [12], minStars: 5, minDays: 7 });
+  await setStore("cdm.earn.filters", { historyTop: 0, types: [12], minStars: 5, minDays: 7 });
   await page.reload();
   await page.waitForSelector("#types label");
   await page.click("#scan");
@@ -426,7 +433,23 @@ async function runChecks() {
   check("without personal stats access it still finds players with status and age, net worth unknown", efound.length === 2 && /Account age100 days/.test(efound[0].text) && /Net worth\?/.test(efound[0].text) && /Net worth could not be read/.test(await text("#scan-msg")), `${efound.length} | ${await text("#scan-msg")}`);
   await setFakeFlag("combinedFail", false);
   await page.evaluate(() => { localStorage.removeItem("cdm.earn.cache"); localStorage.removeItem("cdm.profiles"); });
-  await setStore("cdm.earn.filters", { types: [12], minStars: 5, minDays: 7 });
+  await setStore("cdm.earn.filters", { historyTop: 0, types: [12], minStars: 5, minDays: 7 });
+
+  section("Attack history of players");
+  // Torn's public stats show attacks by anyone: Rex lost 2 fights as the defender in a day (1 was a member's mug we know of),
+  // 5 in a week, and his net worth fell from 2.9b to 2.3b. Pia is quiet.
+  await setStore("cdm.earn.filters", { types: [12], minStars: 5, minDays: 7, historyTop: 5 });
+  await page.evaluate(() => { localStorage.removeItem("cdm.earn.cache"); localStorage.removeItem("cdm.calls"); localStorage.removeItem("cdm.profiles"); });
+  await page.goto(BASE + "/app/earners.html");
+  await page.waitForSelector("#types label");
+  await page.click("#scan");
+  await page.waitForSelector("#scan:not([disabled])", { timeout: 150000 });
+  efound = await earnCards();
+  const rex2 = efound.find((c) => c.name === "Rex"), pia2 = efound.find((c) => c.name === "Pia");
+  check("outside attacks are found from Torn's stats and lower the rating", /Torn stats: 2 fights lost in ~24h, 5 in ~7 days \(anyone\)/.test(rex2.text) && /net worth down 21% since yesterday/.test(rex2.text) && /\(-59%\)/.test(rex2.text), rex2.text.slice(0, 420));
+  check("the predicted mug shrinks with them (6m x 5% x 0.41)", /Predicted mug~\$123k/.test(rex2.text), rex2.text.slice(0, 200));
+  check("a quiet player is not marked", /Recently muggednone known/.test(pia2.text), pia2.text.slice(0, 260));
+  await setStore("cdm.earn.filters", { historyTop: 0, types: [12], minStars: 5, minDays: 7 });
 
   section("Bonus weapon sellers");
   const bonusCards = () => page.$$eval("#results .target", (els) => els.map((e) => ({

@@ -27,6 +27,7 @@
         <h2>API key</h2>
         <div class="stack">
           <a class="btn green small" id="make-key" target="_blank" rel="noopener noreferrer" href="https://www.torn.com/preferences.php#tab=api">1. Make my Torn key</a>
+          <a class="btn small" id="make-key-limited" target="_blank" rel="noopener noreferrer" href="https://www.torn.com/preferences.php#tab=api">or: make a Limited Access key</a>
           <p class="hint">Opens Torn with every permission the site uses (stats, attacks, companies, net worth). Then tap Check my key below to see that all of it works. Tap Create, copy the key. Made your key earlier? Make a new one, or edit it in Torn's API settings and tick Company and Torn.</p>
           <label>2. Paste it here <input type="password" id="key-torn" autocomplete="off" spellcheck="false" maxlength="64"></label>
           <label class="check"><input type="checkbox" id="save-account"> Keep it on my account for other devices</label>
@@ -86,6 +87,22 @@
           </details>
           <button class="btn green small" id="save-wages" type="button">Save wages</button>
           <p class="msg" id="wages-msg" role="status" aria-live="polite"></p>
+        </div>
+      </section>
+
+      <section class="card panel">
+        <h2>Mugging bonuses</h2>
+        <p class="hint">Used for every predicted mug and expected profit on the finders. A mug takes about 5% of their cash; merits and Plunder raise that.</p>
+        <div class="stack">
+          <label>Masterful Looting merits you have (0 to 10)
+            <input type="number" id="m-merits" inputmode="numeric" min="0" max="10" step="1"></label>
+          <label>Extra mug money per merit (%) <span class="hint">5 means each merit adds 5% on top of the 5% base (10 merits: 7.5% instead of 5%).</span>
+            <input type="number" id="m-boost" inputmode="decimal" min="0" max="20" step="0.1"></label>
+          <label>Plunder on my weapon (%) <span class="hint">Leave 0 if your weapon has none.</span>
+            <input type="number" id="m-plunder" inputmode="decimal" min="0" max="100" step="0.1"></label>
+          <p class="hint" id="m-preview"></p>
+          <button class="btn green small" id="save-mugbonus" type="button">Save mugging bonuses</button>
+          <p class="msg" id="mugbonus-msg" role="status" aria-live="polite"></p>
         </div>
       </section>
 

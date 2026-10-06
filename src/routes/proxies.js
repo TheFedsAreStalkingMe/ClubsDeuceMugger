@@ -165,6 +165,22 @@ export async function playerNetworth({ request, env, url, user }) {
   return json({ networth: findNetworth(data.personalstats) });
 }
 
+// Two public stats of a player as they were `ago` days back (Torn keeps daily snapshots): how many fights they have lost
+// when defending, and their net worth. Comparing two snapshots shows how often they were attacked in between, by anyone.
+export async function playerStats({ request, env, url, user }) {
+  const id = url.searchParams.get("id") || "";
+  const ago = Number(url.searchParams.get("ago") || 0);
+  if (!/^\d{1,10}$/.test(id) || !Number.isInteger(ago) || ago < 0 || ago > 30) return fail("Bad player ID or days.");
+  const timestamp = Math.floor(Date.now() / 1000) - Math.max(3600, ago * 86400); // today's latest snapshot for ago = 0
+  const { data, response } = await tornPublic(env, request, user, `/user/${id}/personalstats`, { stat: "defendslost,networth", timestamp: String(timestamp), striptags: null });
+  if (response) return response;
+  const out = { defendslost: null, networth: null, at: null };
+  for (const s of Array.isArray(data.personalstats) ? data.personalstats : []) {
+    if (s.name === "defendslost" || s.name === "networth") { out[s.name] = s.value; out.at = s.timestamp; }
+  }
+  return json(out);
+}
+
 // Status, age, last action AND net worth of a player in ONE Torn call (Torn lets selections be combined). The profile
 // part has the same shape as /api/torn/user, plus `networth`.
 export async function playerData({ request, env, url, user }) {

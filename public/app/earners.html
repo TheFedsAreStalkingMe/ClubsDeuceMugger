@@ -59,13 +59,12 @@
         <summary>More options</summary>
         <div class="stack">
           <label class="check"><input type="checkbox" id="includeUnknown"> Keep players with no stat estimate</label>
-          <label class="check"><input type="checkbox" id="merits"> I have the mugging merits (+10% mug money)</label>
-          <label>Plunder on my weapon (%) <span class="hint">Used for the predicted mug.</span>
-            <input type="number" id="plunder" inputmode="decimal" min="0" max="100" step="0.1"></label>
           <label>Companies read per type <span class="hint">100 per Torn call.</span>
             <input type="number" id="perType" inputmode="numeric" min="100" max="2000" step="100"></label>
           <label>Check at most this many companies <span class="hint">Most stars first. The scan keeps going through them, ten at a time, until it has enough matches.</span>
             <input type="number" id="maxCompanies" inputmode="numeric" min="1" max="1000" step="1"></label>
+          <label>Check recent attacks for the best this many matches <span class="hint">Torn's public stats show how often anyone attacked them lately (3 Torn calls each). 0 = off.</span>
+            <input type="number" id="historyTop" inputmode="numeric" min="0" max="50" step="1"></label>
           <label>Stop after finding this many players <span class="hint">Biggest estimated cash first.</span>
             <input type="number" id="maxPlayers" inputmode="numeric" min="1" max="500" step="1"></label>
         </div>

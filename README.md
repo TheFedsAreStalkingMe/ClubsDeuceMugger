@@ -106,6 +106,16 @@ the hospital status, or no known cause. **Recently mugged** lowers the rating on
 member made is remembered (`seen_mugs`), each one in the last 24 hours takes about 18% off, older ones this week a
 little, a mug in the last hour and a "Mugged by" hospital status extra (`recentDrain` in `earners/rules.js`).
 
+**Mugging bonuses.** Merits (0 to 10, each adding 5% by default) and Plunder are set once in Settings
+(`settings/mugbonus.js`) and read by every finder through `features/mugrate.js`: rate = 5% x (1 + merits x boost + Plunder).
+
+**Attacks by anyone, not just members.** The site only knows mugs members made. For the best matches on the Inactive earners
+tab it also reads Torn's public stat snapshots (`/user/{id}/personalstats?stat=defendslost,networth&timestamp=`) for now, a day
+ago and a week ago (3 Torn calls each; `earners/history.js`, "Check recent attacks for the best N matches", default 10).
+Fights they lost as the defender beyond the members' mugs, and a net worth fall of 20% or more in a day, lower the rating
+and predicted mug. Snapshots are daily, so "~24h" is approximate, and it counts every lost defend (mugs, hospitalisations),
+not only mugs.
+
 **Your Torn key.** Everything the site calls with a member's key is listed in `public/js/core/keyneeds.js`; the "Make
 my Torn key" link in Settings is built from it and "Check my key" (Torn's `/key/info`) compares a key against it.
 Add a new selection there when a feature starts using one.

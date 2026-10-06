@@ -8,7 +8,7 @@ import { DEFAULT_PREFS } from "../state.js";
 const NUMBER_FIELDS = ["minJackpot", "myBs", "outMinutes", "offlineMinutes"];
 
 function savePrefs() {
-  const next = { notify: $("p-notify").checked };
+  const next = { ...load(STORE.prefs, {}), notify: $("p-notify").checked }; // keeps the mugging bonuses saved next to them
   for (const k of NUMBER_FIELDS) {
     const v = parseFloat($(`p-${k}`).value);
     next[k] = Number.isFinite(v) && v >= 0 ? v : DEFAULT_PREFS[k];

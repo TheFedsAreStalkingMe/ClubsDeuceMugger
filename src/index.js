@@ -48,6 +48,7 @@ const ROUTES = [
   ["GET", "/api/torn/key", proxies.keyInfo],
   ["GET", "/api/torn/networth", proxies.playerNetworth],
   ["GET", "/api/torn/player", proxies.playerData],
+  ["GET", "/api/torn/stats", proxies.playerStats],
   ["GET", "/api/torn/company-types", proxies.companyTypes],
   ["GET", "/api/torn/companies", proxies.companyList],
   ["GET", "/api/torn/employees", proxies.companyEmployees],

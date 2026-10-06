@@ -218,6 +218,12 @@ async function runChecks() {
   check("net worth of a player", r.data.networth === 2100000000, JSON.stringify(r.data));
   r = await bob.get("/api/torn/player?id=21", { headers: K });
   check("one call gives status, age, last action and net worth", r.data.age === 100 && r.data.status.state === "Okay" && r.data.last_action.timestamp === 5 && r.data.networth === 2100000000 && r.data.secret === undefined, JSON.stringify(r.data));
+  r = await bob.get("/api/torn/stats?id=23&ago=0", { headers: K });
+  const s0 = r.data;
+  r = await bob.get("/api/torn/stats?id=23&ago=7", { headers: K });
+  check("stats history: defends lost and net worth on two days", s0.defendslost === 50 && r.data.defendslost === 45 && s0.networth === 2300000000 && r.data.networth === 2900000000, JSON.stringify([s0, r.data]));
+  r = await bob.get("/api/torn/stats?id=23&ago=99", { headers: K });
+  check("stats history refuses a silly number of days", r.status === 400);
   r = await bob.get("/api/torn/player?id=abc", { headers: K });
   check("bad player id refused for the combined call", r.status === 400);
   r = await bob.get("/api/torn/networth?id=abc", { headers: K });

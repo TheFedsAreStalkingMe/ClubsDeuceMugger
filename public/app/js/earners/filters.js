@@ -59,12 +59,7 @@ export function initEarnFilters() {
   bindNumber("perType", 100, 2000, 500);
   bindNumber("maxCompanies", 1, 1000, 300);
   bindNumber("maxPlayers", 1, 500, 80);
-  const merits = $("merits");
-  merits.checked = !!f.merits;
-  merits.addEventListener("change", () => { f.merits = merits.checked; persist(); render(); });
-  const plunder = $("plunder");
-  plunder.value = f.plunder;
-  plunder.addEventListener("input", () => { f.plunder = Math.min(100, Math.max(0, parseFloat(plunder.value) || 0)); persist(); render(); });
+  bindNumber("historyTop", 0, 50, 10);
   const unknown = $("includeUnknown");
   unknown.checked = !!f.includeUnknown;
   unknown.addEventListener("change", () => { f.includeUnknown = unknown.checked; persist(); });

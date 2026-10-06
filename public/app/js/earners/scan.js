@@ -16,8 +16,9 @@ import { phase, setProgress, setScanMsg } from "../features/ui.js";
 import { tornCall } from "../features/torncall.js";
 import { state } from "../state.js";
 import { cached, flushCache, keep, loadTypes } from "./data.js";
+import { readHistory } from "./history.js";
 import { applyRecord, render } from "./results.js";
-import { daysInactive, estimateCash } from "./rules.js";
+import { daysInactive, estimateCash, mugScore } from "./rules.js";
 import { earn } from "./state.js";
 
 const isCancel = (e) => e && e.message === "cancelled";
@@ -220,6 +221,14 @@ export async function scanEarners() {
     earn.rows = earn.rows.slice(0, f.maxPlayers);
     render();
     if (keyProblem) return;
+    // How often were the best matches attacked lately by anyone (Torn's daily stat snapshots)? Lowers their rating.
+    const top = [...earn.rows].sort((a, b) => mugScore(b).score - mugScore(a).score).slice(0, f.historyTop || 0);
+    for (let i = 0; i < top.length && runId === state.runId; i++) {
+      setScanMsg(`Reading recent attacks on the best matches ${i + 1}/${top.length} (3 Torn calls each)...`);
+      top[i].history = await readHistory(top[i].id, runId);
+      render();
+    }
+    if (runId !== state.runId) return;
     if (!earn.rows.length) {
       throw new Stop(inactive ? explainDrops(why, inactive).replace("sellers", "inactive players") : `No one at ${checked} companies has been inactive for ${f.minDays}+ days.`, "info", 1);
     }

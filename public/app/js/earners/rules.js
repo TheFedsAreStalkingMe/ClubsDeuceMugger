@@ -2,7 +2,7 @@
 
 import { remaining } from "../features/rules.js";
 import { STORE, load } from "/js/core/storage.js";
-import { BASE_MUG, MERIT_BONUS } from "../state.js";
+import { mugRate } from "../features/mugrate.js";
 import { WAGE_CAP, earn } from "./state.js";
 
 const DAY = 86400;
@@ -25,10 +25,6 @@ export function estimateCash(r, wages = earn.wages, now = Date.now() / 1000) {
   return dailyWage(r.company, wages) * Math.min(Math.floor(idle), r.daysIn ?? Infinity);
 }
 
-// The money a mug would take: about 5% of their cash, plus your merits and Plunder (same sum as the bazaar finder).
-export function mugRate(f = earn.filters) {
-  return BASE_MUG * (1 + (f.merits ? MERIT_BONUS : 0) + (Number(f.plunder) || 0) / 100);
-}
 // How much of their cash recent mugs have probably taken, 0 to 0.9. Each member mug in the last 24h took roughly a
 // fifth of what was left, older mugs this week count a little, a mug in the last hour counts extra, and a player in
 // hospital right after a mug (Torn says "Mugged by ...") was just mugged, maybe by someone outside the site.
@@ -38,6 +34,13 @@ export function recentDrain(r, now = Date.now() / 1000) {
   d += Math.min(0.15, 0.03 * Math.max(0, (rec.n7 || 0) - (rec.n24 || 0)));
   if (rec.last && now - rec.last < 3600) d += 0.15;
   if (/mugged/i.test(r.details || "")) d += 0.25;
+  // Attacks by anyone (Torn's public stats): fights they lost as the defender beyond the ones members made.
+  const h = r.history;
+  if (h) {
+    d += Math.min(0.3, 0.1 * Math.max(0, h.lost24 - (rec.n24 || 0)));
+    d += Math.min(0.1, 0.02 * Math.max(0, h.lost7 - h.lost24 - Math.max(0, (rec.n7 || 0) - (rec.n24 || 0))));
+    if (h.drop24 >= 0.2) d += 0.1; // net worth fell a fifth in a day: money left
+  }
   return Math.min(0.9, d);
 }
 export const recentNote = (r) => {
@@ -46,7 +49,10 @@ export const recentNote = (r) => {
   if (rec.n24) bits.push(`${rec.n24} mug${rec.n24 === 1 ? "" : "s"} in 24h`);
   if ((rec.n7 || 0) > (rec.n24 || 0)) bits.push(`${rec.n7 - (rec.n24 || 0)} earlier this week`);
   if (/mugged/i.test(r.details || "")) bits.push("in hospital after a mug");
-  return bits.length ? bits.join(", ") : r.recent ? "none known" : "not checked";
+  const h = r.history;
+  if (h && (h.lost24 || h.lost7)) bits.push(`Torn stats: ${h.lost24} fight${h.lost24 === 1 ? "" : "s"} lost in ~24h, ${h.lost7} in ~7 days (anyone)`);
+  if (h && h.drop24 >= 0.2) bits.push(`net worth down ${Math.round(h.drop24 * 100)}% since yesterday`);
+  return bits.length ? bits.join(", ") : r.recent || r.history ? "none known" : "not checked";
 };
 
 export function predictedMug(r, wages = earn.wages) {

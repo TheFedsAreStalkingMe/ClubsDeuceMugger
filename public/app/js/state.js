@@ -5,7 +5,6 @@ import { STORE, load, loadKeys } from "/js/core/storage.js";
 export const NUM_MAX = 1e10; // "no limit" for the battle stat sliders
 export const MIN_PRICE = 1000000; // mugs below $1m are not worth the effort
 export const BASE_MUG = 0.05; // a mug takes about 5% of the target's cash
-export const MERIT_BONUS = 0.10; // Masterful Looting merits: +10% more mug money
 
 export const DEFAULT_FILTERS = {
   minPrice: MIN_PRICE,
@@ -15,8 +14,6 @@ export const DEFAULT_FILTERS = {
   priceTol: 10, // listing price must be within this % of market value (0 = off)
   minActivity: 0, // only items with at least this many listings changed in the last hour (0 = off)
   minPart: 0, // also add up items worth at least this much; a seller counts when they add up to minPrice (0 = off)
-  merits: false, // you have the mugging merits (+10% mug money)
-  plunder: 0, // percent of Plunder on your weapon (extra mug money)
   minStack: 0, // also count stacks of 2+ worth at least this much, even if each item is under minPrice (0 = off)
   maxSellers: 80, // sellers who get the slower status checks
   bazaarPages: 3, // pages of 100 listings read per item (it stops early once listings are above the price band)
@@ -33,6 +30,9 @@ export const DEFAULT_PREFS = {
   notify: true,
   minJackpot: 10000000,
   myBs: 0, // your own total battle stats
+  merits: 0, // Masterful Looting merits you have (0 to 10), from Settings
+  meritBoost: 5, // extra mug money per merit, in percent
+  plunder: 0, // percent of Plunder on your weapon
   outMinutes: 5,
   offlineMinutes: 35,
 };

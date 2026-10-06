@@ -6,6 +6,7 @@ export const NEEDS = [
   { feature: "Your own battle stats (Settings)", need: { user: ["battlestats"] } },
   { feature: "Leaderboard (checking your mugs)", need: { user: ["basic", "attacks"], torn: ["attacklog"] } },
   { feature: "Inactive earners (companies, employees, net worth)", need: { torn: ["companies"], company: ["companies", "employees"], user: ["profile", "personalstats"] } },
+  { feature: "Recent attacks on players (Inactive earners: Torn's public stats history)", need: { user: ["personalstats"] } },
   { feature: "Bonus weapon sellers (status and account age)", need: { user: ["profile"] } },
 ];
 
@@ -28,3 +29,7 @@ export function checkKey(selections) {
     return { feature, missing };
   });
 }
+
+// A Limited Access key covers all of the above in one go (Public, Minimal and Limited selections are all included).
+// Torn's make-a-key page takes the access level as `type` (3 = Limited). If that is not preselected, choose Limited Access there.
+export const limitedKeyLink = () => "https://www.torn.com/preferences.php#tab=api?step=addNewKey&title=ClubsDeuceMugger&type=3";

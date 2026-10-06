@@ -164,6 +164,14 @@ function fakeServer() {
       return send({ info: { selections: all, user: { id: 555, faction_id: null, company_id: null }, access: { level: 3, type: flags.keyLimited ? "Custom" : "Limited Access", faction: false, company: false } } });
     }
     const nw = p.match(/^\/v2\/user\/(\d+)\/personalstats$/);
+    if (nw && u.searchParams.get("stat")) {
+      // history: Rex (23) lost 2 defends in the last day and 5 in the last week and his net worth fell from 2.9b to 2.3b; everyone else is quiet
+      const ago = Math.round((now() - Number(u.searchParams.get("timestamp"))) / 86400);
+      const id = Number(nw[1]);
+      const lost = id === 23 ? 50 - (ago >= 7 ? 5 : ago >= 1 ? 2 : 0) : 10;
+      const worth = id === 23 ? (ago >= 1 ? 2900000000 : 2300000000) : id * 100000000;
+      return send({ personalstats: [{ name: "defendslost", value: lost, timestamp: now() - ago * 86400 }, { name: "networth", value: worth, timestamp: now() - ago * 86400 }] });
+    }
     if (nw) return send({ personalstats: { networth: { total: Number(nw[1]) * 100000000 } } });
 
     // Torn companies (inactive earners): types 12 Mining Corporation and 5 Flower Shop
