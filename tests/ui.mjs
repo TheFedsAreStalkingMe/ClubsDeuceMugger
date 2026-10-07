@@ -439,6 +439,7 @@ async function runChecks() {
   await page.evaluate(() => { localStorage.removeItem("cdm.earn.cache"); localStorage.removeItem("cdm.profiles"); });
   await setStore("cdm.earn.filters", { historyTop: 0, types: [12], minStars: 5, minDays: 7 });
 
+  await setFakeFlag("hotBazaar", true);
   section("Attack history of players");
   // Torn's public stats show attacks by anyone: Rex lost 2 fights as the defender in a day (1 was a member's mug we know of),
   // 5 in a week, and his net worth fell from 2.9b to 2.3b. Pia is quiet.
@@ -454,6 +455,16 @@ async function runChecks() {
   check("outside attacks are found from Torn's stats and lower the rating", /Torn stats: 2 fights lost in ~24h, 5 in ~7 days \(anyone\)/.test(rex2.text) && /net worth down 21% since yesterday/.test(rex2.text) && /\(-48%\)/.test(rex2.text), rex2.text.slice(0, 420));
   check("the predicted mug shrinks with them (6m wages + 60m bazaar sales, x 5% x 0.52)", /Predicted mug~\$1\.(69|7[0-3])m/.test(rex2.text), rex2.text.slice(0, 200));
   check("a quiet player is not marked", /Recently muggednone known/.test(pia2.text), pia2.text.slice(0, 260));
+  // With the attack history off, every match still has its bazaar checked right away (2 Torn calls each).
+  await setStore("cdm.earn.filters", { historyTop: 0, types: [12], minStars: 5, minDays: 7 });
+  await page.evaluate(() => { localStorage.removeItem("cdm.earn.cache"); localStorage.removeItem("cdm.calls"); localStorage.removeItem("cdm.profiles"); });
+  await page.goto(BASE + "/app/earners.html");
+  await page.waitForSelector("#types label");
+  await page.click("#scan");
+  await page.waitForSelector("#scan:not([disabled])", { timeout: 150000 });
+  const rex2b = (await earnCards()).find((c) => c.name === "Rex");
+  check("every match has its bazaar checked right away, even with the attack history off", /Bazaar sales30 \(\$60\.0m\) in ~7 days, about \$2\.0m each/.test(rex2b.text) && !/Torn stats:/.test(rex2b.text), rex2b.text.slice(0, 500));
+  await setFakeFlag("hotBazaar", false);
   await setStore("cdm.earn.filters", { historyTop: 0, types: [12], minStars: 5, minDays: 7 });
 
   section("Profit tools");

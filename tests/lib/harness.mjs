@@ -32,7 +32,7 @@ export const section = (title) => console.log(`\n${title}`);
 const now = () => Math.floor(Date.now() / 1000);
 // Test control: statuses the fake Torn reports, by player id. Change them with setFakeStatus().
 const statusOverride = {};
-const flags = { attacklogFail: false, weav3rBusy: false, deep: false, typesFail: false, manyCompanies: false, keyLimited: false, combinedFail: false, attacksDenied: false };
+const flags = { attacklogFail: false, weav3rBusy: false, deep: false, typesFail: false, manyCompanies: false, keyLimited: false, combinedFail: false, attacksDenied: false, hotBazaar: false };
 export async function setFakeFlag(name, on) {
   await fetch(`http://localhost:${FAKE_PORT}/__flag?name=${name}&on=${on ? 1 : 0}`);
 }
@@ -171,7 +171,7 @@ function fakeServer() {
       const lost = id === 23 || id === 8 ? 50 - (ago >= 7 ? 5 : ago >= 1 ? 2 : 0) : 10;
       const worth = id === 23 || id === 8 ? (ago >= 1 ? 2900000000 : 2300000000) : id * 100000000;
       // bazaar: Rex's took in $60m over the week ($10m of it in the last day) from 30 sales (5 in the last day)
-      const hot = id === 23;
+      const hot = id === 23 && flags.hotBazaar;
       const bz = hot ? { bazaarprofit: 100e6 - (ago >= 7 ? 60e6 : ago >= 1 ? 10e6 : 0), bazaarsales: 50 - (ago >= 7 ? 30 : ago >= 1 ? 5 : 0), bazaarcustomers: 90 } : { bazaarprofit: 1e6, bazaarsales: 3, bazaarcustomers: 4 };
       const t = now() - ago * 86400;
       return send({ personalstats: [{ name: "defendslost", value: lost, timestamp: t }, { name: "networth", value: worth, timestamp: t }, ...Object.entries(bz).map(([name, value]) => ({ name, value, timestamp: t }))] });

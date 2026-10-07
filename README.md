@@ -187,3 +187,7 @@ as the attack history (`/api/torn/stats`), so there are no extra Torn calls. A b
 the money stays in their cash, so for Inactive Earners the profit since their last activity (up to 7 days) is added to the
 estimated cash (`features/bazaar.js`). Every card shows a "Bazaar sales" row (sales and profit in ~24h and ~7 days, average
 per sale); no sales in a week means the bazaar is probably closed or empty.
+
+Inactive Earners checks the bazaar of **every** match as soon as it is found (`readBazaar`, 2 Torn calls: now and a week
+ago, kept for an hour), best estimated cash first, while the scan carries on with the next companies. The attack-history
+read (3 calls) stays for the best few matches and also carries the 24-hour bazaar numbers.

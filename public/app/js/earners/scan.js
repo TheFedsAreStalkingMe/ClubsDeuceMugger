@@ -17,7 +17,7 @@ import { phase, setProgress, setScanMsg } from "../features/ui.js";
 import { tornCall } from "../features/torncall.js";
 import { state } from "../state.js";
 import { cached, flushCache, keep, loadTypes } from "./data.js";
-import { readHistory } from "../features/history.js";
+import { readBazaar, readHistory } from "../features/history.js";
 import { applyRecord, render } from "./results.js";
 import { daysInactive, estimateCash, mugScore } from "./rules.js";
 import { earn } from "./state.js";
@@ -171,6 +171,22 @@ export async function scanEarners() {
     const batches = [];
     for (let i = 0; i < companies.length; i += BATCH) batches.push(companies.slice(i, i + BATCH));
     const read = (n) => { const pr = n < batches.length ? readEmployees(batches[n], f, runId, stop) : null; if (pr) pr.catch(() => {}); return pr; };
+    // Every match gets its bazaar checked as soon as it is found (2 Torn calls each), best estimated cash first, while the
+    // scan carries on with the next companies. A bazaar sells while its owner is offline, so its takings add to the cash.
+    const bazaarQueue = [];
+    let bazaarWorker = null;
+    const runBazaar = async () => {
+      while (bazaarQueue.length && runId === state.runId) {
+        const r = bazaarQueue.shift();
+        try { r.bz = await readBazaar(r.id, runId); } catch (e) { if (isCancel(e)) return; r.bz = null; }
+        render();
+      }
+      bazaarWorker = null;
+    };
+    const checkBazaars = (rows) => {
+      bazaarQueue.push(...rows.sort((a, b) => (estimateCash(b) ?? 0) - (estimateCash(a) ?? 0)));
+      if (!bazaarWorker) bazaarWorker = runBazaar();
+    };
     let upcoming = read(0);
     for (let b = 0; b < batches.length && earn.rows.length < f.maxPlayers && !keyProblem; b++) {
       const raw = await upcoming;
@@ -196,6 +212,7 @@ export async function scanEarners() {
           keyProblem = await checkPlayers(good, runId);
           await loadRecentMugs(good, call);
           render();
+          checkBazaars(good);
         }
       }
       setProgress(0.1 + 0.9 * (checked / companies.length));
@@ -209,6 +226,11 @@ export async function scanEarners() {
     earn.rows = earn.rows.slice(0, f.maxPlayers);
     render();
     if (keyProblem) return;
+    if (bazaarWorker) {
+      setScanMsg(`Checking the bazaars of the matches (${bazaarQueue.length} left)...`);
+      await bazaarWorker;
+      if (runId !== state.runId) return;
+    }
     // How often were the best matches attacked lately by anyone (Torn's daily stat snapshots)? Lowers their rating.
     const top = [...earn.rows].sort((a, b) => mugScore(b).score - mugScore(a).score).slice(0, f.historyTop || 0);
     for (let i = 0; i < top.length && runId === state.runId; i++) {

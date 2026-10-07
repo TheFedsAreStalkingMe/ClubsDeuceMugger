@@ -36,3 +36,26 @@ export async function readHistory(id, runId, ttl = HOUR) {
     return null;
   }
 }
+
+// Just the bazaar numbers (2 Torn calls: now and a week ago), for every match as soon as it is found.
+// -> { bazaar: true, profit7, sales7 } or null when Torn would not say.
+export async function readBazaar(id, runId) {
+  const hit = cached(`b:${id}`, HOUR);
+  if (hit) return hit.b;
+  try {
+    const now = await tornCall(`/api/torn/stats?id=${id}&ago=0`, runId);
+    const week = await tornCall(`/api/torn/stats?id=${id}&ago=7`, runId);
+    if (now.bazaarprofit == null || week.bazaarprofit == null) return null;
+    const b = {
+      bazaar: true,
+      profit7: Math.max(0, now.bazaarprofit - week.bazaarprofit),
+      sales7: Math.max(0, (now.bazaarsales ?? 0) - (week.bazaarsales ?? 0)),
+    };
+    keep(`b:${id}`, { b });
+    flushCache();
+    return b;
+  } catch (e) {
+    if (e && e.message === "cancelled") throw e;
+    return null;
+  }
+}
