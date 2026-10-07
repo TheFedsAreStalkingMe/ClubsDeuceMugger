@@ -191,3 +191,22 @@ per sale); no sales in a week means the bazaar is probably closed or empty.
 Inactive Earners checks the bazaar of **every** match as soon as it is found (`readBazaar`, 2 Torn calls: now and a week
 ago, kept for an hour), best estimated cash first, while the scan carries on with the next companies. The attack-history
 read (3 calls) stays for the best few matches and also carries the 24-hour bazaar numbers.
+
+## Background search (runs while the page is closed)
+
+Settings has a **Background search** panel. When turned on, a Cloudflare Cron Trigger (`*/3 * * * *` in `wrangler.jsonc`)
+runs the Inactive Earners search for the member on the server and **emails** the best targets (`src/lib/hunt.js`,
+`src/routes/hunt.js`, table `bg_hunts`). It uses the filters, wages and mugging bonuses the member had in their browser
+when they tapped Turn on / Update (tap Update again after changing them).
+
+- **The key is stored on the server.** It is sealed (AES-GCM) with a Worker secret, so the scheduled job can read it. Turning
+  the search off, or Torn rejecting the key, deletes it. Saving it needs the member's password and an email address.
+- **One-time setup** (deploy as usual, then): `npx wrangler secret put BG_SECRET` and enter any long random text. Without it
+  the panel says the search is not available.
+- **Budget.** A free-plan Worker run may make about 50 outside calls. Each run spends `HUNT_BUDGET` (default 40, a `vars`
+  entry) across all members, oldest first, and remembers where it stopped, so a pass over a few hundred companies takes
+  several runs. On a paid plan raise `HUNT_BUDGET` (it still stays under Torn's 100 calls a minute per key).
+- **What it does per pass:** company lists by type and stars, employees idle for N days, FF Scouter stat estimates (stat
+  filters), status and net worth, bazaar takings, the same mug maths as the page (cash estimate, merits and Plunder, recent-mug
+  drain from members' mugs). Targets over the minimum predicted mug are emailed (best 10, at most one email per half hour,
+  never the same player twice in 24 hours). It does not read the 3-call attack history.

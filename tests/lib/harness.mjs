@@ -248,7 +248,7 @@ function writeConfig() {
   const f = `http://localhost:${FAKE_PORT}`;
   Object.assign(cfg.vars, {
     WEAV3R_API_BASE: `${f}/weav3r`, TORN_V1_API_BASE: `${f}/tornv1`, TORN_API_BASE: `${f}/v2`,
-    FFSCOUTER_API_BASE: `${f}/ff`,
+    FFSCOUTER_API_BASE: `${f}/ff`, BG_SECRET: "test-background-secret", HUNT_BUDGET: "200",
   });
   fs.writeFileSync(path.join(TMP, "wrangler.jsonc"), JSON.stringify(cfg, null, 2));
 }

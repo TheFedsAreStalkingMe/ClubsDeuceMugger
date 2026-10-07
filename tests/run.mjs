@@ -322,6 +322,31 @@ async function runChecks() {
   r = await dana.post("/api/leaderboard/sync", {}, { headers: { "X-Torn-Key": "DANAKEY12345678" } });
   check("one Torn player per member", r.status === 409);
 
+  section("Background search");
+  r = await dana.get("/api/hunt");
+  check("background search starts off and is available", r.status === 200 && r.data.available === true && r.data.enabled === false && r.data.hasEmail === true, JSON.stringify(r.data));
+  const cfg = { types: [12], minStars: 5, minDays: 7, minMug: 50000, wages: { base: 1000000, share: 60, types: {} } };
+  r = await dana.post("/api/hunt", { tornKey: "short!", password: "hunter2hunter2", config: cfg });
+  check("a malformed key is refused", r.status === 400);
+  r = await dana.post("/api/hunt", { tornKey: KEY, password: "wrong-password", config: cfg });
+  check("saving the key on the server needs the password", r.status === 403);
+  r = await dana.post("/api/hunt", { tornKey: KEY, password: "hunter2hunter2", config: { ...cfg, types: [] } });
+  check("a search without company types is refused", r.status === 400);
+  r = await dana.post("/api/hunt", { tornKey: KEY, password: "hunter2hunter2", config: cfg });
+  check("the search is turned on", r.status === 200 && r.data.ok === true, JSON.stringify(r.data));
+  r = await dana.get("/api/hunt");
+  check("status shows it on, without the key", r.data.enabled === true && !JSON.stringify(r.data).includes(KEY), JSON.stringify(r.data));
+  let hunt;
+  for (let i = 0; i < 6; i++) hunt = await dana.post("/api/hunt/run", {});
+  check("a run reads the companies and finds candidates", hunt.status === 200 && hunt.data.ran === true && /Pass complete|Emailed|waiting/.test(hunt.data.lastMsg), JSON.stringify(hunt.data));
+  check("the best targets are emailed with an attack link", !!(await waitForMail(/Pia \[21\]/)) && !!(await waitForMail(/user2ID=21/)));
+  check("players that cannot be attacked or are filtered are not emailed", !(await waitForMail(/Rex \[23\]/, 1500)) && !(await waitForMail(/Sam \[24\]/, 1500)));
+  r = await dana.post("/api/hunt/off", {});
+  r = await dana.get("/api/hunt");
+  check("turning it off deletes the key and the search", r.data.enabled === false && r.data.config === null);
+  const left = await dana.post("/api/hunt/run", {});
+  check("nothing runs once it is off", left.data.ran === false);
+
   section("Bazaar read limit");
   // 330 quick reads against a limit of 300 a minute: some must be refused, with a short retry hint.
   const results = [];

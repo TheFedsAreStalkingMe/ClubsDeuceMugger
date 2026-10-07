@@ -8,11 +8,13 @@
 // `user` is null on public routes.
 
 import { cleanup } from "./lib/db.js";
+import { runAllHunts } from "./lib/hunt.js";
 import { getUser } from "./lib/auth.js";
 import { fail, withSecurityHeaders } from "./lib/http.js";
 import * as account from "./routes/account.js";
 import * as admin from "./routes/admin.js";
 import * as auth from "./routes/auth.js";
+import * as hunt from "./routes/hunt.js";
 import * as invites from "./routes/invites.js";
 import * as leaderboard from "./routes/leaderboard.js";
 import * as proxies from "./routes/proxies.js";
@@ -32,6 +34,12 @@ const ROUTES = [
   ["POST", "/api/account/email", account.setEmail],
   ["GET", "/api/account/key", account.getSavedKeys],
   ["POST", "/api/account/key", account.saveKeys],
+
+  // the background search (runs from a Cron Trigger while the page is closed)
+  ["GET", "/api/hunt", hunt.status],
+  ["POST", "/api/hunt", hunt.enable],
+  ["POST", "/api/hunt/off", hunt.disable],
+  ["POST", "/api/hunt/run", hunt.runNow],
 
   // invites and the owner's tools
   ["GET", "/api/invites", invites.listInvites],
@@ -104,5 +112,10 @@ export default {
       console.error("unhandled", err && err.message);
       return withSecurityHeaders(fail("Something went wrong. Try again.", 500));
     }
+  },
+
+  // Cron Trigger (wrangler.jsonc): one step of every member's background search.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(runAllHunts(env).catch((err) => console.error("scheduled hunt", err && err.message)));
   },
 };

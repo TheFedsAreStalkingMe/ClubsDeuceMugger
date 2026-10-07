@@ -94,3 +94,14 @@ export async function wrapForSession(token, vaultKey, userId) {
 export async function unwrapFromSession(token, wrapped, userId) {
   return decryptBytes(await sessionWrapKey(token), `vault:${userId}`, wrapped);
 }
+
+// ---- the background search key: sealed with a Worker secret so the scheduled job can read it ----
+
+const secretKeyBytes = async (secret) => new Uint8Array(await crypto.subtle.digest("SHA-256", enc.encode(`bg:${secret}`)));
+
+export const sealWithSecret = async (secret, userId, value) =>
+  encryptBytes(await secretKeyBytes(secret), `bg:${userId}`, enc.encode(JSON.stringify(value)));
+
+export async function openWithSecret(secret, userId, sealed) {
+  return JSON.parse(new TextDecoder().decode(await decryptBytes(await secretKeyBytes(secret), `bg:${userId}`, sealed)));
+}

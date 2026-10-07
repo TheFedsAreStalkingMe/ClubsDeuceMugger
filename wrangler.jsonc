@@ -28,6 +28,11 @@
     }
   ],
 
+  // The background search: one small step every 3 minutes (see src/lib/hunt.js). It only does anything for members who
+  // turned it on, and only after you add the secret:  npx wrangler secret put BG_SECRET  (any long random text).
+  // A free-plan Worker run may make about 50 outside calls; the search spends HUNT_BUDGET (default 40) of them.
+  "triggers": { "crons": ["*/3 * * * *"] },
+
   // Lets open pages notice a new deploy (see /api/me and public/js/core/update.js).
   "version_metadata": { "binding": "CF_VERSION_METADATA" },
 

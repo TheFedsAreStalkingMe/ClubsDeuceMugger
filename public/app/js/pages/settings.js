@@ -1,5 +1,6 @@
 // The Settings page (/app/settings.html).
 
+import { initBackground } from "../settings/background.js";
 import { initEmail } from "../settings/email.js";
 import { initInvites } from "../settings/invites.js";
 import { initKeyCheck } from "../settings/keycheck.js";
@@ -15,6 +16,7 @@ initPrefs();
 initMugBonus();
 initWages();
 initEmail();
+initBackground();
 initInvites();
 
 watchForUpdates();

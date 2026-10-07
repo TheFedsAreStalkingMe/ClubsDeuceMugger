@@ -108,6 +108,22 @@
         </div>
       </section>
 
+      <section class="card panel" id="bg-panel">
+        <h2>Background search</h2>
+        <p class="hint">Runs the Inactive Earners search for you while this page is closed (for example on your phone) and emails you the best targets. It uses the company types and filters you set on the Inactive Earners page, your wages and your mugging bonuses from this page. <b>It stores your Torn API key on the site's server</b> (encrypted with a secret that only the site owner has) so the scheduled job can use it. Turning it off deletes the key. It needs an email address (below) and your password.</p>
+        <div class="stack">
+          <p class="msg" id="bg-state" role="status" aria-live="polite"></p>
+          <label>Email me targets whose predicted mug is at least ($)
+            <input type="number" id="bg-min" inputmode="numeric" min="0" step="100000" value="1000000"></label>
+          <label>Torn API key (leave empty to use the one saved in this browser) <input type="password" id="bg-key" autocomplete="off" maxlength="64"></label>
+          <label>Your password <input type="password" id="bg-pass" autocomplete="current-password" maxlength="128"></label>
+          <button class="btn green small" id="bg-on" type="button">Turn on / update</button>
+          <button class="btn small" id="bg-run" type="button" hidden>Run a step now</button>
+          <button class="btn small" id="bg-off" type="button" hidden>Turn off and delete my key</button>
+          <p class="msg" id="bg-msg" role="status" aria-live="polite"></p>
+        </div>
+      </section>
+
       <section class="card panel">
         <h2>Your email</h2>
         <p class="hint">Used for account recovery and security notices, including when your email changes. Changing it needs your current password.</p>
