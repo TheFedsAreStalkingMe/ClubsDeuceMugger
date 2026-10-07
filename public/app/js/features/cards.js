@@ -3,6 +3,7 @@
 import { el } from "/js/core/dom.js";
 import { fmtAgo, fmtCountdown, fmtMoney, fmtShortAgo, fmtShortMoney, fmtStats } from "/js/core/format.js";
 import { mugOutlook } from "./rules.js";
+import { bazaarNote } from "./bazaar.js";
 import { markMugged, recentDrain, recentNote, recentlyMuggedClass } from "./recent.js";
 import { trackAttack } from "./tracking.js";
 
@@ -58,6 +59,7 @@ export function card(r, index, opts = {}) {
   };
   const dl = el("dl", {},
     ...row("Total", fmtMoney(r.total)),
+    ...row("Bazaar sales", el("span", { title: "From Torn's public stat snapshots.", text: bazaarNote(r) })),
     ...row("Recently mugged", el("span", { class: `rating ${recentDrain(r) >= 0.3 ? "bad" : recentDrain(r) > 0 ? "mediocre" : "good"}`, text: `${recentNote(r)}${recentDrain(r) > 0 ? ` (-${Math.round(recentDrain(r) * 100)}%)` : ""}` })),
     ...row("Expected profit", el("span", { class: `rating ${out.rating}`, text: `${signed(out.profit)} · ${out.rating} mug`, title: `Resale ${signed(out.resale)}, mug ${signed(out.mug)} (${(out.rate * 100).toFixed(1)}% of their cash)` })),
     ...row("Est. stats", fmtStats(r.bs)),

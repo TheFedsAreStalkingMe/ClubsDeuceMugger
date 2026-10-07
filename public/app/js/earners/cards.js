@@ -2,6 +2,7 @@
 
 import { el } from "/js/core/dom.js";
 import { fmtShortMoney, fmtStats } from "/js/core/format.js";
+import { bazaarCash, bazaarNote } from "../features/bazaar.js";
 import { attackLink, mugEdge, muggedButton } from "../features/cards.js";
 import { daysInactive, estimateCash, expectedValue, mugScore, predictedMug, winChance } from "./rules.js";
 import { earn } from "./state.js";
@@ -33,6 +34,7 @@ export function earnCard(r, index) {
     ...row("Expected value", el("span", { class: "rating good", title: "Predicted mug x win chance.", text: expectedValue(r) != null ? `~${fmtShortMoney(expectedValue(r))}` : "?" })),
     ...row("Net worth", r.networth != null ? fmtShortMoney(r.networth) : "?"),
     ...row("Recently mugged", el("span", { class: `rating ${ms.drain >= 0.3 ? "bad" : ms.drain > 0 ? "mediocre" : "good"}`, text: `${ms.drainNote}${ms.drain > 0 ? ` (-${Math.round(ms.drain * 100)}%)` : ""}` })),
+    ...row("Bazaar sales", el("span", { class: `rating ${bazaarCash(r) > 0 ? "good" : ""}`, title: "From Torn's public stat snapshots (bazaar sales and profit). A bazaar sells while its owner is offline, so what it took in since they were last active is added to the estimated cash.", text: bazaarNote(r) })),
     ...row("Est. cash", el("span", { class: "rating good", title: "A rough guess: assumed daily wage (see Settings) x days inactive. Torn does not show wages.", text: cash != null ? `~${fmtShortMoney(cash)} (rough)` : "?" })),
     ...row("Days inactive", idle != null ? idle.toFixed(1) : "?"),
     ...row("Est. stats", fmtStats(r.bs)),

@@ -178,3 +178,12 @@ Every minute it asks our server which of them members mugged lately (no Torn cal
 (Torn's public stat snapshots, 3 calls each) of up to 3 players: never-checked ones first, then the oldest, each at most
 every 15 minutes. A player who turns out to be mugged drops in rating or is hidden. Torn offers no way to read another
 player's attack log, so mugs by non-members can only be inferred from those snapshots (fights lost, net worth drop).
+
+## Bazaar sales in the mug prediction
+
+Torn has no per-player "bazaar open" flag or sales list (the bazaar directory only lists the top bazaars), but its public
+stat snapshots include `bazaarsales`, `bazaarprofit` and `bazaarcustomers`. They come back in the same three snapshot calls
+as the attack history (`/api/torn/stats`), so there are no extra Torn calls. A bazaar sells while its owner is offline and
+the money stays in their cash, so for Inactive Earners the profit since their last activity (up to 7 days) is added to the
+estimated cash (`features/bazaar.js`). Every card shows a "Bazaar sales" row (sales and profit in ~24h and ~7 days, average
+per sale); no sales in a week means the bazaar is probably closed or empty.

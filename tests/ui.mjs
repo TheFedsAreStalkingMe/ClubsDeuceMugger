@@ -450,8 +450,9 @@ async function runChecks() {
   await page.waitForSelector("#scan:not([disabled])", { timeout: 150000 });
   efound = await earnCards();
   const rex2 = efound.find((c) => c.name === "Rex"), pia2 = efound.find((c) => c.name === "Pia");
+  check("the bazaar's recent sales are shown from Torn's stats", /5 sales \(\$10\.0m\) in ~24h, 30 \(\$60\.0m\) in ~7 days, about \$2\.0m each/.test(rex2.text), rex2.text.slice(0, 600));
   check("outside attacks are found from Torn's stats and lower the rating", /Torn stats: 2 fights lost in ~24h, 5 in ~7 days \(anyone\)/.test(rex2.text) && /net worth down 21% since yesterday/.test(rex2.text) && /\(-48%\)/.test(rex2.text), rex2.text.slice(0, 420));
-  check("the predicted mug shrinks with them (6m x 5% x 0.52)", /Predicted mug~\$(15[0-9]|16[0-4])k/.test(rex2.text), rex2.text.slice(0, 200));
+  check("the predicted mug shrinks with them (6m wages + 60m bazaar sales, x 5% x 0.52)", /Predicted mug~\$1\.(69|7[0-3])m/.test(rex2.text), rex2.text.slice(0, 200));
   check("a quiet player is not marked", /Recently muggednone known/.test(pia2.text), pia2.text.slice(0, 260));
   await setStore("cdm.earn.filters", { historyTop: 0, types: [12], minStars: 5, minDays: 7 });
 

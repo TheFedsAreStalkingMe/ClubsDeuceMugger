@@ -170,7 +170,11 @@ function fakeServer() {
       const id = Number(nw[1]);
       const lost = id === 23 || id === 8 ? 50 - (ago >= 7 ? 5 : ago >= 1 ? 2 : 0) : 10;
       const worth = id === 23 || id === 8 ? (ago >= 1 ? 2900000000 : 2300000000) : id * 100000000;
-      return send({ personalstats: [{ name: "defendslost", value: lost, timestamp: now() - ago * 86400 }, { name: "networth", value: worth, timestamp: now() - ago * 86400 }] });
+      // bazaar: Rex's took in $60m over the week ($10m of it in the last day) from 30 sales (5 in the last day)
+      const hot = id === 23;
+      const bz = hot ? { bazaarprofit: 100e6 - (ago >= 7 ? 60e6 : ago >= 1 ? 10e6 : 0), bazaarsales: 50 - (ago >= 7 ? 30 : ago >= 1 ? 5 : 0), bazaarcustomers: 90 } : { bazaarprofit: 1e6, bazaarsales: 3, bazaarcustomers: 4 };
+      const t = now() - ago * 86400;
+      return send({ personalstats: [{ name: "defendslost", value: lost, timestamp: t }, { name: "networth", value: worth, timestamp: t }, ...Object.entries(bz).map(([name, value]) => ({ name, value, timestamp: t }))] });
     }
     if (nw) return send({ personalstats: { networth: { total: Number(nw[1]) * 100000000 } } });
 

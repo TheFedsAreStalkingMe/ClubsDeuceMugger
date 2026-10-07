@@ -3,6 +3,7 @@
 import { remaining } from "../features/rules.js";
 import { STORE, load } from "/js/core/storage.js";
 import { mugRate } from "../features/mugrate.js";
+import { bazaarCash } from "../features/bazaar.js";
 import { isRecentlyMugged, recentDrain, recentNote } from "../features/recent.js";
 import { WAGE_CAP, earn } from "./state.js";
 
@@ -19,11 +20,12 @@ export function dailyWage(c, wages = earn.wages) {
 }
 
 // A ROUGH guess of the cash they have built up: the assumed daily wage x days idle.
+// Bazaar sales while they were offline (read with the attack history) are added on top.
 // Wages only build up while they are employed, so days in the company caps it.
 export function estimateCash(r, wages = earn.wages, now = Date.now() / 1000) {
   const idle = daysInactive(r, now);
   if (idle == null) return null;
-  return dailyWage(r.company, wages) * Math.min(Math.floor(idle), r.daysIn ?? Infinity);
+  return dailyWage(r.company, wages) * Math.min(Math.floor(idle), r.daysIn ?? Infinity) + bazaarCash(r, now);
 }
 
 // (recent-mug logic is shared with the other finders: features/recent.js)

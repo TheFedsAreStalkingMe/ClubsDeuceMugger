@@ -4,6 +4,7 @@ import { el } from "/js/core/dom.js";
 import { fmtMoney, fmtShortMoney, fmtStats } from "/js/core/format.js";
 import { attackLink, mugEdge, muggedButton } from "../features/cards.js";
 import { mugRate } from "../features/mugrate.js";
+import { bazaarNote } from "../features/bazaar.js";
 import { recentDrain, recentNote } from "../features/recent.js";
 
 const link = (href, text, cls = "btn small ghost") => el("a", { class: cls, href, target: "_blank", rel: "noopener noreferrer", text });
@@ -24,6 +25,7 @@ export function bonusCard(r, index) {
     ...row("Price", fmtMoney(r.price)),
     ...row("Predicted mug", el("span", { class: "rating good", title: "What you pay lands in their cash: price x your mug rate (Settings), lowered if they were mugged recently.", text: `~${fmtShortMoney(r.price * mugRate() * (1 - recentDrain(r)))} (rough)` })),
     ...row("Recently mugged", el("span", { class: `rating ${recentDrain(r) >= 0.3 ? "bad" : recentDrain(r) > 0 ? "mediocre" : "good"}`, text: `${recentNote(r)}${recentDrain(r) > 0 ? ` (-${Math.round(recentDrain(r) * 100)}%)` : ""}` })),
+    ...row("Bazaar sales", el("span", { title: "From Torn's public stat snapshots.", text: bazaarNote(r) })),
     ...row("Location", "Bazaar"),
     ...row("Damage / Acc / Quality", `${num(r.damage)} / ${num(r.accuracy)} / ${num(r.quality)}`),
     ...row("Seller", `${r.sellerName} (ID ${r.id})`),

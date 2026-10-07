@@ -8,7 +8,7 @@ import { tornCall } from "./torncall.js";
 
 const HOUR = 3600e3;
 
-// -> { lost24, lost7, drop24 } or null when Torn would not say.
+// -> { lost24, lost7, drop24, profit24, profit7, sales24, sales7, bazaar } or null when Torn would not say.
 export async function readHistory(id, runId, ttl = HOUR) {
   const hit = cached(`h:${id}`, ttl);
   if (hit) return hit.h;
@@ -20,6 +20,12 @@ export async function readHistory(id, runId, ttl = HOUR) {
     const h = {
       lost24: Math.max(0, now.defendslost - day.defendslost), // fights they lost as the defender since yesterday's snapshot
       lost7: Math.max(0, now.defendslost - week.defendslost),
+      // Bazaar: money their bazaar took in since the snapshot (it sells while they are offline, and it all stays as cash).
+      profit24: Math.max(0, (now.bazaarprofit ?? 0) - (day.bazaarprofit ?? 0)),
+      profit7: Math.max(0, (now.bazaarprofit ?? 0) - (week.bazaarprofit ?? 0)),
+      sales24: Math.max(0, (now.bazaarsales ?? 0) - (day.bazaarsales ?? 0)),
+      sales7: Math.max(0, (now.bazaarsales ?? 0) - (week.bazaarsales ?? 0)),
+      bazaar: now.bazaarprofit != null && week.bazaarprofit != null, // false when Torn gave no bazaar numbers
       drop24: day.networth > 0 && now.networth != null ? Math.max(0, 1 - now.networth / day.networth) : 0, // net worth fall since yesterday
     };
     keep(`h:${id}`, { h });
