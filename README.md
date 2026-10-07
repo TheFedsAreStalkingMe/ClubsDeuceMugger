@@ -210,3 +210,15 @@ when they tapped Turn on / Update (tap Update again after changing them).
   filters), status and net worth, bazaar takings, the same mug maths as the page (cash estimate, merits and Plunder, recent-mug
   drain from members' mugs). Targets over the minimum predicted mug are emailed (best 10, at most one email per half hour,
   never the same player twice in 24 hours). It does not read the 3-call attack history.
+
+## New targets, and judging your mugs
+
+- **Finding new people.** Each Inactive Earners scan carries on where the last one stopped in the company list (a rotating
+  start, wrapping at the end) instead of always re-reading the best-rated companies, and players shown by a scan in the
+  last 6 hours are skipped (field "Skip players shown in the last (hours)", 0 = off). The background search rotates the
+  same way: each pass takes the next `maxCompanies` of the full list.
+- **Good or bad mug.** Once a mug is matched in your attack log, the profit (the money it took) is compared with what the
+  site predicted when you tapped Attack: 80%+ is a *good* mug, 40 to 80% *okay*, less (or under $100k, or no mug) *bad*;
+  with no prediction saved, $1m+ is good and $250k+ okay. The leaderboard page shows the label and your week's total, and
+  a card shows "Your last mug" (profit, label, how long ago) for any player you mugged in the last 30 days
+  (`/api/targets/recent` returns it as `mine`). Mugs also keep feeding the calibration of the predictions.

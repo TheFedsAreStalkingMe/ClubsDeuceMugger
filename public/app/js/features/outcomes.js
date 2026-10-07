@@ -1,6 +1,7 @@
 // Why a mug took what it did: compares what the page predicted when Attack was tapped with what Torn's attack log shows.
 // Pure: given one outcome row from /api/mug/outcomes, returns { status, lines }.
 
+import { el } from "/js/core/dom.js";
 import { fmtShortMoney } from "/js/core/format.js";
 
 const RESULT_HINTS = {
@@ -36,4 +37,30 @@ export function explainOutcome(o) {
     if (!o.others_24h && !o.recent_mugs && !o.hosp) lines.push("No recent mugs are known. They probably spent or banked their cash, or the wage estimate is too high. Torn's mug percentage also varies from fight to fight.");
   }
   return { status, lines };
+}
+
+// Was it worth it? Judged from the profit (the money the mug took) against what the site predicted when you tapped Attack.
+//   Good mug   took at least 80% of the prediction (or $1m+ when nothing was predicted)
+//   Okay mug   took 40% to 80% (or $250k+)
+//   Bad mug    took less, under $100k, or the attack ended without a mug
+// Takes an outcome row ({ matched, result, actual, predicted }). null while the attack is still being waited for.
+export function mugVerdict(o) {
+  if (!o || o.matched === 0) return null;
+  if (o.result !== "Mugged") return { label: "Bad mug", tone: "bad", profit: 0, note: "nothing was mugged" };
+  const profit = o.actual || 0;
+  const ratio = o.predicted > 0 ? profit / o.predicted : null;
+  let tone = ratio != null ? (ratio >= 0.8 ? "good" : ratio >= 0.4 ? "mediocre" : "bad") : profit >= 1e6 ? "good" : profit >= 250000 ? "mediocre" : "bad";
+  if (profit < 100000) tone = "bad";
+  const label = tone === "good" ? "Good mug" : tone === "mediocre" ? "Okay mug" : "Bad mug";
+  return { label, tone, profit, note: ratio != null ? `${Math.round(ratio * 100)}% of the prediction` : "no prediction was saved" };
+}
+
+// "Your last mug" row value for a card: what you took from this player and the verdict, or null if you never mugged them.
+export function lastMugBadge(r) {
+  const m = r.recent && r.recent.mine;
+  if (!m) return null;
+  const v = mugVerdict({ matched: 1, result: "Mugged", actual: m.actual, predicted: m.predicted });
+  const days = Math.max(0, (Date.now() / 1000 - m.at) / 86400);
+  const when = days < 1 ? `${Math.max(1, Math.round(days * 24))}h ago` : `${Math.round(days)} day${Math.round(days) === 1 ? "" : "s"} ago`;
+  return el("span", { class: `rating ${v.tone}`, title: `Judged from your profit against the prediction (${v.note}).`, text: `${v.label}: took ${fmtShortMoney(v.profit)}, ${when}` });
 }

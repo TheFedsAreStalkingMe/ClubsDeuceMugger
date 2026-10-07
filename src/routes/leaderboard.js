@@ -216,5 +216,14 @@ export async function recentMugs({ env, url, user }) {
   ).bind(now - 86400, now - 86400, ...ids, now - 7 * 86400).all();
   const out = {};
   for (const r of results) out[r.target_id] = { n24: r.n24, n7: r.n7, last: r.last, sum24: r.sum24 };
+  // This member's own latest mug of each (last 30 days): what it took, and what the site had predicted.
+  const { results: mine } = await env.DB.prepare(
+    `SELECT target_id, clicked_at, resolved_at, actual, predicted FROM clicks
+     WHERE user_id = ? AND matched = 1 AND result = 'Mugged' AND target_id IN (${marks}) AND clicked_at > ? ORDER BY clicked_at DESC`
+  ).bind(user.id, ...ids, now - 30 * 86400).all();
+  for (const m of mine) {
+    out[m.target_id] ||= { n24: 0, n7: 0, last: 0, sum24: 0 };
+    out[m.target_id].mine ||= { at: m.resolved_at || m.clicked_at, actual: m.actual || 0, predicted: m.predicted || 0 };
+  }
   return json({ recent: out });
 }

@@ -18,7 +18,8 @@ function bindNumber(name, min, max, fallback) {
   const input = $(name);
   input.value = earn.filters[name];
   input.addEventListener("input", () => {
-    earn.filters[name] = Math.min(max, Math.max(min, parseInt(input.value, 10) || fallback));
+    const n = parseInt(input.value, 10);
+    earn.filters[name] = Math.min(max, Math.max(min, Number.isNaN(n) ? fallback : n)); // 0 is a real choice for some fields
     persist();
   });
 }
@@ -60,6 +61,7 @@ export function initEarnFilters() {
   bindNumber("maxCompanies", 1, 1000, 300);
   bindNumber("maxPlayers", 1, 500, 80);
   bindNumber("historyTop", 0, 50, 10);
+  bindNumber("skipSeenHours", 0, 168, 6);
   const unknown = $("includeUnknown");
   unknown.checked = !!f.includeUnknown;
   unknown.addEventListener("change", () => { f.includeUnknown = unknown.checked; persist(); });

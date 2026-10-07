@@ -6,7 +6,7 @@ import { $, el, say } from "/js/core/dom.js";
 import { fmtMoney } from "/js/core/format.js";
 import { checkKey, keyLink } from "/js/core/keyneeds.js";
 import { loadKeys } from "/js/core/storage.js";
-import { explainOutcome } from "../features/outcomes.js";
+import { explainOutcome, mugVerdict } from "../features/outcomes.js";
 import { runLeaderboardCheck } from "../features/tracking.js";
 import { watchForUpdates } from "/js/core/update.js";
 
@@ -47,13 +47,18 @@ const when = (t) => new Date(t * 1000).toLocaleString();
 async function loadOutcomes() {
   const d = await api("/api/mug/outcomes");
   const s = d.summary;
-  $("outcome-summary").textContent = s.compared
+  const verdicts = d.rows.map(mugVerdict).filter(Boolean);
+  const profit = verdicts.reduce((n, v) => n + v.profit, 0);
+  const tally = verdicts.length
+    ? ` Last 7 days: ${fmtMoney(profit)} taken, ${verdicts.filter((v) => v.tone === "good").length} good, ${verdicts.filter((v) => v.tone === "mediocre").length} okay and ${verdicts.filter((v) => v.tone === "bad").length} bad mug(s).`
+    : "";
+  $("outcome-summary").textContent = (s.compared
     ? `Across ${plural(s.compared, "mug")} compared: the middle one took ${Math.round(s.median * 100)}% of its prediction (average ${Math.round(s.mean * 100)}%).`
-    : "No mugs to compare yet. Tap Attack on a card, mug them, and the comparison appears here.";
+    : "No mugs to compare yet. Tap Attack on a card, mug them, and the comparison appears here.") + tally;
   $("outcomes").replaceChildren(...d.rows.map((o) => {
     const x = explainOutcome(o);
     return el("div", { class: "item" },
-      el("span", { text: `${x.status}` }),
+      el("span", {}, `${x.status}`, mugVerdict(o) ? el("span", { class: `rating ${mugVerdict(o).tone}`, text: ` ${mugVerdict(o).label}` }) : null),
       el("span", {}, el("a", { href: `https://www.torn.com/profiles.php?XID=${o.target_id}`, target: "_blank", rel: "noopener noreferrer", text: `Player ${o.target_id}` }), ` (${o.src || "?"}, ${when(o.clicked_at)})`),
       el("span", { text: o.matched === 1 ? `${fmtMoney(o.actual)} of ${o.predicted != null ? fmtMoney(o.predicted) : "?"}` : "" }),
       el("span", { class: "meta", text: x.lines.join(" ") }));

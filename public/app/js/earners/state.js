@@ -15,6 +15,7 @@ export const DEFAULT_EARN = {
   maxCompanies: 300, // the most companies whose employees are read in one scan (best stars first)
   maxPlayers: 80, // stop once this many matches are found
   historyTop: 10, // read the attack history (3 Torn calls each) of this many best matches at the end (0 = off)
+  skipSeenHours: 6, // players shown by a scan in the last this many hours are skipped, so repeat scans find new people (0 = off)
   includeUnknown: false, // keep players with no stat estimate
   sort: "score",
   dir: "desc",

@@ -16,7 +16,8 @@ async function runChecks() {
   page.on("console", (m) => { if (m.type() === "error" && !/ERR_CERT|Failed to load resource/.test(m.text())) errors.push(m.text()); });
 
   const text = (sel) => page.textContent(sel);
-  const setStore = (key, value) => page.evaluate(([k, v]) => localStorage.setItem(k, JSON.stringify(v)), [key, value]);
+  // (earner scans skip players shown by a recent scan unless a test says otherwise: most tests scan the same few players again and again)
+  const setStore = (key, value) => page.evaluate(([k, v]) => localStorage.setItem(k, JSON.stringify(v)), [key, key === "cdm.earn.filters" ? { skipSeenHours: 0, ...value } : value]);
   const cards = (sel) => page.$$eval(`${sel} .target`, (els) => els.map((e) => ({
     name: e.querySelector(".name").textContent,
     stats: [...e.querySelectorAll("dt")].map((d, i) => [d.textContent, e.querySelectorAll("dd")[i].textContent]).find(([k]) => k === "Est. stats")?.[1],
@@ -290,7 +291,16 @@ async function runChecks() {
   const outcomeText = await text("#outcomes");
   check("the outcome compares what was predicted with what was mugged, and says why it was lower", /Below prediction/.test(outcomeText) && /\$2,500,000 of \$5,000,000/.test(outcomeText) && /2 recent mugs/.test(outcomeText), outcomeText.slice(0, 300));
   check("the summary says how close predictions are", /took 50% of its prediction/.test(await text("#outcome-summary")), await text("#outcome-summary"));
-  // A key without the attacks permission: the check says what is missing and links to a new key.
+
+  check("the mug is labelled from its profit against the prediction, and the week is totalled", /Okay mug/.test(outcomeText) && /\$2,500,000 taken, 0 good, 1 okay and 0 bad/.test(await text("#outcome-summary")), outcomeText.slice(0, 200) + " | " + await text("#outcome-summary"));
+  const verdicts = await page.evaluate(async () => {
+    const { mugVerdict } = await import("/app/js/features/outcomes.js");
+    const v = (o) => mugVerdict({ matched: 1, result: "Mugged", ...o })?.tone;
+    return [v({ actual: 4000000, predicted: 5000000 }), v({ actual: 2500000, predicted: 5000000 }), v({ actual: 500000, predicted: 5000000 }), v({ actual: 2000000, predicted: 0 }), v({ actual: 50000, predicted: 60000 }), mugVerdict({ matched: 1, result: "Lost" })?.tone, String(mugVerdict({ matched: 0 }))];
+  });
+  check("good / okay / bad verdicts: 80%+ good, 40-80% okay, less or under $100k or no mug is bad", verdicts.join() === "good,mediocre,bad,good,bad,bad,null", verdicts.join());
+  const mine = await page.evaluate(async () => (await (await fetch("/api/targets/recent?ids=111")).json()).recent[111]?.mine);
+  check("the server remembers your last mug of a player (what it took and what was predicted)", mine && mine.actual === 2500000 && mine.predicted === 5000000, JSON.stringify(mine));  // A key without the attacks permission: the check says what is missing and links to a new key.
   await page.evaluate(() => fetch("/api/clicks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ target: 5000 }) }));
   await setFakeFlag("attacksDenied", true);
   await setFakeFlag("keyLimited", true);
@@ -414,7 +424,8 @@ async function runChecks() {
   efound = await earnCards();
   check("it keeps going through every company (more than one batch of ten)", efound.length === 27, `${efound.length} | ${await text("#scan-msg")}`);
   const callsUsed = await page.evaluate(() => JSON.parse(localStorage.getItem("cdm.calls") || "[]").length);
-  check("one combined call per match: 26 employee lists + 27 players is about 55 Torn calls, not 80+", callsUsed > 0 && callsUsed <= 62, `${callsUsed} Torn calls`);
+  // (26 employee lists + 27 combined player calls + 2 bazaar calls each would be 107: the page only ever counts the last minute, and must stay under the limit)
+  check("Torn calls in the last minute stay under the limit of 82", callsUsed > 0 && callsUsed <= 82, `${callsUsed} Torn calls`);
   check("the message says how many companies were checked", /after checking 26 of 26 companies|after checking \d+ of \d+ companies/.test(await text("#scan-msg")), await text("#scan-msg"));
   await setStore("cdm.earn.filters", { historyTop: 0, types: [12], minStars: 5, minDays: 7, maxPlayers: 5 });
   await page.reload();
@@ -501,6 +512,36 @@ async function runChecks() {
   check("the tap still saves the plain prediction, so the correction never feeds on itself", calTap && calTap.pred && calTap.pred.mug > 190000, JSON.stringify(calTap));
   await page.evaluate(() => { localStorage.removeItem("cdm.calMin"); localStorage.setItem("cdm.prefs", JSON.stringify({ hideMuggedHours: 0 })); });
   await setStore("cdm.earn.filters", { historyTop: 0, types: [12], minStars: 5, minDays: 7 });
+
+  section("Finding new targets");
+  // 26 companies with employees. With 10 companies per scan, the first scan starts at company 1 and the next carries on at 11.
+  await setFakeFlag("manyCompanies", true);
+  const rescan = async (filters) => {
+    await setStore("cdm.earn.filters", { historyTop: 0, types: [12], minStars: 5, minDays: 7, ...filters });
+    await page.reload();
+    await page.waitForSelector("#types label");
+    await page.evaluate(() => localStorage.removeItem("cdm.calls"));
+    await page.click("#scan");
+    await page.waitForSelector("#scan:not([disabled])", { timeout: 150000 });
+    return text("#scan-msg");
+  };
+  await page.evaluate(() => { localStorage.removeItem("cdm.earn.cursor"); localStorage.removeItem("cdm.earn.seen"); localStorage.removeItem("cdm.earn.cache"); localStorage.removeItem("cdm.profiles"); });
+  let msg1 = await rescan({ maxCompanies: 10, skipSeenHours: 0 });
+  check("the first scan starts at company 1", /starting at company 1 of 26/.test(msg1), msg1);
+  let msg2 = await rescan({ maxCompanies: 10, skipSeenHours: 0 });
+  check("the next scan carries on where the last one stopped (company 11), not at the same top companies", /starting at company 11 of 26/.test(msg2), msg2);
+  let msg3 = await rescan({ maxCompanies: 10, skipSeenHours: 0 });
+  check("and then company 21, wrapping around the list after that", /starting at company 21 of 26/.test(msg3), msg3);
+  await page.evaluate(() => { localStorage.removeItem("cdm.earn.cursor"); localStorage.removeItem("cdm.earn.seen"); });
+  const first = await rescan({ maxCompanies: 300, skipSeenHours: 6 });
+  const firstCount = (await earnCards()).length;
+  check("a scan with skipping on still finds everyone the first time", firstCount === 27, `${firstCount} | ${first}`);
+  const again = await rescan({ maxCompanies: 300, skipSeenHours: 6 });
+  check("an immediate repeat skips the players it already showed and says so", (await earnCards()).length === 0 && /shown by a recent scan/.test(again), `${(await earnCards()).length} | ${again}`);
+  const off = await rescan({ maxCompanies: 300, skipSeenHours: 0 });
+  check("turning skipping off shows everyone again", (await earnCards()).length === 27, off);
+  await setFakeFlag("manyCompanies", false);
+  await page.evaluate(() => { localStorage.removeItem("cdm.earn.cursor"); localStorage.removeItem("cdm.earn.seen"); });
 
   section("Avoiding mugged players");
   // Rex was mugged 9 hours ago (by a member, in the record). By default players mugged in the last 12 hours are hidden.

@@ -105,20 +105,30 @@ export async function runHunt(env, row, budgetObj) {
     if (!cfg.types.length) throw new Error("No company types chosen.");
 
     for (;;) {
-      // 1. the company list: built page by page, then walked through employees
-      if (!state.companies || (state.pos >= state.companies.length && now - (state.companiesAt || 0) > LIST_REFRESH)) {
-        const b = (state.build ||= { found: [], t: 0, page: 0 });
-        while (b.t < cfg.types.length) {
-          const type = cfg.types[b.t];
-          const r = await torn(`/company/${type}/companies`, { limit: "100", offset: String(b.page * 100) });
-          const list = (r.companies || []).map((c) => ({ id: c.id, name: c.name, type: c.type?.id ?? type, typeName: c.type?.name || "", stars: c.rating, hired: c.employees?.hired ?? 0, income: c.income?.daily ?? 0 }));
-          b.found.push(...list);
-          if (list.length < 100) { b.t++; b.page = 0; } else b.page++;
+      // 1. the company list. Read once in full (page by page, kept for LIST_REFRESH), then each pass takes the next
+      //    `maxCompanies` of it, carrying on where the last pass stopped, so the search moves on to NEW companies
+      //    instead of reading the same top ones again and again.
+      if (!state.companies || state.nextPass) {
+        if (!state.all || now - (state.allAt || 0) > LIST_REFRESH) {
+          const b = (state.build ||= { found: [], t: 0, page: 0 });
+          while (b.t < cfg.types.length) {
+            const type = cfg.types[b.t];
+            const r = await torn(`/company/${type}/companies`, { limit: "100", offset: String(b.page * 100) });
+            const list = (r.companies || []).map((c) => ({ id: c.id, name: c.name, type: c.type?.id ?? type, typeName: c.type?.name || "", stars: c.rating, hired: c.employees?.hired ?? 0, income: c.income?.daily ?? 0 }));
+            b.found.push(...list);
+            if (list.length < 100) { b.t++; b.page = 0; } else b.page++;
+          }
+          state.all = b.found.filter((c) => c.stars >= cfg.minStars && c.hired > 0).sort((a, c) => c.stars - a.stars || c.hired - a.hired || a.id - c.id).slice(0, 2500);
+          state.allAt = now;
+          delete state.build;
         }
-        state.companies = b.found.filter((c) => c.stars >= cfg.minStars && c.hired > 0).sort((a, c) => c.stars - a.stars || c.hired - a.hired).slice(0, cfg.maxCompanies);
-        state.companiesAt = now;
+        const total = state.all.length;
+        const start = total ? (state.cursor || 0) % total : 0;
+        state.companies = state.all.slice(start).concat(state.all.slice(0, start)).slice(0, cfg.maxCompanies);
+        state.cursor = total ? (start + state.companies.length) % total : 0;
+        state.passStart = start;
         state.pos = 0;
-        delete state.build;
+        state.nextPass = false;
       }
 
       // 2. estimate stats for new candidates (one FF Scouter call for up to 200)
@@ -207,9 +217,10 @@ export async function runHunt(env, row, budgetObj) {
         }
         continue;
       }
-      break; // a full pass is done; the next run starts a new one when the lists are stale
+      state.nextPass = true; // a pass is done: the next run starts the next slice of the list
+      break;
     }
-    msg = `Pass complete: ${state.companies.length} companies read.`;
+    msg = `Pass complete: ${state.companies.length} companies read (from company ${(state.passStart || 0) + 1} of ${(state.all || []).length}). The next pass carries on from there.`;
   } catch (e) {
     if (e instanceof OutOfBudget) msg = "";
     else if (e.code && TORN_KEY_ERRORS.includes(e.code)) { stopped = e.message; msg = `Stopped: ${e.message}`; }

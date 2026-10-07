@@ -8,6 +8,7 @@
 // for a few hours (data.js), so a repeat scan only pays for what changed.
 
 import { api } from "/js/core/api.js";
+import { load, save } from "/js/core/storage.js";
 import { pool } from "/js/core/async.js";
 import { estimateStats } from "../features/estimates.js";
 import { hiddenNote, loadRecentMugs } from "../features/recent.js";
@@ -25,6 +26,19 @@ import { earn } from "./state.js";
 const isCancel = (e) => e && e.message === "cancelled";
 const BATCH = 10; // companies read before their employees are filtered and shown
 const STAGES = { companies: phase(0, 0.1) };
+
+// ---------------------------------------------------------------- finding NEW targets
+// Two things stop the scan from showing the same people every time:
+//   1. a rotating start: each scan carries on from where the last one stopped in the company list (instead of always
+//      starting with the best-rated companies), and wraps around at the end;
+//   2. players shown in a recent scan are skipped for `skipSeenHours` (Settings of the page: "Skip players shown in the last").
+const CURSOR = "cdm.earn.cursor"; // { k, pos }: where the next scan starts
+const SEEN = "cdm.earn.seen"; // { playerId: seconds }: players shown by earlier scans
+const cursorKey = (f) => `${[...f.types].sort((a, b) => a - b).join(",")}|${f.minStars}`;
+const seenMap = (hours) => {
+  const cut = Date.now() / 1000 - Math.max(hours, 48) * 3600;
+  return Object.fromEntries(Object.entries(load(SEEN, {}) || {}).filter(([, t]) => t > cut));
+};
 
 class Stop extends Error {
   constructor(message, kind = "info", progress = null) { super(message); Object.assign(this, { kind, progress }); }
@@ -59,9 +73,14 @@ async function readCompanies(f, runId) {
     }
   }
   flushCache();
-  const picked = found.filter((c) => c.stars >= f.minStars && c.hired > 0).sort((a, b) => b.stars - a.stars || b.hired - a.hired);
+  const picked = found.filter((c) => c.stars >= f.minStars && c.hired > 0).sort((a, b) => b.stars - a.stars || b.hired - a.hired || a.id - b.id);
   if (!picked.length) throw new Stop(`${found.length} companies read, none with ${f.minStars} stars or more and employees.`, "info", 1);
-  return picked.slice(0, f.maxCompanies);
+  const cur = load(CURSOR, null);
+  const start = cur && cur.k === cursorKey(f) ? cur.pos % picked.length : 0;
+  const window = picked.slice(start).concat(picked.slice(0, start)).slice(0, f.maxCompanies);
+  window.start = start; // where in the list this scan began
+  window.total = picked.length;
+  return window;
 }
 
 // ---------------------------------------------------------------- 2. employees
@@ -163,6 +182,10 @@ export async function scanEarners() {
     const companies = await readCompanies(f, runId);
     const why = { noEst: 0, tooStrong: 0, tooWeak: 0, ffHigh: 0 };
     const known = new Set(); // players already looked at
+    const skipH = f.skipSeenHours ?? 6;
+    const seen = seenMap(skipH);
+    const nowS = Date.now() / 1000;
+    let skippedSeen = 0;
     networthDenied = false;
     combinedOk = true;
     const stop = { v: false };
@@ -192,7 +215,11 @@ export async function scanEarners() {
       const raw = await upcoming;
       upcoming = read(b + 1); // the next ten companies are read while this batch is filtered and checked
       if (runId !== state.runId) return;
-      const rows = raw.filter((r) => !known.has(r.id));
+      const rows = raw.filter((r) => {
+        if (known.has(r.id)) return false;
+        if (skipH > 0 && seen[r.id] > nowS - skipH * 3600) { known.add(r.id); skippedSeen++; return false; } // shown by a recent scan
+        return true;
+      });
       checked += batches[b].length;
       if (rows.length) {
         for (const r of rows) known.add(r.id);
@@ -219,6 +246,7 @@ export async function scanEarners() {
       setScanMsg(`Checked ${checked}/${companies.length} companies, ${earn.rows.length} match(es) so far. Cancel to stop.`);
     }
     stop.v = true; // no more companies are started once the scan is over
+    save(CURSOR, { k: cursorKey(f), pos: (companies.start + checked) % companies.total }); // the next scan carries on from here
     if (runId !== state.runId) return;
 
     earn.rows.sort((a, b) => (estimateCash(b) ?? 0) - (estimateCash(a) ?? 0));
@@ -226,6 +254,8 @@ export async function scanEarners() {
     earn.rows = earn.rows.slice(0, f.maxPlayers);
     render();
     if (keyProblem) return;
+    for (const r of earn.rows) seen[r.id] = nowS;
+    save(SEEN, seen);
     if (bazaarWorker) {
       setScanMsg(`Checking the bazaars of the matches (${bazaarQueue.length} left)...`);
       await bazaarWorker;
@@ -240,9 +270,10 @@ export async function scanEarners() {
     }
     if (runId !== state.runId) return;
     if (!earn.rows.length) {
+      if (skippedSeen) throw new Stop(`${skippedSeen} player(s) matched but were shown by a recent scan, so they were skipped. Change "Skip players shown in the last" (under More filters) to see them again, or scan again later for new ones.`, "info", 1);
       throw new Stop(inactive ? explainDrops(why, inactive).replace("sellers", "inactive players") : `No one at ${checked} companies has been inactive for ${f.minDays}+ days.`, "info", 1);
     }
-    setScanMsg(`Done. ${earn.rows.length} inactive player(s) found${full ? " (stopped at your limit)" : ""} after checking ${checked} of ${companies.length} companies.${hiddenNote(earn.rows) ? ` ${hiddenNote(earn.rows)}` : ""}${networthDenied ? " Net worth could not be read: your key may need the personalstats permission (Settings, Check my key)." : ""}`, networthDenied ? "info" : "ok");
+    setScanMsg(`Done. ${earn.rows.length} inactive player(s) found${full ? " (stopped at your limit)" : ""} after checking ${checked} of ${companies.length} companies (starting at company ${companies.start + 1} of ${companies.total}; the next scan carries on from there).${skippedSeen ? ` ${skippedSeen} skipped: shown by a recent scan.` : ""}${hiddenNote(earn.rows) ? ` ${hiddenNote(earn.rows)}` : ""}${networthDenied ? " Net worth could not be read: your key may need the personalstats permission (Settings, Check my key)." : ""}`, networthDenied ? "info" : "ok");
     setProgress(1);
   } catch (e) {
     if (isCancel(e) || runId !== state.runId) return;

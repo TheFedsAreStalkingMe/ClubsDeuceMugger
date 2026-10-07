@@ -65,6 +65,8 @@
             <input type="number" id="maxCompanies" inputmode="numeric" min="1" max="1000" step="1"></label>
           <label>Check recent attacks for the best this many matches <span class="hint">Torn's public stats show how often anyone attacked them lately (3 Torn calls each). 0 = off.</span>
             <input type="number" id="historyTop" inputmode="numeric" min="0" max="50" step="1"></label>
+          <label>Skip players shown in the last (hours) <span class="hint">So a repeat scan finds new people. Each scan also carries on from where the last one stopped in the company list. 0 = show everyone again.</span>
+            <input type="number" id="skipSeenHours" inputmode="numeric" min="0" max="168" step="1"></label>
           <label>Stop after finding this many players <span class="hint">Biggest estimated cash first.</span>
             <input type="number" id="maxPlayers" inputmode="numeric" min="1" max="500" step="1"></label>
         </div>
