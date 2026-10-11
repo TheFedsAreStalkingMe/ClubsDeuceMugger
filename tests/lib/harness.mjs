@@ -169,7 +169,8 @@ function fakeServer() {
       const ago = Math.round((now() - Number(u.searchParams.get("timestamp"))) / 86400);
       const id = Number(nw[1]);
       const lost = id === 23 || id === 8 ? 50 - (ago >= 7 ? 5 : ago >= 1 ? 2 : 0) : 10;
-      const worth = id === 23 || id === 8 ? (ago >= 1 ? 2900000000 : 2300000000) : id * 100000000;
+      // net worth grows about $1m a day for everyone (more than any wage in these tests); Rex's fell by a fifth in the last day after growing a lot before
+      const worth = id === 23 || id === 8 ? (ago >= 20 ? 1000000000 : ago >= 1 ? 2900000000 : 2300000000) : id * 100000000 - ago * 1000000;
       // bazaar: Rex's took in $60m over the week ($10m of it in the last day) from 30 sales (5 in the last day)
       const hot = id === 23 && flags.hotBazaar;
       const bz = hot ? { bazaarprofit: 100e6 - (ago >= 7 ? 60e6 : ago >= 1 ? 10e6 : 0), bazaarsales: 50 - (ago >= 7 ? 30 : ago >= 1 ? 5 : 0), bazaarcustomers: 90 } : { bazaarprofit: 1e6, bazaarsales: 3, bazaarcustomers: 4 };

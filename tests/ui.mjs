@@ -474,7 +474,7 @@ async function runChecks() {
   await page.click("#scan");
   await page.waitForSelector("#scan:not([disabled])", { timeout: 150000 });
   const rex2b = (await earnCards()).find((c) => c.name === "Rex");
-  check("every match has its bazaar checked right away, even with the attack history off", /Bazaar sales30 \(\$60\.0m\) in ~7 days, about \$2\.0m each/.test(rex2b.text) && !/Torn stats:/.test(rex2b.text), rex2b.text.slice(0, 500));
+  check("every match has its bazaar checked right away, even with the attack history off", /Bazaar sales30 sales \(\$60\.0m\) in the 30 days they were offline, about \$2\.0m each/.test(rex2b.text) && !/Torn stats:/.test(rex2b.text), rex2b.text.slice(0, 500));
   await setFakeFlag("hotBazaar", false);
   await setStore("cdm.earn.filters", { historyTop: 0, types: [12], minStars: 5, minDays: 7 });
 
@@ -512,6 +512,30 @@ async function runChecks() {
   check("the tap still saves the plain prediction, so the correction never feeds on itself", calTap && calTap.pred && calTap.pred.mug > 190000, JSON.stringify(calTap));
   await page.evaluate(() => { localStorage.removeItem("cdm.calMin"); localStorage.setItem("cdm.prefs", JSON.stringify({ hideMuggedHours: 0 })); });
   await setStore("cdm.earn.filters", { historyTop: 0, types: [12], minStars: 5, minDays: 7 });
+
+  section("Cash estimate limits");
+  // Torn hides cash on hand, so the wage guess is limited by what public stats show (net worth growth while offline, and net worth).
+  const parts = await page.evaluate(async () => {
+    const { cashParts } = await import("/app/js/earners/rules.js");
+    const wages = { base: 1000000, share: 60, types: {} };
+    const now = Date.now() / 1000;
+    const row = (o) => ({ last: now - 10 * 86400, daysIn: 100, position: "Miner", company: { type: 1, stars: 10, income: 1000000, hired: 3 }, ...o });
+    const c = (o) => Math.round(cashParts(row(o), wages, now).cash);
+    return {
+      plain: c({}), // 200k a day x 10 days
+      cappedByWorth: c({ networth: 12000000, company: { type: 1, stars: 10, income: 30000000, hired: 1 } }), // would be 180m: cannot exceed 80% of $12m
+      unassigned: c({ position: "Unassigned" }),
+      unassignedButGrew: c({ position: "Unassigned", bz: { bazaar: false, nwGain: 5000000 } }),
+      growthLessThanWages: c({ bz: { bazaar: false, nwGain: 500000 } }),
+      flat: c({ bz: { bazaar: false, nwGain: -3000000 } }),
+      bazaarAdds: c({ bz: { bazaar: true, profit: 4000000, nwGain: 9000000 } }),
+    };
+  });
+  check("assumed wages are used when nothing contradicts them", parts.plain === 2000000, JSON.stringify(parts));
+  check("cash can never be more than 80% of their net worth", parts.cappedByWorth === 9600000, JSON.stringify(parts));
+  check("an Unassigned employee counts a fifth, until net worth growth shows they were paid", parts.unassigned === 400000 && parts.unassignedButGrew === 2000000, JSON.stringify(parts));
+  check("less net worth growth than wages means the wages did not all arrive", parts.growthLessThanWages === 500000 && parts.flat === 0, JSON.stringify(parts));
+  check("bazaar takings while offline are added on top", parts.bazaarAdds === 6000000, JSON.stringify(parts));
 
   section("Finding new targets");
   // 26 companies with employees. With 10 companies per scan, the first scan starts at company 1 and the next carries on at 11.

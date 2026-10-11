@@ -222,3 +222,16 @@ when they tapped Turn on / Update (tap Update again after changing them).
   with no prediction saved, $1m+ is good and $250k+ okay. The leaderboard page shows the label and your week's total, and
   a card shows "Your last mug" (profit, label, how long ago) for any player you mugged in the last 30 days
   (`/api/targets/recent` returns it as `mine`). Mugs also keep feeding the calibration of the predictions.
+
+## Why cash estimates were wrong, and the limits now
+
+Torn hides other players' cash on hand (their public net worth is only a total), so the Earners "Est. cash" is a guess that
+starts from the assumed wage (company income share / employees). It is now limited by what Torn's public stats show
+(`cashParts` in `earners/rules.js`, mirrored in `lib/hunt.js`):
+
+- **Net worth growth while offline** (2 snapshots per match: now and when they were last active, `readBazaar`). Wages that
+  arrive raise net worth, so the wage part cannot be more than that growth; flat growth means the wages did not arrive.
+- **Never more than 80% of their net worth** (cash is part of it).
+- **"Unassigned" employees** (no position) are probably unpaid: a fifth is counted until the growth shows otherwise.
+- **Bazaar takings while offline** are added (sold items become cash without raising net worth).
+Each card's "Est. cash" tooltip lists how the number was reached, and a "Net worth while offline" row shows the growth.

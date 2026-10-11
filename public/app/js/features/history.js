@@ -37,21 +37,31 @@ export async function readHistory(id, runId, ttl = HOUR) {
   }
 }
 
-// Just the bazaar numbers (2 Torn calls: now and a week ago), for every match as soon as it is found.
-// -> { bazaar: true, profit7, sales7 } or null when Torn would not say.
-export async function readBazaar(id, runId) {
-  const hit = cached(`b:${id}`, HOUR);
+// What happened to a player's money while they were offline: two snapshots, now and the moment they were last active
+// (2 Torn calls, checked for every match as soon as it is found, kept for an hour).
+//   nwGain  how much their net worth grew while offline (wages and other income show up here; bazaar sales do not,
+//           because an item sold for its market price is just swapped for cash)
+//   profit  what their bazaar took in over the same time (public stat), sales the number of sales
+// -> { bazaar, profit, sales, nwGain, days } or null when Torn would not say.
+export async function readBazaar(id, last, runId) {
+  const hit = cached(`b2:${id}:${last}`, HOUR);
   if (hit) return hit.b;
   try {
+    const nowSec = Math.floor(Date.now() / 1000);
+    const at = Math.max(last, nowSec - 360 * 86400); // Torn's history does not go back further than this here
     const now = await tornCall(`/api/torn/stats?id=${id}&ago=0`, runId);
-    const week = await tornCall(`/api/torn/stats?id=${id}&ago=7`, runId);
-    if (now.bazaarprofit == null || week.bazaarprofit == null) return null;
+    const then = await tornCall(`/api/torn/stats?id=${id}&at=${at}`, runId);
+    const haveBazaar = now.bazaarprofit != null && then.bazaarprofit != null;
+    const haveWorth = now.networth != null && then.networth != null;
+    if (!haveBazaar && !haveWorth) return null;
     const b = {
-      bazaar: true,
-      profit7: Math.max(0, now.bazaarprofit - week.bazaarprofit),
-      sales7: Math.max(0, (now.bazaarsales ?? 0) - (week.bazaarsales ?? 0)),
+      bazaar: haveBazaar,
+      profit: haveBazaar ? Math.max(0, now.bazaarprofit - then.bazaarprofit) : 0,
+      sales: haveBazaar ? Math.max(0, (now.bazaarsales ?? 0) - (then.bazaarsales ?? 0)) : 0,
+      nwGain: haveWorth ? now.networth - then.networth : null,
+      days: Math.max(1, Math.round((nowSec - at) / 86400)),
     };
-    keep(`b:${id}`, { b });
+    keep(`b2:${id}:${last}`, { b });
     flushCache();
     return b;
   } catch (e) {

@@ -60,15 +60,17 @@ function dailyWage(co, w) {
   return w.base * (co.stars / 10);
 }
 
-// Money their bazaar took in while they were offline (see public/app/js/features/bazaar.js).
-function bazaarCash(c, idle) {
-  if (!c.bz || idle < 1) return 0;
-  return idle >= 7 ? c.bz.profit7 : (c.bz.profit7 * idle) / 7;
-}
-
+// Same as the page (public/app/js/earners/rules.js cashParts): the assumed wage, limited by how much their net worth grew
+// while offline, plus what their bazaar took in; an Unassigned employee is probably unpaid; never over 80% of net worth.
 export function estimateCash(c, cfg, now) {
   const idle = (now - c.last) / DAY;
-  return dailyWage(c.company, cfg.wages) * Math.min(Math.floor(idle), c.daysIn ?? Infinity) + bazaarCash(c, idle);
+  const full = dailyWage(c.company, cfg.wages) * Math.min(Math.floor(idle), c.daysIn ?? Infinity);
+  const growth = c.bz && c.bz.nwGain != null ? Math.max(0, c.bz.nwGain) : null;
+  let wage = growth == null && /unassigned/i.test(c.position || "") ? full * 0.2 : full;
+  if (growth != null) wage = Math.min(wage, growth);
+  const bazaar = c.bz && idle >= 1 ? c.bz.profit : 0;
+  const cash = wage + bazaar;
+  return c.networth != null ? Math.min(cash, c.networth * 0.8) : cash;
 }
 
 // Lower for players mugged recently (members' mugs from our own record): same rules as the page.
@@ -172,17 +174,19 @@ export async function runHunt(env, row, budgetObj) {
           continue;
         }
         if (c.stage === 2) {
-          const stat = async (ago) => {
-            const r = await torn(`/user/${c.id}/personalstats`, { stat: "bazaarprofit,bazaarsales", timestamp: String(now - Math.max(3600, ago * DAY)) });
+          const stat = async (at) => {
+            const r = await torn(`/user/${c.id}/personalstats`, { stat: "bazaarprofit,bazaarsales,networth", timestamp: String(at) });
             const o = {};
             for (const s of Array.isArray(r.personalstats) ? r.personalstats : []) o[s.name] = s.value;
             return o;
           };
-          const nowS = await stat(0);
-          const weekS = await stat(7);
-          c.bz = nowS.bazaarprofit != null && weekS.bazaarprofit != null
-            ? { profit7: Math.max(0, nowS.bazaarprofit - weekS.bazaarprofit), sales7: Math.max(0, (nowS.bazaarsales ?? 0) - (weekS.bazaarsales ?? 0)) }
-            : null;
+          const nowS = await stat(now - 3600);
+          const thenS = await stat(Math.max(c.last, now - 360 * DAY)); // when they were last active
+          const haveBazaar = nowS.bazaarprofit != null && thenS.bazaarprofit != null;
+          c.bz = {
+            profit: haveBazaar ? Math.max(0, nowS.bazaarprofit - thenS.bazaarprofit) : 0,
+            nwGain: nowS.networth != null && thenS.networth != null ? nowS.networth - thenS.networth : null,
+          };
           c.stage = 3;
           continue;
         }
@@ -198,7 +202,7 @@ export async function runHunt(env, row, budgetObj) {
         const cash = estimateCash(c, cfg, now);
         const mug = cash * mugRate(cfg) * (1 - d.drain);
         if (mug >= cfg.minMug && !(state.alerted[c.id] > now - RE_MAIL) && !state.pending.some((p) => p.id === c.id)) {
-          state.pending.push({ id: c.id, name: c.name, position: c.position, company: c.company.name, stars: c.company.stars, idle: Math.round((now - c.last) / DAY), cash: Math.round(cash), mug: Math.round(mug), bz: c.bz ? Math.round(c.bz.profit7) : null, bs: c.bs, networth: c.networth, drain: Math.round(d.drain * 100) });
+          state.pending.push({ id: c.id, name: c.name, position: c.position, company: c.company.name, stars: c.company.stars, idle: Math.round((now - c.last) / DAY), cash: Math.round(cash), mug: Math.round(mug), bz: c.bz && c.bz.profit > 0 ? Math.round(c.bz.profit) : null, bs: c.bs, networth: c.networth, drain: Math.round(d.drain * 100) });
         }
         continue;
       }
@@ -234,7 +238,7 @@ export async function runHunt(env, row, budgetObj) {
   if (state.pending.length && now - (state.lastMail || 0) >= MAIL_EVERY && row.email) {
     const top = [...state.pending].sort((a, b) => b.mug - a.mug).slice(0, 10);
     const lines = top.map((t) =>
-      `${t.name} [${t.id}], ${t.position} at ${t.company} (${t.stars} stars)\n  predicted mug ~${money(t.mug)} (est. cash ${money(t.cash)}${t.bz ? `, bazaar took ${money(t.bz)} in a week` : ""}), offline ${t.idle} days${t.bs ? `, est. stats ${money(t.bs).replace("$", "")}` : ""}${t.drain ? `, recently mugged -${t.drain}%` : ""}\n  Attack: https://www.torn.com/page.php?sid=attack&user2ID=${t.id}`);
+      `${t.name} [${t.id}], ${t.position} at ${t.company} (${t.stars} stars)\n  predicted mug ~${money(t.mug)} (est. cash ${money(t.cash)}${t.bz ? `, bazaar took ${money(t.bz)} while offline` : ""}), offline ${t.idle} days${t.bs ? `, est. stats ${money(t.bs).replace("$", "")}` : ""}${t.drain ? `, recently mugged -${t.drain}%` : ""}\n  Attack: https://www.torn.com/page.php?sid=attack&user2ID=${t.id}`);
     const ok = await sendMail(env, row.email, `${top.length} mug target${top.length === 1 ? "" : "s"} found`, `Your background search found:\n\n${lines.join("\n\n")}\n\nThese are rough guesses. Check them before you attack. Turn the search off in Settings.`);
     if (ok) {
       for (const t of top) state.alerted[t.id] = now;

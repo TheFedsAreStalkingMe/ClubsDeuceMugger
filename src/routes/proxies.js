@@ -166,13 +166,16 @@ export async function playerNetworth({ request, env, url, user }) {
   return json({ networth: findNetworth(data.personalstats) });
 }
 
-// Two public stats of a player as they were `ago` days back (Torn keeps daily snapshots): how many fights they have lost
+// Two public stats of a player as they were `ago` days back (or `at` a given moment) (Torn keeps daily snapshots): how many fights they have lost
 // when defending, and their net worth. Comparing two snapshots shows how often they were attacked in between, by anyone.
 export async function playerStats({ request, env, url, user }) {
   const id = url.searchParams.get("id") || "";
   const ago = Number(url.searchParams.get("ago") || 0);
+  const at = url.searchParams.get("at"); // or an exact moment (seconds), up to a year back: e.g. when they were last active
+  const nowS = Math.floor(Date.now() / 1000);
   if (!/^\d{1,10}$/.test(id) || !Number.isInteger(ago) || ago < 0 || ago > 30) return fail("Bad player ID or days.");
-  const timestamp = Math.floor(Date.now() / 1000) - Math.max(3600, ago * 86400); // today's latest snapshot for ago = 0
+  if (at !== null && (!/^\d{9,11}$/.test(at) || Number(at) > nowS || Number(at) < nowS - 366 * 86400)) return fail("Bad time.");
+  const timestamp = at !== null ? Number(at) : nowS - Math.max(3600, ago * 86400); // today's latest snapshot for ago = 0
   const { data, response } = await tornPublic(env, request, user, `/user/${id}/personalstats`, { stat: "defendslost,networth,bazaarsales,bazaarprofit,bazaarcustomers", timestamp: String(timestamp), striptags: null });
   if (response) return response;
   const out = { defendslost: null, networth: null, bazaarsales: null, bazaarprofit: null, bazaarcustomers: null, at: null };

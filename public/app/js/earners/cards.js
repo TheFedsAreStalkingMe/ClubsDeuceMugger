@@ -5,7 +5,7 @@ import { el } from "/js/core/dom.js";
 import { fmtShortMoney, fmtStats } from "/js/core/format.js";
 import { bazaarCash, bazaarNote } from "../features/bazaar.js";
 import { attackLink, mugEdge, muggedButton } from "../features/cards.js";
-import { daysInactive, estimateCash, expectedValue, mugScore, predictedMug, winChance } from "./rules.js";
+import { cashBasis, daysInactive, estimateCash, expectedValue, mugScore, predictedMug, winChance } from "./rules.js";
 import { earn } from "./state.js";
 
 const profileLink = (id) =>
@@ -34,10 +34,11 @@ export function earnCard(r, index) {
     ...row("Win chance", el("span", { title: "From their estimated stats against yours (set your stats in Settings). A rough guess.", text: winChance(r) != null ? `~${Math.round(winChance(r) * 100)}% (rough)` : "set your stats in Settings" })),
     ...row("Expected value", el("span", { class: "rating good", title: "Predicted mug x win chance.", text: expectedValue(r) != null ? `~${fmtShortMoney(expectedValue(r))}` : "?" })),
     ...row("Net worth", r.networth != null ? fmtShortMoney(r.networth) : "?"),
+    ...row("Net worth while offline", r.bz && r.bz.nwGain != null ? el("span", { class: `rating ${r.bz.nwGain > 0 ? "good" : "bad"}`, title: "Net worth now minus net worth when they were last active (Torn's public stats). Wages that arrived while they were offline show up here; if it is flat, the assumed wages did not arrive.", text: `${r.bz.nwGain >= 0 ? "+" : "-"}${fmtShortMoney(Math.abs(r.bz.nwGain))} in ${r.bz.days} days` }) : "not checked"),
     ...row("Recently mugged", el("span", { class: `rating ${ms.drain >= 0.3 ? "bad" : ms.drain > 0 ? "mediocre" : "good"}`, text: `${ms.drainNote}${ms.drain > 0 ? ` (-${Math.round(ms.drain * 100)}%)` : ""}` })),
     ...(lastMugBadge(r) ? row("Your last mug", lastMugBadge(r)) : []),
     ...row("Bazaar sales", el("span", { class: `rating ${bazaarCash(r) > 0 ? "good" : ""}`, title: "From Torn's public stat snapshots (bazaar sales and profit). A bazaar sells while its owner is offline, so what it took in since they were last active is added to the estimated cash.", text: bazaarNote(r) })),
-    ...row("Est. cash", el("span", { class: "rating good", title: "A rough guess: assumed daily wage (see Settings) x days inactive. Torn does not show wages.", text: cash != null ? `~${fmtShortMoney(cash)} (rough)` : "?" })),
+    ...row("Est. cash", el("span", { class: "rating good", title: `A rough guess: Torn hides cash on hand. ${cashBasis(r)}.`, text: cash != null ? `~${fmtShortMoney(cash)} (rough)` : "?" })),
     ...row("Days inactive", idle != null ? idle.toFixed(1) : "?"),
     ...row("Est. stats", fmtStats(r.bs)),
     ...row("Fair fight", r.ff != null ? Number(r.ff).toFixed(2) : "?"),

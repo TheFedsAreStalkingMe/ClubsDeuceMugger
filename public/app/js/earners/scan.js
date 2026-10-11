@@ -201,7 +201,7 @@ export async function scanEarners() {
     const runBazaar = async () => {
       while (bazaarQueue.length && runId === state.runId) {
         const r = bazaarQueue.shift();
-        try { r.bz = await readBazaar(r.id, runId); } catch (e) { if (isCancel(e)) return; r.bz = null; }
+        try { r.bz = await readBazaar(r.id, r.last, runId); } catch (e) { if (isCancel(e)) return; r.bz = null; }
         render();
       }
       bazaarWorker = null;

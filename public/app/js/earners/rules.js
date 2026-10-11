@@ -19,13 +19,45 @@ export function dailyWage(c, wages = earn.wages) {
   return wages.base * (c.stars / 10);
 }
 
-// A ROUGH guess of the cash they have built up: the assumed daily wage x days idle.
-// Bazaar sales while they were offline (read with the attack history) are added on top.
-// Wages only build up while they are employed, so days in the company caps it.
-export function estimateCash(r, wages = earn.wages, now = Date.now() / 1000) {
+// A ROUGH guess of the cash they have built up. Torn hides other players' cash on hand, so this starts from the assumed
+// wage and is then limited by what Torn's public stats show:
+//   wage     the assumed daily wage x days idle (days in the company caps it); an "Unassigned" employee has no position and
+//            is probably not paid, so only a fifth is counted until the net worth growth says otherwise
+//   growth   wages that arrive while offline raise their net worth, so the wage part cannot be more than the net worth
+//            grew since they were last active (read for every match, see history.js)
+//   bazaar   what their bazaar took in while offline (sold items turn into cash without raising net worth)
+//   cap      cash is part of net worth, so it can never be more than 80% of it
+export function cashParts(r, wages = earn.wages, now = Date.now() / 1000) {
   const idle = daysInactive(r, now);
   if (idle == null) return null;
-  return dailyWage(r.company, wages) * Math.min(Math.floor(idle), r.daysIn ?? Infinity) + bazaarCash(r, now);
+  const full = dailyWage(r.company, wages) * Math.min(Math.floor(idle), r.daysIn ?? Infinity);
+  const unassigned = /unassigned/i.test(r.position || "");
+  const growth = r.bz && r.bz.nwGain != null ? Math.max(0, r.bz.nwGain) : null;
+  let wage = growth == null && unassigned ? full * 0.2 : full;
+  if (growth != null) wage = Math.min(wage, growth);
+  const bazaar = bazaarCash(r, now);
+  const cap = r.networth != null ? r.networth * 0.8 : null;
+  const raw = wage + bazaar;
+  const cash = cap != null ? Math.min(raw, cap) : raw;
+  return { full, wage, growth, unassigned, bazaar, cap, capped: cap != null && raw > cap, cash };
+}
+
+export function estimateCash(r, wages = earn.wages, now = Date.now() / 1000) {
+  const p = cashParts(r, wages, now);
+  return p ? p.cash : null;
+}
+
+// One line for the card tooltip: how the estimate was reached.
+export function cashBasis(r) {
+  const p = cashParts(r);
+  if (!p) return "";
+  const m = (n) => `$${Math.round(n).toLocaleString("en-US")}`;
+  const bits = [`assumed wages ${m(p.full)}`];
+  if (p.unassigned && p.growth == null) bits.push("no position (Unassigned): probably unpaid, so a fifth counted");
+  if (p.growth != null) bits.push(`net worth grew ${m(p.growth)} while offline${p.growth < p.full ? " (less than the wages, so that is used)" : ""}`);
+  if (p.bazaar > 0) bits.push(`bazaar took in ${m(p.bazaar)}`);
+  if (p.capped) bits.push(`limited to 80% of their net worth (${m(p.cap)})`);
+  return bits.join("; ");
 }
 
 // (recent-mug logic is shared with the other finders: features/recent.js)
