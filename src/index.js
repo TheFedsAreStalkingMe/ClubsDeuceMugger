@@ -69,6 +69,7 @@ const ROUTES = [
   ["GET", "/api/leaderboard", leaderboard.leaderboard],
   ["GET", "/api/mug/outcomes", leaderboard.outcomes],
   ["GET", "/api/targets/recent", leaderboard.recentMugs],
+  ["GET", "/api/mug/targets", leaderboard.farmList],
   ["POST", "/api/leaderboard/sync", leaderboard.syncMugs],
 ];
 

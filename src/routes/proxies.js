@@ -186,18 +186,41 @@ export async function playerStats({ request, env, url, user }) {
 }
 
 // Status, age, last action AND net worth of a player in ONE Torn call (Torn lets selections be combined). The profile
-// part has the same shape as /api/torn/user, plus `networth`.
+// part has the same shape as /api/torn/user, plus `networth`, `property` and a few public stats that show how strong and
+// how much of a trainer they are (from the mugging guides: xanax taken and energy refills, fights won and lost, best hit).
+// The "popular" stat group has all of those; if Torn refuses it the call is repeated with net worth alone.
+const stat = (v) => (typeof v === "number" ? v : null);
+function popularStats(ps) {
+  if (!ps || typeof ps !== "object" || Array.isArray(ps)) return null;
+  const a = ps.attacking || {};
+  const out = {
+    xanax: stat(ps.drugs?.xanax), refills: stat(ps.other?.refills?.energy),
+    won: stat(a.attacks?.won), lost: stat(a.attacks?.lost), defWon: stat(a.defends?.won), defLost: stat(a.defends?.lost),
+    bestHit: stat(a.damage?.best),
+  };
+  return Object.values(out).some((v) => v != null) ? out : null;
+}
+
 export async function playerData({ request, env, url, user }) {
   const id = url.searchParams.get("id") || "";
   if (!/^\d{1,10}$/.test(id)) return fail("Bad player ID.");
-  const { data, response } = await tornPublic(env, request, user, "/user", { selections: "profile,personalstats", id, cat: "networth" });
-  if (response) return response;
+  const call = (cat) => tornPublic(env, request, user, "/user", { selections: "profile,personalstats", id, cat });
+  let r = await call("popular");
+  if (r.response) {
+    // a Torn error other than a key or rate problem (for example the group is not accepted): ask for net worth alone
+    const body = await r.response.clone().json().catch(() => null);
+    if (body && body.code != null && ![2, 5, 10, 13, 16].includes(body.code)) r = await call("networth");
+  }
+  if (r.response) return r.response;
+  const data = r.data;
   const p = data.profile || {};
+  const ps = data.personalstats;
   return json({
-    player_id: p.id, name: p.name, level: p.level, age: p.age,
+    player_id: p.id, name: p.name, level: p.level, age: p.age, property: p.property?.name || "",
     last_action: p.last_action && { timestamp: p.last_action.timestamp, status: p.last_action.status },
     status: p.status && { state: p.status.state, description: p.status.description, details: p.status.details || "", until: p.status.until },
-    networth: findNetworth(data.personalstats),
+    networth: typeof ps?.networth?.total === "number" ? ps.networth.total : findNetworth(ps),
+    stats: popularStats(ps),
   });
 }
 

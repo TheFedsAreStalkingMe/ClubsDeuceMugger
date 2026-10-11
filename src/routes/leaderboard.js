@@ -216,14 +216,30 @@ export async function recentMugs({ env, url, user }) {
   ).bind(now - 86400, now - 86400, ...ids, now - 7 * 86400).all();
   const out = {};
   for (const r of results) out[r.target_id] = { n24: r.n24, n7: r.n7, last: r.last, sum24: r.sum24 };
-  // This member's own latest mug of each (last 30 days): what it took, and what the site had predicted.
+  // This member's own mugs of each (last 30 days): the latest (what it took, what was predicted), how many, the average.
   const { results: mine } = await env.DB.prepare(
     `SELECT target_id, clicked_at, resolved_at, actual, predicted FROM clicks
      WHERE user_id = ? AND matched = 1 AND result = 'Mugged' AND target_id IN (${marks}) AND clicked_at > ? ORDER BY clicked_at DESC`
   ).bind(user.id, ...ids, now - 30 * 86400).all();
   for (const m of mine) {
     out[m.target_id] ||= { n24: 0, n7: 0, last: 0, sum24: 0 };
-    out[m.target_id].mine ||= { at: m.resolved_at || m.clicked_at, actual: m.actual || 0, predicted: m.predicted || 0 };
+    const t = (out[m.target_id].mine ||= { at: m.resolved_at || m.clicked_at, actual: m.actual || 0, predicted: m.predicted || 0, n: 0, sum: 0 });
+    t.n++;
+    t.sum += m.actual || 0;
+    t.avg = Math.round(t.sum / t.n);
   }
   return json({ recent: out });
+}
+
+// The players this member has mugged (last 60 days), newest first, with how many times and what each took: the "farm list"
+// (the page checks which of them are still offline). Mug.City-style: last amount, running average, last hit time.
+export async function farmList({ env, user }) {
+  const { results } = await env.DB.prepare(
+    `SELECT target_id, COUNT(*) AS n, CAST(AVG(actual) AS INTEGER) AS avg, MAX(actual) AS best, MAX(clicked_at) AS last_at,
+            (SELECT actual FROM clicks c2 WHERE c2.user_id = c.user_id AND c2.target_id = c.target_id AND c2.matched = 1 AND c2.result = 'Mugged' ORDER BY c2.clicked_at DESC LIMIT 1) AS last_actual,
+            (SELECT predicted FROM clicks c2 WHERE c2.user_id = c.user_id AND c2.target_id = c.target_id AND c2.matched = 1 AND c2.result = 'Mugged' ORDER BY c2.clicked_at DESC LIMIT 1) AS last_predicted
+     FROM clicks c WHERE c.user_id = ? AND c.matched = 1 AND c.result = 'Mugged' AND c.clicked_at > ?
+     GROUP BY c.target_id ORDER BY last_at DESC LIMIT 60`
+  ).bind(user.id, nowSec() - 60 * 86400).all();
+  return json({ targets: results });
 }

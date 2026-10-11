@@ -14,6 +14,7 @@ import { loadTypes } from "../earners/data.js";
 import { loadCalibration } from "../earners/calibration.js";
 import { initEarnFilters, renderTypes, showTypesError } from "../earners/filters.js";
 import { earn } from "../earners/state.js";
+import { renderFarm } from "../earners/farm.js";
 import { render } from "../earners/results.js";
 import { cancelEarners, scanEarners } from "../earners/scan.js";
 
@@ -43,6 +44,12 @@ async function boot() {
   setInterval(() => refreshStatuses(Date.now() / 1000), 1000);
   startMugWatch();
   startRowWatch({ rows: () => earn.rows, render, score: (r) => mugScore(r).score });
+
+  // the farm list loads when it is opened (the status check costs a few Torn calls)
+  let farmLoaded = false;
+  $("farm-panel").addEventListener("toggle", () => {
+    if ($("farm-panel").open && !farmLoaded) { farmLoaded = true; renderFarm($("farm")); }
+  });
 
   loadTypeList();
 }

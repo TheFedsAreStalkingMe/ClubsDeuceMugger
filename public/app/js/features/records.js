@@ -15,6 +15,8 @@ export const recordFrom = (p) => ({
   age: p.age,
   level: p.level,
   last: p.last_action?.timestamp || 0,
+  property: p.property || "", // Private Island, Castle, Palace ... (a sign of wealth)
+  ps: p.stats || null, // public stats: xanax, refills, fights won and lost, best hit
 });
 
 // Okay players are trusted for 15 s (they can flip any moment). Players who are out are trusted until

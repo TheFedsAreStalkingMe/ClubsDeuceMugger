@@ -17,7 +17,7 @@ async function runChecks() {
 
   const text = (sel) => page.textContent(sel);
   // (earner scans skip players shown by a recent scan unless a test says otherwise: most tests scan the same few players again and again)
-  const setStore = (key, value) => page.evaluate(([k, v]) => localStorage.setItem(k, JSON.stringify(v)), [key, key === "cdm.earn.filters" ? { skipSeenHours: 0, ...value } : value]);
+  const setStore = (key, value) => page.evaluate(([k, v]) => localStorage.setItem(k, JSON.stringify(v)), [key, key === "cdm.earn.filters" ? { skipSeenHours: 0, minMug: 0, ...value } : value]);
   const cards = (sel) => page.$$eval(`${sel} .target`, (els) => els.map((e) => ({
     name: e.querySelector(".name").textContent,
     stats: [...e.querySelectorAll("dt")].map((d, i) => [d.textContent, e.querySelectorAll("dd")[i].textContent]).find(([k]) => k === "Est. stats")?.[1],
@@ -127,13 +127,13 @@ async function runChecks() {
   check("bazaar cards show whether the seller was mugged recently", /Recently muggednone known/.test(await profitText()), (await profitText()).slice(0, 200));
   // Foxtrot: $16m at market, so profit is the mug alone: 16m x 5% = +$800k (good). Merits + 20% plunder: 5% x 1.3 = 6.5% = +$1.04m.
   const foxtrot = async () => page.$$eval("#results .target", (cs) => (cs.find((c) => c.textContent.includes("Foxtrot")) || {}).textContent || "");
-  check("expected profit at base rate", /\+\$800k/.test(await foxtrot()), await foxtrot());
+  check("expected profit at base rate", /\+\$1\.01m/.test(await foxtrot()), await foxtrot());
   // merits and Plunder now live in Settings (2 merits x 5% + 20% Plunder = 1.3x)
   await page.evaluate(() => localStorage.setItem("cdm.prefs", JSON.stringify({ merits: 2, plunder: 20 })));
   await page.reload();
   await page.click("#scan");
   await scanDone();
-  check("merits and plunder from Settings raise the expected profit", /\+\$1\.04m/.test(await foxtrot()), await foxtrot());
+  check("merits and plunder from Settings raise the expected profit", /\+\$1\.31m/.test(await foxtrot()), await foxtrot());
   await page.evaluate(() => localStorage.removeItem("cdm.prefs")); // back to no bonuses for the tests that follow
   await setStore("cdm.filters", filters);
   await page.reload();
@@ -349,6 +349,7 @@ async function runChecks() {
   await page.waitForFunction(() => /missing access/.test(document.getElementById("keycheck-msg").textContent));
   check("Check my key names the features a limited key cannot do", /Missing: Leaderboard[^\n]*attacks/.test(await text("#keycheck-list")) && /Missing: Inactive earners/.test(await text("#keycheck-list")), await text("#keycheck-list"));
   await setFakeFlag("keyLimited", false);
+  await setStore("cdm.earn.filters", { types: [12], minStars: 5, minDays: 7 });
   await page.goto(BASE + "/app/earners.html");
   await page.waitForSelector("#types label");
   await page.click("#scan");
@@ -361,12 +362,12 @@ async function runChecks() {
   check("cards show stats, fair fight, age and status", /Est\. stats2b/.test(rex.text) && /Fair fight1\.50/.test(rex.text) && /Account age\d+ days/.test(rex.text) && /Status(Okay|Out|Hospital)/.test(rex.text), rex.text);
   check("mug rating and predicted mug shown", /Mug rating(Excellent|Good|Fair|Poor) \(\d+\/100\)/.test(rex.text) && /Predicted mug~\$(20[5-9]|21[0-4])k \(rough\)/.test(rex.text), rex.text.slice(0, 220));
   check("net worth shown and counted in the rating", /Net worth\$2\.3b/.test(rex.text), rex.text.slice(0, 220));
-  check("a player mugged 9 hours ago is marked and rated lower (the yield is back to about 70%)", /Recently mugged1 mug in 24h \(last 9h ago\) \(-30%\)/.test(rex.text), rex.text.slice(0, 320));
+  check("a player mugged 9 hours ago is marked and rated lower (protection falls in a straight line over 12 hours: 75% back)", /Recently mugged1 mug in 24h \(last 9h ago\)/.test(rex.text) && /\(-(25|44)%\)/.test(rex.text), rex.text.slice(0, 320));
   const rec = await page.evaluate(async () => { const m = await import("/app/js/earners/rules.js"); return [m.recovery(0), m.recovery(8), m.recovery(9), m.recovery(10), m.recovery(15), m.recovery(40)]; });
-  check("mug yield recovers over 15 hours (about 65% at 8h, 70% at 9h, full at 15h)", rec[0] === 0.1 && rec[1] > 0.6 && rec[1] < 0.7 && rec[2] > 0.68 && rec[2] < 0.72 && rec[3] > rec[2] && rec[4] === 1 && rec[5] === 1, JSON.stringify(rec));
+  check("mug yield recovers in a straight line over 12 hours (5% at once, 67% at 8h, 75% at 9h, full at 12h)", rec[0] === 0.05 && Math.abs(rec[1] - 2 / 3) < 0.001 && rec[2] === 0.75 && rec[3] > rec[2] && rec[4] === 1 && rec[5] === 1, JSON.stringify(rec));
   await page.click("#results .target:has-text('Rex') a:has-text('Attack')");
   const lastTap = await page.evaluate(() => JSON.parse(localStorage.getItem("cdm.taps") || "[]").pop());
-  check("the Attack tap saves the prediction (mug, cash, net worth, score, recent mugs)", lastTap && lastTap.pred && lastTap.pred.src === "earners" && lastTap.pred.mug > 0 && lastTap.pred.networth === 2300000000 && lastTap.pred.score > 0 && lastTap.pred.recent === 1, JSON.stringify(lastTap));
+  check("the Attack tap saves the prediction (mug, cash, net worth, score, recent mugs)", lastTap && lastTap.pred && lastTap.pred.src === "earners" && lastTap.pred.mug > 0 && lastTap.pred.networth === 2300000000 && lastTap.pred.score > 0 && lastTap.pred.recent >= 1, JSON.stringify(lastTap));
   check("a player mugged recently is ranked below one who was not (Pia above Rex)", efound[0].name === "Pia", efound.map((c) => c.name).join());
   await page.evaluate(() => localStorage.setItem("cdm.prefs", JSON.stringify({ merits: 2, plunder: 20, hideMuggedHours: 0 })));
   await page.reload();
@@ -463,8 +464,8 @@ async function runChecks() {
   efound = await earnCards();
   const rex2 = efound.find((c) => c.name === "Rex"), pia2 = efound.find((c) => c.name === "Pia");
   check("the bazaar's recent sales are shown from Torn's stats", /5 sales \(\$10\.0m\) in ~24h, 30 \(\$60\.0m\) in ~7 days, about \$2\.0m each/.test(rex2.text), rex2.text.slice(0, 600));
-  check("outside attacks are found from Torn's stats and lower the rating", /Torn stats: 2 fights lost in ~24h, 5 in ~7 days \(anyone\)/.test(rex2.text) && /net worth down 21% since yesterday/.test(rex2.text) && /\(-48%\)/.test(rex2.text), rex2.text.slice(0, 420));
-  check("the predicted mug shrinks with them (6m wages + 60m bazaar sales, x 5% x 0.52)", /Predicted mug~\$1\.(69|7[0-3])m/.test(rex2.text), rex2.text.slice(0, 200));
+  check("outside attacks are found from Torn's stats and lower the rating", /Torn stats: 2 fights lost in ~24h, 5 in ~7 days \(anyone\)/.test(rex2.text) && /net worth down 21% since yesterday/.test(rex2.text) && /\(-44%\)/.test(rex2.text), rex2.text.slice(0, 420));
+  check("the predicted mug shrinks with them (6m wages + 60m bazaar sales, x 6.3% x 0.56)", /Predicted mug~\$2\.3\dm/.test(rex2.text), rex2.text.slice(0, 200));
   check("a quiet player is not marked", /Recently muggednone known/.test(pia2.text), pia2.text.slice(0, 260));
   // With the attack history off, every match still has its bazaar checked right away (2 Torn calls each).
   await setStore("cdm.earn.filters", { historyTop: 0, types: [12], minStars: 5, minDays: 7 });
@@ -488,6 +489,7 @@ async function runChecks() {
   await page.waitForSelector("#scan:not([disabled])", { timeout: 150000 });
   efound = await earnCards();
   const rex3 = efound.find((c) => c.name === "Rex");
+  const rex3Text = rex3.text;
   check("win chance from their stats against yours, and the expected value", /Win chance~9[12]% \(rough\)/.test(rex3.text) && /Expected value~\$\d+k/.test(rex3.text), rex3.text.slice(0, 260));
   await page.selectOption("#sort", "ev:desc");
   check("sorting by expected value puts the bigger mug first", (await earnCards())[0].name === "Rex", (await earnCards()).map((c) => c.name).join());
@@ -506,7 +508,7 @@ async function runChecks() {
   await page.waitForSelector("#scan:not([disabled])", { timeout: 150000 });
   efound = await earnCards();
   const rex4 = efound.find((c) => c.name === "Rex");
-  check("predicted mug is halved (about $105k instead of $210k)", /Predicted mug~\$10[0-9]k/.test(rex4.text), rex4.text.slice(0, 200));
+  check("predicted mug is halved (about $140k instead of $283k)", /Predicted mug~\$1[34]\dk/.test(rex4.text), rex4.text.slice(0, 200));
   await page.click("#results .target:has-text('Rex') a:has-text('Attack')");
   const calTap = await page.evaluate(() => JSON.parse(localStorage.getItem("cdm.taps") || "[]").pop());
   check("the tap still saves the plain prediction, so the correction never feeds on itself", calTap && calTap.pred && calTap.pred.mug > 190000, JSON.stringify(calTap));
@@ -536,6 +538,44 @@ async function runChecks() {
   check("an Unassigned employee counts a fifth, until net worth growth shows they were paid", parts.unassigned === 400000 && parts.unassignedButGrew === 2000000, JSON.stringify(parts));
   check("less net worth growth than wages means the wages did not all arrive", parts.growthLessThanWages === 500000 && parts.flat === 0, JSON.stringify(parts));
   check("bazaar takings while offline are added on top", parts.bazaarAdds === 6000000, JSON.stringify(parts));
+
+  section("Guide signals and the farm list");
+  // From the mugging guides: flat 5-10% roll, fights lost, few xanax, rich property, 25 energy = $600k, and farming past mugs.
+  const sig = await page.evaluate(async () => {
+    const rules = await import("/app/js/earners/rules.js");
+    const rate = await import("/app/js/features/mugrate.js");
+    const { earn } = await import("/app/js/earners/state.js");
+    const now = Date.now() / 1000;
+    const row = (id, cash) => ({ id, name: `P${id}`, last: now - 20 * 86400, daysIn: 100, position: "Miner", company: { type: 1, stars: 10, income: cash * 3 / 0.6 / 20 / 1.0, hired: 3 } });
+    const weak = { ...row(1, 20e6), ps: { xanax: 8, refills: 2, won: 3, lost: 20, defWon: 1, defLost: 15 }, property: "Private Island" };
+    const strong = { ...row(2, 20e6), ps: { xanax: 900, refills: 400, won: 800, lost: 30, defWon: 500, defLost: 20 }, property: "Shack" };
+    const score = (r) => rules.mugScore(r).score;
+    const small = row(3, 1e6), big = row(4, 50e6);
+    const saved = earn.rows, filt = earn.filters.minMug;
+    earn.rows = [small, big]; earn.filters.minMug = 0; const all = rules.visibleRows().length;
+    earn.filters.minMug = 300000; const some = rules.visibleRows().length;
+    earn.rows = saved; earn.filters.minMug = filt;
+    return {
+      rate: rate.mugRate(), range: rate.mugRange(),
+      fight: rules.fightRecord(weak).rate, noFight: rules.fightRecord({ ps: { won: 2, lost: 1 } }),
+      train: rules.trainingLoad(weak), prop: [rules.propertyValue("Castle"), rules.propertyValue("Shack"), rules.propertyValue("Flat"), rules.propertyValue("")],
+      tones: [rules.mugTone(700000), rules.mugTone(300000), rules.mugTone(100000), rules.mugTone(null)],
+      weakBeatsStrong: score(weak) > score(strong), all, some,
+    };
+  });
+  check("a mug is expected to take about 6.3% (5% base, typical dice roll), at most 10%", Math.abs(sig.rate - 0.063) < 1e-9 && sig.range[0] === 0.05 && sig.range[1] === 0.1, JSON.stringify([sig.rate, sig.range]));
+  check("fights: a player who loses most fights is weak (won 10%); under 10 fights is not enough to say", Math.abs(sig.fight - 4 / 39) < 1e-9 && sig.noFight === null, JSON.stringify([sig.fight, sig.noFight]));
+  check("training: xanax and refills are read; property: castle best, shack low, unknown none", sig.train.xanax === 8 && sig.train.refills === 2 && sig.prop.join() === "1,0.4,0.3,", JSON.stringify([sig.train, sig.prop]));
+  check("25 energy is worth $600k: green above, yellow to $250k, red under", sig.tones.join() === "good,mediocre,bad,", sig.tones.join());
+  check("a weak untrained player on a private island rates above a strong trained one on a shack", sig.weakBeatsStrong === true);
+  check("the minimum predicted mug filter hides small mugs", sig.all === 2 && sig.some === 1, JSON.stringify([sig.all, sig.some]));
+  check("cards show fights, xanax and property from Torn's public stats", /Fightswon 1\d% of 39/.test(rex3Text) && /Xanax \/ refills8 xanax, 2 refills/.test(rex3Text) && /PropertyPrivate Island/.test(rex3Text), rex3Text.slice(0, 700));
+  await page.click("#farm-panel summary");
+  await page.waitForFunction(() => document.querySelectorAll("#farm .target").length > 0 && /still offline|online again/.test(document.getElementById("farm").textContent), null, { timeout: 30000 });
+  const farm = await text("#farm");
+  check("the farm list shows who you mugged: how often, the average, the verdict and whether they are still offline", /mugged 1 time, average \$2\.5m/.test(farm) && /Okay mug: last took \$2\.5m/.test(farm) && /still offline since your mug: ready in/.test(farm), farm.slice(0, 500));
+  const targets = await page.evaluate(async () => (await (await fetch("/api/mug/targets")).json()).targets);
+  check("the server lists your mugs by player with count, average and last", targets.some((t) => t.target_id === 111 && t.n >= 1 && t.avg === 2500000 && t.last_actual === 2500000), JSON.stringify(targets).slice(0, 300));
 
   section("Finding new targets");
   // 26 companies with employees. With 10 companies per scan, the first scan starts at company 1 and the next carries on at 11.

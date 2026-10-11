@@ -51,8 +51,9 @@ export function cleanConfig(c = {}) {
 
 // ---------------------------------------------------------------- the same maths as the page
 
-export const mugRate = (c) => 0.05 * (1 + (c.merits * c.meritBoost) / 100 + c.plunder / 100);
-const recovery = (h) => (h >= 15 ? 1 : 0.1 + 0.9 * Math.pow(Math.max(0, h) / 15, 0.8));
+// a flat base of 5% and a dice roll that adds up to 100% (typically about +26%), then merits and Plunder (see features/mugrate.js)
+export const mugRate = (c) => 0.05 * 1.26 * (1 + (c.merits * c.meritBoost) / 100 + c.plunder / 100);
+const recovery = (h) => (h >= 12 ? 1 : Math.max(0.05, Math.max(0, h) / 12)); // protection falls in a straight line over 12 hours
 
 function dailyWage(co, w) {
   if (w.types[co.type] != null) return w.types[co.type] * (co.stars / 10);

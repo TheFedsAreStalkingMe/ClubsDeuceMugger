@@ -62,6 +62,7 @@ export function initEarnFilters() {
   bindNumber("maxPlayers", 1, 500, 80);
   bindNumber("historyTop", 0, 50, 10);
   bindNumber("skipSeenHours", 0, 168, 6);
+  bindNumber("minMug", 0, 1e9, 200000);
   const unknown = $("includeUnknown");
   unknown.checked = !!f.includeUnknown;
   unknown.addEventListener("change", () => { f.includeUnknown = unknown.checked; persist(); });

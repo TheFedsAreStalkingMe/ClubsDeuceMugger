@@ -235,3 +235,27 @@ starts from the assumed wage (company income share / employees). It is now limit
 - **"Unassigned" employees** (no position) are probably unpaid: a fifth is counted until the growth shows otherwise.
 - **Bazaar takings while offline** are added (sold items become cash without raising net worth).
 Each card's "Est. cash" tooltip lists how the number was reached, and a "Net worth while offline" row shows the growth.
+
+## What the mugging guides changed
+
+From the Offertory, "Mugging 2.0", YNMK and Mug.City guides:
+
+- **Flat mug rate.** A mug takes a flat base of 5% of their cash, a dice roll adds up to double (low rolls are the common
+  ones: with full merits 8 to 11% is typical), then merits (+5% each) and Plunder. Predictions use the typical roll
+  (`ROLL_AVG` 1.26, about 6.3% with no bonuses); Settings shows the range. The real-mug calibration still corrects it.
+- **Protection is linear over 12 hours.** After a mug the wallet is protected and the protection falls in a straight line
+  to nothing in 12 hours (`recovery` in `features/recent.js`; the background search uses the same).
+- **More signals from Torn's public stats** (one `cat=popular` call that replaces the net worth call, falling back to net
+  worth alone if Torn refuses it): xanax taken and energy refills ("few xanax on a rich account = weak, little playtime"),
+  fights won and lost ("loses most fights"), and the profile's property (Private Island, Castle, Palace). They are shown on
+  the card and feed the rating (Fights, Training, Property).
+- **Your own mug history (Mug.City).** A card shows how many times you mugged them, the average, the last mug with a good /
+  okay / bad label, and when (yellow under 12 hours, green 12 to 36 hours). It feeds the rating ("Your mugs", 15 points) and
+  two sort options (your biggest average, mugged longest ago).
+- **Farm list.** The Earners page has a "Your farm list" panel (`earners/farm.js`, `/api/mug/targets`): everyone you mugged
+  in the last 60 days, whether they have been online since your mug, and when they are ready again. Players still offline
+  and ready come first.
+- **25 energy is worth about $600,000** (Offertory): a predicted mug under that shows yellow, under $250,000 red, and
+  matches under "Hide matches with a predicted mug under" (default $200,000) are hidden.
+- Not possible through the API (so not done): the donator search, the Hall of Fame list, casino, auction house and property
+  market watching (the site does not scrape pages).

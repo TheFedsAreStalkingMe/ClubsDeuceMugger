@@ -55,12 +55,18 @@ export function mugVerdict(o) {
   return { label, tone, profit, note: ratio != null ? `${Math.round(ratio * 100)}% of the prediction` : "no prediction was saved" };
 }
 
-// "Your last mug" row value for a card: what you took from this player and the verdict, or null if you never mugged them.
+// "Your last mug" row value for a card (the Mug.City way: how often you mugged them, the average, the last one and when):
+// the time is yellow under 12 hours (still protected), green from 12 to 36 hours (ready to farm again), plain after that.
+// null if you never mugged them.
 export function lastMugBadge(r) {
   const m = r.recent && r.recent.mine;
   if (!m) return null;
   const v = mugVerdict({ matched: 1, result: "Mugged", actual: m.actual, predicted: m.predicted });
-  const days = Math.max(0, (Date.now() / 1000 - m.at) / 86400);
-  const when = days < 1 ? `${Math.max(1, Math.round(days * 24))}h ago` : `${Math.round(days)} day${Math.round(days) === 1 ? "" : "s"} ago`;
-  return el("span", { class: `rating ${v.tone}`, title: `Judged from your profit against the prediction (${v.note}).`, text: `${v.label}: took ${fmtShortMoney(v.profit)}, ${when}` });
+  const hours = Math.max(0, (Date.now() / 1000 - m.at) / 3600);
+  const when = hours < 24 ? `${Math.max(1, Math.round(hours))}h ago` : `${Math.round(hours / 24)} day${Math.round(hours / 24) === 1 ? "" : "s"} ago`;
+  const timeTone = hours < 12 ? "mediocre" : hours <= 36 ? "good" : "";
+  const times = m.n > 1 ? `${m.n} mugs, average ${fmtShortMoney(m.avg)}; last ` : "";
+  return el("span", {},
+    el("span", { class: `rating ${v.tone}`, title: `Judged from your profit against the prediction (${v.note}).`, text: `${v.label}: ${times}took ${fmtShortMoney(v.profit)}` }),
+    " ", el("span", { class: timeTone ? `rating ${timeTone}` : "", title: "Yellow: under 12 hours ago (their cash is still protected). Green: 12 to 36 hours ago (ready to mug again).", text: when }));
 }

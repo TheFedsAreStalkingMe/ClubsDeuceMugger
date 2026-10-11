@@ -3,13 +3,14 @@
 import { $, say } from "/js/core/dom.js";
 import { STORE, load, save } from "/js/core/storage.js";
 import { BASE_MUG } from "../state.js";
-import { mugBonus } from "../features/mugrate.js";
+import { ROLL_AVG, mugBonus } from "../features/mugrate.js";
 import { hideHours } from "../features/recent.js";
 
 const preview = (merits, boost, plunder) => {
-  const rate = BASE_MUG * (1 + (merits * boost + plunder) / 100);
+  const bonus = 1 + (merits * boost + plunder) / 100;
+  const pct = (x) => (x * 100).toFixed(1);
   const extra = Math.round(merits * boost + plunder);
-  return `A mug would take about ${(rate * 100).toFixed(2)}% of their cash (${merits} Masterful Looting level${merits === 1 ? "" : "s"} and ${plunder}% Plunder: +${extra}% on top of the 5% base).`;
+  return `A mug takes ${pct(BASE_MUG * bonus)}% to ${pct(BASE_MUG * 2 * bonus)}% of their cash (a flat 5% base, a dice roll adds up to double, and your ${merits} Masterful Looting level${merits === 1 ? "" : "s"} and ${plunder}% Plunder add +${extra}%). The finders expect about ${pct(BASE_MUG * ROLL_AVG * bonus)}, because low rolls are the common ones.`;
 };
 
 export function initMugBonus() {

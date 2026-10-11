@@ -16,6 +16,7 @@ export const DEFAULT_EARN = {
   maxPlayers: 80, // stop once this many matches are found
   historyTop: 10, // read the attack history (3 Torn calls each) of this many best matches at the end (0 = off)
   skipSeenHours: 6, // players shown by a scan in the last this many hours are skipped, so repeat scans find new people (0 = off)
+  minMug: 200000, // hide matches whose predicted mug is under this (25 energy is worth about $600k to a mugger; 0 = show all)
   includeUnknown: false, // keep players with no stat estimate
   sort: "score",
   dir: "desc",

@@ -105,6 +105,31 @@ const clamp01 = (x) => Math.max(0, Math.min(1, x));
 const scale = (x, lo, hi) => clamp01((x - lo) / (hi - lo));
 const logScale = (x, lo, hi) => (x <= 0 ? 0 : clamp01((Math.log10(x) - Math.log10(lo)) / (Math.log10(hi) - Math.log10(lo))));
 
+// ---- signals from the mugging guides, read from Torn's public stats and profile (see /api/torn/player) ----
+
+// Fights won and lost (as attacker and defender): "they lose most fights" means weak. Needs a sample of 10 fights.
+export function fightRecord(r) {
+  const p = r.ps;
+  if (!p || (p.won == null && p.defWon == null)) return null;
+  const won = (p.won || 0) + (p.defWon || 0), lost = (p.lost || 0) + (p.defLost || 0);
+  return won + lost >= 10 ? { rate: won / (won + lost), total: won + lost } : null;
+}
+
+// Xanax taken and energy refills show how much they train: few of them on a rich account means a weak player with little
+// playtime (the guide's example: 8 billion net worth, 10 xanax, loses most fights).
+export function trainingLoad(r) {
+  const p = r.ps;
+  if (!p || (p.xanax == null && p.refills == null)) return null;
+  return { xanax: p.xanax ?? 0, refills: p.refills ?? 0 };
+}
+
+// Private Islands, Castles and Palaces go with real money; a Shack or Trailer on an old inactive account means rent and upkeep cost nothing.
+export const propertyValue = (name) => (!name ? null : /private island|castle|palace/i.test(name) ? 1 : /shack|trailer/i.test(name) ? 0.4 : 0.3);
+
+// What 25 energy is worth when mugging (from a mugging guide): a mug under this is not worth the energy.
+export const ENERGY_VALUE = 600000;
+export const mugTone = (mug) => (mug == null ? "" : mug >= ENERGY_VALUE ? "good" : mug >= ENERGY_VALUE / 2.4 ? "mediocre" : "bad");
+
 export function mugScore(r, now = Date.now() / 1000) {
   const myBs = Number((load(STORE.prefs, {}) || {}).myBs) || 0;
   const cash = estimateCash(r);
@@ -117,6 +142,10 @@ export function mugScore(r, now = Date.now() / 1000) {
     { label: "Inactive", max: 10, v: idle == null ? null : scale(idle, 1, 30), note: idle == null ? "unknown" : `${idle.toFixed(0)} days` },
     // From a mugging guide: a high level for a young account (1 level is about 100 days) tends to carry more cash.
     { label: "Level for age", max: 5, v: r.level && r.age ? scale(r.level / (r.age / 100), 0.5, 1.5) : null, note: r.level && r.age ? `level ${r.level} at ${r.age} days` : "not known" },
+    { label: "Fights", max: 8, v: fightRecord(r) ? clamp01((0.8 - fightRecord(r).rate) / 0.6) : null, note: fightRecord(r) ? `won ${Math.round(fightRecord(r).rate * 100)}% of ${fightRecord(r).total}` : "not enough fights" },
+    { label: "Training", max: 8, v: trainingLoad(r) ? 1 - logScale(trainingLoad(r).xanax + trainingLoad(r).refills + 1, 10, 1000) : null, note: trainingLoad(r) ? `${trainingLoad(r).xanax} xanax, ${trainingLoad(r).refills} refills` : "not known" },
+    { label: "Property", max: 6, v: propertyValue(r.property), note: r.property || "not known" },
+    { label: "Your mugs", max: 15, v: r.recent && r.recent.mine && r.recent.mine.avg ? logScale(r.recent.mine.avg, 200000, 5000000) : null, note: r.recent && r.recent.mine ? `${r.recent.mine.n} mug${r.recent.mine.n === 1 ? "" : "s"}, average $${Math.round(r.recent.mine.avg || 0).toLocaleString("en-US")}` : "never mugged" },
     { label: "Company", max: 5, v: r.company ? r.company.stars / 10 : null, note: r.company ? `${r.company.stars} stars` : "unknown" },
   ];
   const known = parts.filter((p) => p.v != null);
@@ -129,7 +158,8 @@ export function mugScore(r, now = Date.now() / 1000) {
 }
 
 // Rows to show: at least the minimum days inactive (a fresh status check can show they came back).
-export const visibleRows = () => earn.rows.filter((r) => (daysInactive(r) ?? 0) >= earn.filters.minDays && !isRecentlyMugged(r));
+export const visibleRows = () =>
+  earn.rows.filter((r) => (daysInactive(r) ?? 0) >= earn.filters.minDays && !isRecentlyMugged(r) && !(earn.filters.minMug > 0 && (predictedMug(r) ?? Infinity) < earn.filters.minMug));
 
 export function sortValue(r, key) {
   switch (key) {
@@ -137,6 +167,8 @@ export function sortValue(r, key) {
     case "mug": return predictedMug(r);
     case "ev": return expectedValue(r);
     case "cash": return estimateCash(r);
+    case "avgmug": return r.recent && r.recent.mine ? r.recent.mine.avg : null; // your own average mug of them
+    case "lastmug": return r.recent && r.recent.mine ? r.recent.mine.at : null;
     case "days": return daysInactive(r);
     case "stats": return r.bs;
     case "hospital": return remaining(r);

@@ -5,7 +5,7 @@ import { el } from "/js/core/dom.js";
 import { fmtShortMoney, fmtStats } from "/js/core/format.js";
 import { bazaarCash, bazaarNote } from "../features/bazaar.js";
 import { attackLink, mugEdge, muggedButton } from "../features/cards.js";
-import { cashBasis, daysInactive, estimateCash, expectedValue, mugScore, predictedMug, winChance } from "./rules.js";
+import { cashBasis, daysInactive, estimateCash, fightRecord, mugTone, trainingLoad, expectedValue, mugScore, predictedMug, winChance } from "./rules.js";
 import { earn } from "./state.js";
 
 const profileLink = (id) =>
@@ -30,13 +30,16 @@ export function earnCard(r, index) {
   const mug = predictedMug(r);
   const dl = el("dl", {},
     ...row("Mug rating", el("span", { class: `rating ${tone}`, title: `${why}\nUnknown parts are left out and the rest scaled up.`, text: `${ms.label} (${ms.score}/100)` })),
-    ...row("Predicted mug", el("span", { class: "rating good", title: `Estimated cash x your mug rate (5%, plus the merits and Plunder set in Settings) x what is left after recent mugs. A rough guess.${earn.calibration.n ? ` Adjusted x${earn.calibration.factor.toFixed(2)} from your ${earn.calibration.n} real mugs.` : ""}`, text: mug != null ? `~${fmtShortMoney(mug)} (rough)` : "?" })),
+    ...row("Predicted mug", el("span", { class: `rating ${mugTone(mug) || "good"}`, title: `Estimated cash x your mug rate (a flat 5% base, a dice roll that typically adds about a quarter, plus the merits and Plunder set in Settings) x what is left of their protection after recent mugs. Green: at least $600,000, what 25 energy is worth to a mugger; red: under $250,000. A rough guess.${earn.calibration.n ? ` Adjusted x${earn.calibration.factor.toFixed(2)} from your ${earn.calibration.n} real mugs.` : ""}`, text: mug != null ? `~${fmtShortMoney(mug)} (rough)` : "?" })),
     ...row("Win chance", el("span", { title: "From their estimated stats against yours (set your stats in Settings). A rough guess.", text: winChance(r) != null ? `~${Math.round(winChance(r) * 100)}% (rough)` : "set your stats in Settings" })),
     ...row("Expected value", el("span", { class: "rating good", title: "Predicted mug x win chance.", text: expectedValue(r) != null ? `~${fmtShortMoney(expectedValue(r))}` : "?" })),
     ...row("Net worth", r.networth != null ? fmtShortMoney(r.networth) : "?"),
     ...row("Net worth while offline", r.bz && r.bz.nwGain != null ? el("span", { class: `rating ${r.bz.nwGain > 0 ? "good" : "bad"}`, title: "Net worth now minus net worth when they were last active (Torn's public stats). Wages that arrived while they were offline show up here; if it is flat, the assumed wages did not arrive.", text: `${r.bz.nwGain >= 0 ? "+" : "-"}${fmtShortMoney(Math.abs(r.bz.nwGain))} in ${r.bz.days} days` }) : "not checked"),
     ...row("Recently mugged", el("span", { class: `rating ${ms.drain >= 0.3 ? "bad" : ms.drain > 0 ? "mediocre" : "good"}`, text: `${ms.drainNote}${ms.drain > 0 ? ` (-${Math.round(ms.drain * 100)}%)` : ""}` })),
     ...(lastMugBadge(r) ? row("Your last mug", lastMugBadge(r)) : []),
+    ...(fightRecord(r) ? row("Fights", el("span", { class: `rating ${fightRecord(r).rate < 0.5 ? "good" : "mediocre"}`, title: "Fights won (attacking and defending) out of all fights. A player who loses most of his fights is weak and easy to hit.", text: `won ${Math.round(fightRecord(r).rate * 100)}% of ${fightRecord(r).total}` })) : []),
+    ...(trainingLoad(r) ? row("Xanax / refills", el("span", { title: "Few xanax and energy refills on a rich account means little playtime and weak stats.", text: `${trainingLoad(r).xanax.toLocaleString("en-US")} xanax, ${trainingLoad(r).refills.toLocaleString("en-US")} refills` })) : []),
+    ...(r.property ? row("Property", el("span", { class: /private island|castle|palace/i.test(r.property) ? "rating good" : "", title: "Private Islands, Castles and Palaces go with real money.", text: r.property })) : []),
     ...row("Bazaar sales", el("span", { class: `rating ${bazaarCash(r) > 0 ? "good" : ""}`, title: "From Torn's public stat snapshots (bazaar sales and profit). A bazaar sells while its owner is offline, so what it took in since they were last active is added to the estimated cash.", text: bazaarNote(r) })),
     ...row("Est. cash", el("span", { class: "rating good", title: `A rough guess: Torn hides cash on hand. ${cashBasis(r)}.`, text: cash != null ? `~${fmtShortMoney(cash)} (rough)` : "?" })),
     ...row("Days inactive", idle != null ? idle.toFixed(1) : "?"),

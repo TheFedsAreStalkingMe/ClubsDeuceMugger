@@ -1,16 +1,18 @@
 // How recently a player was mugged, and what that does to the next mug. Shared by every finder.
 // From a mugging guide: Torn reduces what a mug takes from a player who was just mugged, and the yield comes back over
-// about 15 hours (at 8 to 10 hours you still get 60 to 70% of the best amount). `recovery` is 0.1 right after a mug,
-// about 0.7 after 9 hours and 1 after 15. Players mugged several times in a day or week are ones others farm, and
+// about 12 hours, in a straight line (at 9 hours you still get about 75% of the best amount). `recovery` is 0.05 right
+// after a mug, 0.5 after 6 hours and 1 after 12. Players mugged several times in a day or week are ones others farm, and
 // fights lost to anyone (Torn's stats, `r.history`) count too.
 // Rows carry `recent` ({ n24, n7, last }) from our own record of member mugs (/api/targets/recent) and `details` (the
 // status text, "Mugged by ..." while in hospital).
 
 import { STORE, load, save } from "/js/core/storage.js";
 
-const RECOVERY_HOURS = 15;
+const RECOVERY_HOURS = 12;
 const LOCAL_MUGS = "cdm.muggedLocal"; // players you marked as mugged by hand: { id: seconds }
-export const recovery = (hours) => (hours >= RECOVERY_HOURS ? 1 : 0.1 + 0.9 * Math.pow(Math.max(0, hours) / RECOVERY_HOURS, 0.8));
+// Mug protection (Mugging 2.0 and the later guides): what is left in the wallet after a mug is protected, and the
+// protection falls in a straight line to nothing over 12 hours. So a mug after 6 hours takes about half of a full one.
+export const recovery = (hours) => (hours >= RECOVERY_HOURS ? 1 : Math.max(0.05, Math.max(0, hours) / RECOVERY_HOURS));
 
 // You can mark a player as mugged by hand (for a mug the site cannot see); it counts like any other mug for a day.
 export function markMugged(id) {
@@ -35,7 +37,7 @@ export const hiddenNote = (rows) => {
   const n = rows.filter((r) => isRecentlyMugged(r)).length;
   return n ? `${n} hidden: mugged in the last ${hideHours()} hours (change this in Settings).` : "";
 };
-// Has a mug in the last 15 hours (when the yield is still reduced): shown with a red edge on the card.
+// Has a mug in the last 12 hours (when the yield is still reduced): shown with a red edge on the card.
 export function recentlyMuggedClass(r) {
   const hours = hoursSinceMug(r);
   return hours != null && hours < RECOVERY_HOURS ? "recent-mug" : "";

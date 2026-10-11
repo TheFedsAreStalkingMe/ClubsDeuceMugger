@@ -135,7 +135,10 @@ function fakeServer() {
       const id = u.searchParams.get("id");
       const o = statusOverride[id];
       const status = o ? { state: o.state, until: o.state === "Abroad" ? 0 : o.until, description: o.state } : { state: "Okay", until: 0, description: "Okay" };
-      return send({ profile: { id: Number(id), name: "A", age: 100, level: 30, last_action: { timestamp: 5, status: "Offline", relative: "x" }, status }, personalstats: { networth: { total: Number(id) * 100000000 } } });
+      // public stats: players with an id under 30 are weak untrained players (few xanax, lose most fights), the rest are strong
+      const weak = Number(id) < 30;
+      const stats = { drugs: { xanax: weak ? 8 : 900 }, other: { refills: { energy: weak ? 2 : 400 } }, attacking: { attacks: { won: weak ? 3 : 800, lost: weak ? 20 : 30 }, defends: { won: weak ? 1 : 500, lost: weak ? 15 : 20 }, damage: { best: weak ? 900 : 90000 }, networth: { money_mugged: 1, largest_mug: 1, items_looted: 1 } } };
+      return send({ profile: { id: Number(id), name: "A", age: 100, level: 30, property: { id: 1, name: weak ? "Private Island" : "Shack" }, last_action: { timestamp: 5, status: "Offline", relative: "x" }, status }, personalstats: { networth: { total: Number(id) * 100000000 }, ...stats } });
     }
 
     // Torn v2 (leaderboard)

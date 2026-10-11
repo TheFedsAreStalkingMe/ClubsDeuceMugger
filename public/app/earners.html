@@ -67,6 +67,8 @@
             <input type="number" id="historyTop" inputmode="numeric" min="0" max="50" step="1"></label>
           <label>Skip players shown in the last (hours) <span class="hint">So a repeat scan finds new people. Each scan also carries on from where the last one stopped in the company list. 0 = show everyone again.</span>
             <input type="number" id="skipSeenHours" inputmode="numeric" min="0" max="168" step="1"></label>
+          <label>Hide matches with a predicted mug under ($) <span class="hint">25 energy is worth about $600,000 to a mugger. 0 = show everything.</span>
+            <input type="number" id="minMug" inputmode="numeric" min="0" step="50000"></label>
           <label>Stop after finding this many players <span class="hint">Biggest estimated cash first.</span>
             <input type="number" id="maxPlayers" inputmode="numeric" min="1" max="500" step="1"></label>
         </div>
@@ -89,6 +91,8 @@
           <option value="score:desc">Best mug first</option>
           <option value="score:asc">Worst mug first</option>
           <option value="mug:desc">Biggest predicted mug</option>
+          <option value="avgmug:desc">Your biggest average mug of them</option>
+          <option value="lastmug:asc">Mugged by you longest ago</option>
           <option value="cash:desc">Most estimated cash</option>
           <option value="cash:asc">Least estimated cash</option>
           <option value="days:desc">Longest inactive</option>
@@ -103,6 +107,11 @@
       </label>
     </div>
 
+    <details class="more" id="farm-panel">
+      <summary>Your farm list: players you already mugged</summary>
+      <p class="hint">A good mug can be farmed again every 12 hours for as long as they stay offline. This lists who you mugged, whether they have been online since, and when they are ready again.</p>
+      <div class="results" id="farm"></div>
+    </details>
     <p class="hint" id="hidden-note"></p>
     <section class="results" id="results" aria-live="polite"></section>
   <p class="foot">Font: Fontstuck by KevinHilt, <a href="/fonts/LICENSE-fontstuck.txt">CC BY-SA 3.0</a></p>
