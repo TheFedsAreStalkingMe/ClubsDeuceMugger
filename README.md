@@ -259,3 +259,70 @@ From the Offertory, "Mugging 2.0", YNMK and Mug.City guides:
   matches under "Hide matches with a predicted mug under" (default $200,000) are hidden.
 - Not possible through the API (so not done): the donator search, the Hall of Fame list, casino, auction house and property
   market watching (the site does not scrape pages).
+
+## Flipper (Hypixel SkyBlock flip finder)
+
+A page at `/app/flipper.html` (tab "Flipper") that scans Hypixel SkyBlock's Bazaar and Auction House for profitable flips and ranks
+them by margin **and** how fast they sell. It is **read-only analysis**: it shows suggestions and never automates anything in the
+game. Sources, rate limits and verification dates are in [SOURCES.md](SOURCES.md).
+
+**Flip types:** Bazaar order flips (buy order, then sell offer), Bazaar instant flips (only if the spread survives the tax: almost
+never), craft flips (NEU recipes, multi-step), reverse NPC flips (NPC shop to Bazaar), NPC sell flips (Bazaar to NPC) with the NPC
+price shown as a floor, and Auction House BIN flips (a BIN well under the same *variant* of the item).
+
+**How it works**
+- A collector (`src/flipper/collect.js`) runs from an every-minute Cron Trigger (the second entry in `wrangler.jsonc`; the 3-minute
+  entry is still the background Torn search). Each run samples the Bazaar, reads the auction pages and the recently ended auctions,
+  and samples the Bazaar again ~30s later (the data refreshes about every 20s). Price history of the ~150 best items plus every
+  watched item is stored every 15 minutes (7 days), recent BIN sales per item identity are stored (newest 40, 7 days).
+- The snapshots live in D1 (`migrations/0009_flipper.sql`). `GET /api/flipper/flips` runs the flip finders over the latest snapshot
+  with your filters (`src/flipper/engine.js`); the page only displays the result. Item detail (`/api/flipper/item?id=`) adds the
+  order book, a price chart (own samples, topped up from SkyCofl's hourly prices when there are fewer than 24) and the crafting route.
+- **Calculations** are in `src/flipper/math.js` (tax, fees, order books, fill times, scores) and every constant is in
+  `src/flipper/config.js`, each marked verified / **VERIFY IN-GAME** / tuning. A buy order fills as other players sell instantly
+  (`sellMovingWeek`), a sell offer as they buy instantly (`buyMovingWeek`); fill time = order size / (weekly volume / 168 h) x a
+  queue penalty. Coins/hour = net profit / (buy fill + sell fill + hands-on time). The ranking blends margin, speed and reliability
+  (confidence) with weights you set in the page.
+- **Liquidity** (0 to 100) is shown in each row's tooltip. The **NPC price floor** panel lists every item NPCs buy that is on the Bazaar, with the NPC price next to the best buy order and sell offer (`GET /api/flipper/floor`).
+- **Safety filters** (each can be switched off in the page): minimum volume, thin markets, outlier top-of-book orders (top price vs the
+  depth-weighted price), "too good to be true" spreads, 24h volatility, falling or just-spiked prices, cosmetic items. Every flip shows
+  High / Med / Low confidence with the reasons in its tooltip; Low is hidden by default.
+- **Auction items** are identified by decoding `item_bytes` (`src/flipper/nbt.js`) into the internal id and modifiers
+  (`src/flipper/variant.js`: stars, recombobulator, ultimate enchant, pets by type/tier/level bucket/held item/skin, books, Kuudra
+  attributes; reforge, Hot Potato/Fuming books, enchant list, gems, dye, rune and skin in the "full" key). A price is only trusted from
+  items with the same full key; with only a same-core match the flip is Low confidence, and with nothing comparable no flip is made.
+
+**Configuration** (environment variables / `vars`, all optional; nothing is hardcoded and no API key is needed):
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `FLIPPER_BAZAAR_TAX` | `0.0125` | Bazaar sell tax (lower if you have the community upgrades) |
+| `FLIPPER_AH_DURATION` | `24h` | listing length used for the Auction House fee estimate (`1h`/`6h`/`12h`/`24h`/`48h`) |
+| `FLIPPER_NPC_LIMIT_STACKS` | `10` | NPC per-trip limit in stacks (**not verified in-game**) |
+| `FLIPPER_SUBREQUEST_BUDGET` | `45` | outside calls + database queries per run (a free-plan Worker allows about 50; raise it on a paid plan) |
+| `FLIPPER_AUCTION_PAGES` | `44` | most auction pages read per sweep (fewer pages = only the newest listings) |
+| `FLIPPER_AUCTION_EVERY_MIN` | `2` | the full set of auction pages is read every this many minutes (the 60-second ended-auction feed is read every minute) |
+| `FLIPPER_HYPIXEL_BASE`, `FLIPPER_COFL_BASE` | the real APIs | point at a mirror or the test fakes |
+
+**Recipes and NPC shops** come from the NotEnoughUpdates repo as a generated file, `public/flipper-data/recipes.json`. Regenerate it
+when the repo changes: `git clone --depth 1 https://github.com/NotEnoughUpdates/NotEnoughUpdates-REPO /tmp/neu && node scripts/flipper-build-data.mjs /tmp/neu`.
+
+**Known limitations**
+- Fees, tax tiers, the NPC limit and the reading of the weekly volumes need in-game confirmation (see SOURCES.md); a profit is only
+  as right as they are.
+- The Bazaar API gives only the top 30 orders per side (the site keeps 10), so depth beyond that is unknown.
+- On a free-plan Worker (about 50 outside calls per run) only the newest auction pages fit in a run, so auction flips can miss older
+  listings; the page says when the data is partial. On a paid plan raise `FLIPPER_SUBREQUEST_BUDGET`.
+- BIN sales under 500k are not recorded (keeps the database small), so cheap items have no sell-time estimate. Per-variant sales
+  history keeps the newest 40 sales, so very hot items undercount their per-day rate.
+- Craft flips do not check collection or level unlocks (the recipe's "Requires:" text is shown), and intermediate crafts are priced at
+  the top of the book. Forge, Kat and trade recipes are not crafts. NPC shop stock limits are not in any data source.
+- Pets are compared by level bucket, not exact level; a drill's or gear's extra parts that the variant key does not see can make a
+  listing look cheaper than it is (flagged "less than half the reference price").
+- The first hours after deploying have little price history, so confidence is capped at Med until enough samples exist.
+
+**Load on Hypixel:** per minute about 2 Bazaar requests, 1 ended-auctions request, and every 2nd minute the 44 auction pages (about 25 requests a minute on average), all on the keyless public endpoints, never faster than their cache windows.
+
+**Tests:** `node tests/flipper.mjs` (150+ unit checks, plain Node: the maths with known numbers, order books, safety checks, crafts, NPC
+flips, NBT decoding and variant matching with real Hypixel `item_bytes`, BIN flips, history, formatting). The Worker API is covered in
+`tests/run.mjs` and the page in `tests/ui.mjs`, both against a fake Hypixel/SkyCofl (`tests/lib/fake-hypixel.mjs`).

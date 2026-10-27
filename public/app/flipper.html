@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#08080b">
+  <meta name="robots" content="noindex">
+  <title>Clubs Deuce Mugger | Flipper</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <main class="wrap wide">
+    <header class="topbar">
+      <h1>Flipper <svg class="icon club-c"><use href="/img/sprite.svg#club"/></svg></h1>
+      <div class="who" id="who"></div>
+      <div class="actions">
+        <a class="btn ghost small" href="/app/settings.html">Settings</a>
+        <button class="btn ghost small" id="logout" type="button">Log out</button>
+      </div>
+    </header>
+
+    <nav class="tabs" aria-label="Finders">
+      <a href="/app/">Bazaar finder</a>
+      <a href="/app/earners.html">Inactive earners</a>
+      <a href="/app/bonus.html">Bonus weapons</a>
+      <a href="/app/flipper.html" aria-current="page">Flipper</a>
+    </nav>
+
+    <section class="card">
+      <h2>Hypixel SkyBlock flips</h2>
+      <p class="hint">Bazaar, craft, NPC and Auction House flips ranked by profit and by how fast they sell. These are suggestions only: nothing here plays the game for you. Prices are estimates from public data; check them in the game before you buy.</p>
+      <div class="fl-status" id="fl-status" role="status" aria-live="polite">
+        <span class="fl-age" id="age-bz">Bazaar: no data</span>
+        <span class="fl-age" id="age-ah">Auctions: no data</span>
+        <span class="fl-age" id="fl-updated">Updated: never</span>
+      </div>
+      <p class="msg info" id="fl-msg" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="card fl-controls">
+      <h2>Filters</h2>
+      <div class="fl-types" id="fl-types" role="group" aria-label="Flip types"></div>
+      <div class="fl-grid">
+        <label>My purse (coins) <input type="text" id="f-purse" inputmode="text" placeholder="e.g. 50m" autocomplete="off"></label>
+        <label>Order size (items, 0 = automatic) <input type="number" id="f-orderSize" inputmode="numeric" min="0" step="1"></label>
+        <label>Min total profit <input type="text" id="f-minProfit" placeholder="e.g. 100k" autocomplete="off"></label>
+        <label>Min ROI % <input type="number" id="f-minRoi" inputmode="decimal" min="0" step="0.5"></label>
+        <label>Max cost <input type="text" id="f-maxCost" placeholder="e.g. 20m" autocomplete="off"></label>
+        <label>Min coins/hour <input type="text" id="f-minCph" placeholder="e.g. 1m" autocomplete="off"></label>
+        <label>Min volume (per week; auctions per day) <input type="text" id="f-minVolume" placeholder="e.g. 10k" autocomplete="off"></label>
+        <label>Lowest confidence to show
+          <select id="f-confidence"><option value="High">High only</option><option value="Med">Medium and up</option><option value="Low">Everything</option></select></label>
+        <label>Bazaar tax % <input type="number" id="f-tax" inputmode="decimal" min="0" max="10" step="0.05" placeholder="server default"></label>
+        <label>Search <input type="text" id="f-q" placeholder="item name" autocomplete="off"></label>
+        <label>Sort by
+          <select id="f-sort"><option value="score">Best blend (margin, speed, reliability)</option><option value="cph">Coins per hour</option><option value="profit">Total profit</option><option value="roi">ROI</option><option value="speed">Fastest</option></select></label>
+      </div>
+
+      <h3>Ranking weights</h3>
+      <p class="hint">How the "best blend" counts margin, speed and reliability. Any numbers work: only the proportions matter.</p>
+      <div class="fl-grid">
+        <label>Margin <input type="range" id="w-margin" min="0" max="10" step="1"></label>
+        <label>Speed <input type="range" id="w-speed" min="0" max="10" step="1"></label>
+        <label>Reliability <input type="range" id="w-reliability" min="0" max="10" step="1"></label>
+      </div>
+
+      <h3>Safety filters</h3>
+      <p class="hint">Each one removes flips that look unsafe (they show as Low confidence). Switch one off to ignore that check.</p>
+      <div class="fl-checks" id="fl-safety"></div>
+
+      <div class="fl-actions">
+        <label class="check"><input type="checkbox" id="f-auto"> Auto-refresh every 20 seconds</label>
+        <label class="check"><input type="checkbox" id="f-watchonly"> Watchlist only</label>
+        <label class="check"><input type="checkbox" id="f-notify"> Notify me about new flips</label>
+        <button class="btn small" id="fl-refresh" type="button">Refresh now</button>
+      </div>
+    </section>
+
+    <section class="card" id="fl-detail" hidden>
+      <div class="fl-detail-head">
+        <h2 id="d-title"></h2>
+        <div class="fl-detail-btns"><button class="btn ghost small" id="d-watch" type="button">Watch</button><button class="btn ghost small" id="d-close" type="button">Close</button></div>
+      </div>
+      <p class="hint" id="d-sub"></p>
+      <div class="fl-chart" id="d-chart"></div>
+      <p class="hint" id="d-source"></p>
+      <div class="fl-detail-grid">
+        <div><h3>Sell offers (you pay)</h3><ul class="fl-book" id="d-ask"></ul></div>
+        <div><h3>Buy orders (you get)</h3><ul class="fl-book" id="d-bid"></ul></div>
+      </div>
+      <h3>Notes</h3>
+      <ul class="fl-notes" id="d-notes"></ul>
+    </section>
+
+    <details class="card" id="fl-floor">
+      <summary>NPC price floor: what an NPC pays next to the Bazaar</summary>
+      <p class="hint">An NPC pays a fixed price for an item, so that is the least you get if you dump it. "Below floor" means the best Bazaar buy order is under what an NPC pays. Rows where the Bazaar <em>sell offers</em> are also under the NPC price are the NPC sell flips in the table.</p>
+      <div class="fl-tablewrap"><table class="fl-table fl-floor-table"><thead><tr><th>Item</th><th>NPC pays</th><th>Best buy order</th><th>Best sell offer</th><th>Shop sells at</th><th>NPC vs buy order</th></tr></thead><tbody id="fl-floor-body"></tbody></table></div>
+      <p class="hint" id="fl-floor-count"></p>
+    </details>
+
+    <section class="card">
+      <div class="fl-tablewrap">
+        <table class="fl-table" id="fl-table">
+          <thead><tr id="fl-head"></tr></thead>
+          <tbody id="fl-body"></tbody>
+        </table>
+      </div>
+      <p class="hint" id="fl-count"></p>
+    </section>
+
+    <footer class="fl-foot">
+      <p class="hint">Data: Hypixel Public API (<a href="https://api.hypixel.net/" target="_blank" rel="noopener noreferrer">api.hypixel.net</a>: Bazaar, auctions, ended auctions, items), NotEnoughUpdates item repo (<a href="https://github.com/NotEnoughUpdates/NotEnoughUpdates-REPO" target="_blank" rel="noopener noreferrer">recipes and NPC shops, MIT</a>), SkyCofl (<a href="https://sky.coflnet.com/api" target="_blank" rel="noopener noreferrer">price history top-up</a>). Details, rate limits and verification dates are in SOURCES.md. This tool is not affiliated with or endorsed by Hypixel Inc.</p>
+    </footer>
+  </main>
+  <script type="module" src="/app/js/pages/flipper.js"></script>
+</body>
+</html>

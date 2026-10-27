@@ -320,7 +320,7 @@ async function runChecks() {
   await page.goto(BASE + "/app/");
   await setStore("cdm.keys", { torn: "abcdefgh12345678", ff: "" });
   await page.evaluate(() => { localStorage.removeItem("cdm.earn.filters"); localStorage.removeItem("cdm.earn.wages"); localStorage.removeItem("cdm.earn.cache"); });
-  check("the bazaar page has the finder tabs", (await page.$$("nav.tabs a")).length === 3);
+  check("the bazaar page has the finder tabs (and the Flipper tab)", (await page.$$("nav.tabs a")).length === 4);
   await page.goto(BASE + "/app/earners.html");
   await page.waitForSelector("#types label");
   check("company types listed, Mining ticked the first time", (await page.$$("#types label")).length === 2 && (await page.isChecked("#types label:first-child input")));
@@ -656,7 +656,7 @@ async function runChecks() {
   const scanBonusPage = async () => { await page.click("#scan"); await scanDone(); return bonusCards(); };
   await page.goto(BASE + "/app/bonus.html");
   await page.waitForFunction(() => document.getElementById("maxBs").value !== ""); // the page has started and saved its own filters
-  check("three finder tabs on the bonus page", (await page.$$("nav.tabs a")).length === 3 && (await page.$("nav.tabs a[aria-current=page]")) !== null);
+  check("four tabs on the bonus page (three finders and the Flipper)", (await page.$$("nav.tabs a")).length === 4 && (await page.$("nav.tabs a[aria-current=page]")) !== null);
   await setStore("cdm.keys", { torn: "abcdefgh12345678", ff: "" });
   await setStore("cdm.bonus.filters", { historyTop: 0, maxBs: 5000000000 });
   await page.reload();
@@ -729,6 +729,83 @@ async function runChecks() {
   await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
   check("update bar appears after a new deploy", await page.waitForSelector("#update-bar", { timeout: 5000 }).then(() => true, () => false));
   await page.unroute("**/api/me");
+
+  section("Flipper");
+  await page.goto(BASE + "/app/flipper.html");
+  await page.waitForSelector("#fl-head th");
+  await page.evaluate(() => localStorage.removeItem("cdm.flipper"));
+  check("the page has the Flipper tab, the not-affiliated notice and the sources in the footer", (await page.$$eval(".tabs a", (a) => a.map((x) => x.textContent))).includes("Flipper") && /not affiliated with or endorsed by Hypixel/.test(await text(".fl-foot")) && /api\.hypixel\.net/.test(await text(".fl-foot")) && /SOURCES\.md/.test(await text(".fl-foot")));
+  check("before any collection the data age says there is no data and the table is empty", /no data/.test(await text("#age-bz")) && (await page.$$("#fl-body tr.fl-row")).length === 0);
+  await page.evaluate(() => fetch("/api/flipper/refresh", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).then((r) => r.json()));
+  await page.reload();
+  await page.waitForSelector("#fl-body tr.fl-row");
+  const flipNames = () => page.$$eval("#fl-body tr.fl-row", (rows) => rows.map((r) => r.querySelector("td").textContent));
+  check("the default minimum profit (10k) is shown", (await page.inputValue("#f-minProfit")) === "10k");
+  check("the table lists flips with the item, type tag, prices, ROI, quantity, time to sell, coins/hour, volume, NPC floor and confidence", (await page.$$eval("#fl-head th", (t) => t.map((x) => x.textContent.replace(/ v$/, "")))).join("|") === "Item|Buy at|Sell at|Net / item|ROI|Qty|Total|Time to sell|Coins/hour|Volume|NPC floor|Confidence|" && /Test Order Item/.test((await flipNames()).join()));
+  check("the data age is shown and fresh", /Bazaar: \d+s old/.test(await text("#age-bz")) && (await page.$eval("#age-bz", (e) => e.className)).includes("fresh") && /Updated:/.test(await text("#fl-updated")));
+  check("the default confidence hides the thin market", !(await flipNames()).join().includes("Test Thin"), (await flipNames()).join(" | "));
+  await page.selectOption("#f-confidence", "Low");
+  await page.waitForFunction(() => /Test Thin|Thin/i.test(document.getElementById("fl-body").textContent));
+  check("choosing 'Everything' shows the thin market with Low confidence", (await page.$$eval("#fl-body tr.fl-row", (rows) => rows.find((r) => /Test Thin/.test(r.textContent)).querySelector("td.conf-Low")?.textContent)) === "Low");
+  const row = await page.$$eval("#fl-body tr.fl-row", (rows) => { const r = rows.find((x) => /Test Order Item/.test(x.textContent)); return [...r.querySelectorAll("td")].map((c) => c.textContent); });
+  check("a row shows 1.0k buy, 1.1k sell and the coins in k/m/b format", row[1] === "1000" || row[1] === "1k" || /^1\.?\d*k$|^1000$/.test(row[1]), JSON.stringify(row));
+  check("the 'why' tooltip lists the reasons", /Cycle:/.test(await page.$eval("#fl-body tr.fl-row", (r) => r.title)));
+  // flip type chips
+  const types = await page.$$eval("#fl-types label", (l) => l.map((x) => x.textContent.trim()));
+  check("flip types can be switched on and off", types.includes("Bazaar order") && types.includes("Craft") && types.includes("Reverse NPC") && types.includes("NPC sell") && types.includes("Auction BIN"), types.join());
+  await page.evaluate(() => { for (const l of document.querySelectorAll("#fl-types label")) { const on = /Craft/.test(l.textContent); if (l.querySelector("input").checked !== on) l.querySelector("input").click(); } });
+  await page.waitForFunction(() => document.querySelectorAll("#fl-body tr.fl-row").length > 0 && [...document.querySelectorAll("#fl-body tr.fl-row")].every((r) => /Craft/.test(r.querySelector(".tagtype").textContent)));
+  check("only the chosen type is shown (craft: Enchanted Gunpowder from the NPC shop)", /Enchanted Gunpowder/.test((await flipNames()).join()));
+  await page.evaluate(() => { for (const l of document.querySelectorAll("#fl-types label")) { const on = /NPC sell/.test(l.textContent); if (l.querySelector("input").checked !== on) l.querySelector("input").click(); } });
+  await page.waitForFunction(() => [...document.querySelectorAll("#fl-body tr.fl-row")].length > 0 && [...document.querySelectorAll("#fl-body tr.fl-row")].every((r) => /NPC sell/.test(r.querySelector(".tagtype").textContent)));
+  await page.fill("#f-minProfit", ""); // (the page hides flips under 10k total profit by default; this one is worth 1k)
+  await page.fill("#f-purse", "9k");
+  await page.waitForFunction(() => /Npc Sell Item/.test(document.getElementById("fl-body").textContent) && [...document.querySelectorAll("#fl-body tr.fl-row")].some((r) => r.querySelectorAll("td")[5].textContent === "10"), null, { timeout: 8000 });
+  check("my purse caps the suggested quantity (9k buys 10 at ~900)", true);
+  await page.fill("#f-purse", "");
+  await page.fill("#f-q", "zzzz-nothing");
+  await page.waitForFunction(() => /No flips/.test(document.getElementById("fl-body").textContent), null, { timeout: 8000 });
+  check("search narrows the list and an empty result says so", /No flips match your filters/.test(await text("#fl-count")));
+  await page.fill("#f-q", "");
+  // detail view
+  await page.evaluate(() => { for (const l of document.querySelectorAll("#fl-types label")) { const on = /Bazaar order/.test(l.textContent); if (l.querySelector("input").checked !== on) l.querySelector("input").click(); } });
+  await page.waitForFunction(() => /Test Order Item/.test(document.getElementById("fl-body").textContent), null, { timeout: 8000 });
+  await page.$$eval("#fl-body tr.fl-row", (rows) => rows.find((r) => /Test Order Item/.test(r.textContent)).click());
+  await page.waitForSelector("#fl-detail:not([hidden])");
+  await page.waitForSelector("#d-chart polyline");
+  check("the detail view shows the price chart (SkyCofl top-up), the order book and the notes", (await page.$$("#d-chart polyline")).length === 2 && (await page.$$("#d-ask li")).length >= 3 && (await page.$$("#d-bid li")).length >= 3 && /Test Order Item/.test(await text("#d-title")) && /SkyCofl/.test(await text("#d-source")) && (await page.$$("#d-notes li")).length >= 1);
+  // watchlist
+  await page.click("#d-watch");
+  await page.waitForFunction(() => document.getElementById("d-watch").textContent === "Unwatch");
+  check("the watchlist star turns on in the table", (await page.$$eval("#fl-body tr.fl-row", (rows) => rows.find((r) => /Test Order Item/.test(r.textContent)).querySelector(".fl-star").classList.contains("on"))) === true);
+  await page.click("#f-watchonly");
+  await page.waitForFunction(() => document.querySelectorAll("#fl-body tr.fl-row").length === 1);
+  check("'Watchlist only' shows just the watched item", /Test Order Item/.test((await flipNames()).join()));
+  await page.click("#f-watchonly");
+  await page.click("#d-close");
+  check("closing the detail hides it", await page.$eval("#fl-detail", (e) => e.hidden));
+  await page.click("#fl-floor summary");
+  await page.waitForFunction(() => /Npc Sell Item/.test(document.getElementById("fl-floor-body").textContent), null, { timeout: 8000 });
+  check("the NPC price floor view lists the NPC price next to the Bazaar prices and marks items below the floor", /below floor/.test(await text("#fl-floor-body")) && /1k/.test(await text("#fl-floor-body")) && /items NPCs buy/.test(await text("#fl-floor-count")));
+  await page.click("#fl-floor summary");
+  // safety toggles, weights and persistence
+  check("safety filters and ranking weights are shown", (await page.$$("#fl-safety input")).length === 7 && (await page.$$("#w-margin, #w-speed, #w-reliability")).length === 3);
+  await page.click("#fl-safety label:first-child input");
+  await page.fill("#f-minProfit", "1m");
+  await page.reload();
+  await page.waitForSelector("#fl-head th");
+  check("filters are remembered in this browser", (await page.inputValue("#f-minProfit")) === "1m" && (await page.$eval("#fl-safety label:first-child input", (e) => e.checked)) === false);
+  await page.evaluate(() => localStorage.removeItem("cdm.flipper"));
+  // auction flips cannot be opened as a Bazaar detail: the page shows the in-game command
+  await page.goto(BASE + "/app/flipper.html");
+  await page.waitForSelector("#fl-body tr.fl-row");
+  await page.evaluate(() => { for (const l of document.querySelectorAll("#fl-types label")) { const on = /Auction BIN/.test(l.textContent); if (l.querySelector("input").checked !== on) l.querySelector("input").click(); } });
+  await page.waitForFunction(() => [...document.querySelectorAll("#fl-body tr.fl-row")].length > 0 && [...document.querySelectorAll("#fl-body tr.fl-row")].every((r) => /Auction BIN/.test(r.querySelector(".tagtype").textContent)), null, { timeout: 8000 });
+  await page.$$eval("#fl-body tr.fl-row", (rows) => rows[0].click());
+  await page.waitForSelector("#fl-detail:not([hidden])");
+  await page.waitForFunction(() => /\/viewauction auc1/.test(document.getElementById("d-notes").textContent));
+  check("an auction flip shows the variant and, on click, a panel with the in-game /viewauction command and the reasons", /5 stars/.test(await text("#fl-body")) && /Open it in the game with \/viewauction auc1/.test(await text("#d-notes")) && /Heroic Test Blade/.test(await text("#d-title")) && /net/.test(await text("#d-sub")) && (await page.$eval("#d-watch", (e) => e.hidden)));
+  await page.evaluate(() => localStorage.removeItem("cdm.flipper"));
 
   section("Leaderboard");
   await page.goto(BASE + "/app/leaderboard.html");

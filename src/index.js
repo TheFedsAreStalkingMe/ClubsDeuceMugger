@@ -8,12 +8,14 @@
 // `user` is null on public routes.
 
 import { cleanup } from "./lib/db.js";
+import { collectFlipper } from "./flipper/collect.js";
 import { runAllHunts } from "./lib/hunt.js";
 import { getUser } from "./lib/auth.js";
 import { fail, withSecurityHeaders } from "./lib/http.js";
 import * as account from "./routes/account.js";
 import * as admin from "./routes/admin.js";
 import * as auth from "./routes/auth.js";
+import * as flipper from "./routes/flipper.js";
 import * as hunt from "./routes/hunt.js";
 import * as invites from "./routes/invites.js";
 import * as leaderboard from "./routes/leaderboard.js";
@@ -40,6 +42,15 @@ const ROUTES = [
   ["POST", "/api/hunt", hunt.enable],
   ["POST", "/api/hunt/off", hunt.disable],
   ["POST", "/api/hunt/run", hunt.runNow],
+
+  // the Flipper (Hypixel SkyBlock flips): read-only suggestions
+  ["GET", "/api/flipper/flips", flipper.flips],
+  ["GET", "/api/flipper/item", flipper.item],
+  ["GET", "/api/flipper/status", flipper.status],
+  ["GET", "/api/flipper/floor", flipper.floor],
+  ["GET", "/api/flipper/watch", flipper.watchList],
+  ["POST", "/api/flipper/watch", flipper.watchToggle],
+  ["POST", "/api/flipper/refresh", flipper.refresh],
 
   // invites and the owner's tools
   ["GET", "/api/invites", invites.listInvites],
@@ -115,8 +126,9 @@ export default {
     }
   },
 
-  // Cron Trigger (wrangler.jsonc): one step of every member's background search.
+  // Cron Triggers (wrangler.jsonc): every minute the Flipper collects data; every 3 minutes one step of the background searches.
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(runAllHunts(env).catch((err) => console.error("scheduled hunt", err && err.message)));
+    if (event.cron === "* * * * *") ctx.waitUntil(collectFlipper(env).catch((err) => console.error("scheduled flipper", err && err.message)));
+    else ctx.waitUntil(runAllHunts(env).catch((err) => console.error("scheduled hunt", err && err.message)));
   },
 };

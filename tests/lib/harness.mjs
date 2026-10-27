@@ -2,6 +2,7 @@
 // Starts fake Torn / Weav3r / FF Scouter servers and a local copy of the Worker with a
 // local database. Nothing here touches your real Cloudflare account, database or email.
 
+import { hypixelRoute } from "./fake-hypixel.mjs";
 import { spawn, spawnSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -32,7 +33,7 @@ export const section = (title) => console.log(`\n${title}`);
 const now = () => Math.floor(Date.now() / 1000);
 // Test control: statuses the fake Torn reports, by player id. Change them with setFakeStatus().
 const statusOverride = {};
-const flags = { attacklogFail: false, weav3rBusy: false, deep: false, typesFail: false, manyCompanies: false, keyLimited: false, combinedFail: false, attacksDenied: false, hotBazaar: false };
+const flags = { attacklogFail: false, weav3rBusy: false, deep: false, typesFail: false, manyCompanies: false, keyLimited: false, combinedFail: false, attacksDenied: false, hotBazaar: false, hypixelDown: false, auctionPageFail: false };
 export async function setFakeFlag(name, on) {
   await fetch(`http://localhost:${FAKE_PORT}/__flag?name=${name}&on=${on ? 1 : 0}`);
 }
@@ -47,6 +48,7 @@ function fakeServer() {
     const send = (obj, status = 200) => { res.statusCode = status; res.setHeader("Content-Type", "application/json"); res.end(JSON.stringify(obj)); };
     const p = u.pathname;
     const key = u.searchParams.get("key") || "";
+    if (hypixelRoute(u, flags, send)) return; // the Flipper's data sources
 
     // Weav3r: three items.
     //   Gold Bar $20m, busy (5 listings changed a minute ago): Alpha has five stacks of 2 at $19.5m, Bravo one at $20.5m.
@@ -252,7 +254,7 @@ function writeConfig() {
   const f = `http://localhost:${FAKE_PORT}`;
   Object.assign(cfg.vars, {
     WEAV3R_API_BASE: `${f}/weav3r`, TORN_V1_API_BASE: `${f}/tornv1`, TORN_API_BASE: `${f}/v2`,
-    FFSCOUTER_API_BASE: `${f}/ff`, BG_SECRET: "test-background-secret", HUNT_BUDGET: "200",
+    FFSCOUTER_API_BASE: `${f}/ff`, FLIPPER_HYPIXEL_BASE: `${f}/hypixel`, FLIPPER_COFL_BASE: `${f}/cofl`, BG_SECRET: "test-background-secret", HUNT_BUDGET: "200",
   });
   fs.writeFileSync(path.join(TMP, "wrangler.jsonc"), JSON.stringify(cfg, null, 2));
 }
